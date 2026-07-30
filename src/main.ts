@@ -1,0 +1,924 @@
+import * as THREE from 'three'
+import { InputManager } from './core/InputManager'
+import { PlayerState } from './player/PlayerState'
+import { FarmGrid, TileType } from './farm/FarmGrid'
+import { MineSystem } from './mine/MineSystem'
+import { DialogueSystem } from './npcs/DialogueSystem'
+import { UIManager } from './ui/UIManager'
+import { CROPS, TOOLS, GAME_CONFIG, MINE_ITEMS, MATERIAL_ITEMS, getItemInfo, TOOL_MAX_DURABILITY } from './data/gameData'
+import { COLORS, getTileTexture, createTexturedPlane, createPlayerModel, createNPCModel, createDogModel, createToolMesh, createItemDropMesh, createStone, createCoinParticle, SeededRNG } from './core/MeshFactory'
+import { sound } from './core/SoundManager'
+
+class Game {
+  private renderer: THREE.WebGLRenderer
+  private scene: THREE.Scene
+  private mineScene: THREE.Scene | null = null
+  private camera: THREE.PerspectiveCamera
+  private input: InputManager
+  private player: PlayerState
+  private farm!: FarmGrid
+  private mine: MineSystem
+  private dialogue: DialogueSystem
+  private ui: UIManager
+  private playerModel: THREE.Group
+  private heldToolMesh: THREE.Group | null = null
+  private npcModel: THREE.Group | null = null
+  private dogModel: THREE.Group | null = null
+  private clock = new THREE.Clock()
+  private inMine = false
+  private actionCooldown = 0
+  private footstepTimer = 0
+  private started = false
+  private camTarget = new THREE.Vector3()
+  private morningBuyerActive = false
+  private morningBuyerPhase: 'walking' | 'counting' | 'leaving' | 'idle' = 'idle'
+  private buyerTimer = 0
+  private binPosition = new THREE.Vector3(2, 0.1, 1)
+  // Tool animation state
+  private toolAnimTimer = 0
+  private toolAnimType: 'none' | 'swing' | 'pour' | 'dig' = 'none'
+  // Dog state
+  private dogTimer = 0
+  private dogBarkTimer = 0
+  private dogState: 'idle' | 'walk' | 'bark' | 'play' = 'idle'
+  private dogTargetPos = new THREE.Vector3()
+  private worldSeed = 0
+  // FPS tracking
+  private fpsFrames = 0
+  private fpsTime = 0
+  private fpsDisplay = 0
+
+  constructor() {
+    this.renderer = new THREE.WebGLRenderer({ antialias: true })
+    this.renderer.setSize(window.innerWidth, window.innerHeight)
+    this.renderer.setClearColor(COLORS.sky)
+    this.renderer.shadowMap.enabled = true
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    document.body.appendChild(this.renderer.domElement)
+
+    this.scene = new THREE.Scene()
+    this.scene.fog = new THREE.Fog(COLORS.sky, 18, 40)
+
+    this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100)
+    this.camera.position.set(8, 12, 14)
+    this.camera.lookAt(8, 0, 6)
+
+    // Wholesome lighting
+    const ambient = new THREE.AmbientLight(0xffeedd, 0.7)
+    this.scene.add(ambient)
+    const sun = new THREE.DirectionalLight(0xfff5e0, 0.9)
+    sun.position.set(15, 20, 10)
+    sun.castShadow = true
+    sun.shadow.mapSize.set(2048, 2048)
+    sun.shadow.camera.left = -25; sun.shadow.camera.right = 25
+    sun.shadow.camera.top = 25; sun.shadow.camera.bottom = -25
+    this.scene.add(sun)
+    const fill = new THREE.DirectionalLight(0xaaccff, 0.3)
+    fill.position.set(-10, 8, -5)
+    this.scene.add(fill)
+
+    this.input = new InputManager()
+    this.player = new PlayerState()
+    this.mine = new MineSystem()
+    this.dialogue = new DialogueSystem()
+    this.ui = new UIManager()
+
+    // Player model
+    this.playerModel = createPlayerModel()
+    this.playerModel.position.set(1, 0, 1)
+    this.playerModel.castShadow = true
+    this.scene.add(this.playerModel)
+
+    // Dog
+    this.dogModel = createDogModel()
+    this.dogModel.position.set(1.5, 0, 1.5)
+    this.dogModel.castShadow = true
+    this.scene.add(this.dogModel)
+
+    window.addEventListener('resize', () => {
+      this.camera.aspect = window.innerWidth / window.innerHeight
+      this.camera.updateProjectionMatrix()
+      this.renderer.setSize(window.innerWidth, window.innerHeight)
+    })
+
+    window.addEventListener('keydown', (e) => {
+      if (!this.started || this.dialogue.active || this.ui.shopOpen || this.morningBuyerActive) return
+      if (e.key >= '1' && e.key <= '8') {
+        this.player.selectedSlot = parseInt(e.key) - 1
+        sound.menuSelect()
+        this.updateHeldVisual()
+      }
+      if (e.key === 'b' || e.key === 'B') this.shipItems()
+    })
+
+    // Start button with seed input
+    const startBtn = document.getElementById('start-btn')!
+    startBtn.addEventListener('click', () => {
+      const seedInput = document.getElementById('world-seed') as HTMLInputElement
+      const seedVal = seedInput?.value.trim()
+      this.worldSeed = seedVal ? parseInt(seedVal, 10) || this.hashString(seedVal) : Date.now()
+
+      sound.init(); sound.startMusic()
+      document.getElementById('start-overlay')!.style.display = 'none'
+      this.started = true
+
+      // Create farm with seed
+      this.farm = new FarmGrid(this.worldSeed)
+      this.scene.add(this.farm.group)
+
+      if (!this.player.load()) { /* defaults */ }
+      else {
+        const sf = localStorage.getItem('till_debt_farm')
+        if (sf) try { this.farm.loadState(JSON.parse(sf)) } catch {}
+      }
+      this.updateHeldVisual()
+    })
+
+    this.loop()
+  }
+
+  private hashString(s: string): number {
+    let h = 0
+    for (let i = 0; i < s.length; i++) { h = ((h << 5) - h + s.charCodeAt(i)) | 0 }
+    return Math.abs(h)
+  }
+
+  private loop = () => {
+    requestAnimationFrame(this.loop)
+    const dt = Math.min(this.clock.getDelta(), 0.05)
+    if (!this.started) { this.renderer.render(this.scene, this.camera); return }
+
+    this.input.update()
+    this.actionCooldown = Math.max(0, this.actionCooldown - dt)
+
+    if (!this.dialogue.active && !this.ui.shopOpen && !this.morningBuyerActive) {
+      this.handleMovement(dt)
+      this.handleActions()
+      this.handleSleep()
+    }
+    if (this.inMine) {
+      this.mine.update(dt)
+      this.collectMineItems()
+      // Update torch position to follow player in mine
+      if (this.mineScene) {
+        const torch = this.mineScene.getObjectByName('torch') as THREE.PointLight | undefined
+        if (torch) {
+          torch.position.set(this.playerModel.position.x, 2.5, this.playerModel.position.z)
+        }
+      }
+    }
+    if (this.morningBuyerActive) this.updateMorningBuyer(dt)
+    this.updateToolAnimation(dt)
+    this.updateDog(dt)
+    this.checkStoryTriggers()
+    this.ui.updateHUD(this.player)
+    this.updateCamera(dt)
+
+    // FPS counter
+    this.fpsFrames++
+    this.fpsTime += dt
+    if (this.fpsTime >= 0.5) {
+      this.fpsDisplay = Math.round(this.fpsFrames / this.fpsTime)
+      this.fpsFrames = 0
+      this.fpsTime = 0
+      const fpsEl = document.getElementById('fps-display')
+      if (fpsEl) fpsEl.textContent = `${this.fpsDisplay} FPS`
+    }
+
+    // Render correct scene
+    this.renderer.render(this.inMine && this.mineScene ? this.mineScene : this.scene, this.camera)
+  }
+
+  private updateCamera(dt: number) {
+    const p = this.playerModel.position
+    let tx: number, tz: number
+    if (this.inMine) {
+      const fl = this.mine.floors[this.mine.currentFloor]
+      const sz = fl?.length || 10
+      tx = sz / 2; tz = sz / 2
+    } else {
+      tx = p.x; tz = p.z
+    }
+    this.camTarget.set(tx + 6, 10, tz + 10)
+    const lerp = 1 - Math.pow(0.005, dt)
+    this.camera.position.lerp(this.camTarget, lerp)
+    this.camera.lookAt(this.camera.position.x - 6, 0, this.camera.position.z - 10)
+  }
+
+  private handleMovement(dt: number) {
+    let dx = 0, dz = 0
+    if (this.input.isDown('KeyW') || this.input.isDown('ArrowUp')) dz -= 1
+    if (this.input.isDown('KeyS') || this.input.isDown('ArrowDown')) dz += 1
+    if (this.input.isDown('KeyA') || this.input.isDown('ArrowLeft')) dx -= 1
+    if (this.input.isDown('KeyD') || this.input.isDown('ArrowRight')) dx += 1
+    if (dx === 0 && dz === 0) return
+
+    const len = Math.sqrt(dx * dx + dz * dz)
+    dx /= len; dz /= len
+    const speed = 3.5 * dt
+    const pos = this.playerModel.position
+    const nx = pos.x + dx * speed
+    const nz = pos.z + dz * speed
+
+    this.playerModel.rotation.y = Math.atan2(dx, dz)
+
+    if (this.inMine) {
+      const fl = this.mine.floors[this.mine.currentFloor]
+      const sz = fl?.length || 10
+      pos.x = Math.max(0.3, Math.min(sz - 0.3, nx))
+      pos.z = Math.max(0.3, Math.min(sz - 0.3, nz))
+    } else {
+      const margin = 0.35
+      const testX = Math.round(nx), curZ = Math.round(pos.z)
+      if (!this.farm.isSolid(testX, curZ) || Math.abs(nx - testX) > margin)
+        pos.x = Math.max(0.2, Math.min(GAME_CONFIG.farmWidth - 0.8, nx))
+      const curX = Math.round(pos.x), testZ = Math.round(nz)
+      if (!this.farm.isSolid(curX, testZ) || Math.abs(nz - testZ) > margin)
+        pos.z = Math.max(0.2, Math.min(GAME_CONFIG.farmHeight - 0.8, nz))
+    }
+
+    this.footstepTimer += dt
+    if (this.footstepTimer > 0.3) { this.footstepTimer = 0; sound.footstep() }
+  }
+
+  private getFacingTile(): { x: number; z: number } {
+    const rot = this.playerModel.rotation.y
+    const fx = Math.sin(rot) * 0.8
+    const fz = Math.cos(rot) * 0.8
+    return {
+      x: Math.round(this.playerModel.position.x + fx),
+      z: Math.round(this.playerModel.position.z + fz)
+    }
+  }
+
+  private handleActions() {
+    if (this.actionCooldown > 0) return
+    const interact = this.input.isJustPressed('KeyE')
+    const space = this.input.isJustPressed('Space')
+
+    if (interact) {
+      if (this.inMine) { this.exitMine(); return }
+      const { x, z } = this.getFacingTile()
+      const ft = this.farm.getTile(x, z)
+      if (!ft) return
+      if (ft.type === TileType.SHOP) { this.openShop(); return }
+      if (ft.type === TileType.MINE) { this.enterMine(); return }
+      if (ft.type === TileType.WELL) { sound.water(); this.actionCooldown = 0.3; return }
+      return
+    }
+
+    if (!space) return
+    if (this.inMine) { this.handleMineAction(); return }
+
+    const { x, z } = this.getFacingTile()
+    const ft = this.farm.getTile(x, z)
+    if (!ft) return
+    if ([TileType.HOUSE, TileType.SHOP, TileType.MINE, TileType.WELL, TileType.WATER, TileType.BIN, TileType.FENCE].includes(ft.type)) return
+
+    const sel = this.player.getSelectedItem()
+    const tier = this.player.toolTiers
+
+    // Check tool durability
+    const checkDurability = (toolId: string): boolean => {
+      if (this.player.getToolDurability(toolId) <= 0) {
+        sound.error()
+        this.dialogue.show('tool_broken')
+        return false
+      }
+      return true
+    }
+
+    if (sel?.id === 'axe') {
+      if (!checkDurability('axe')) return
+      if (ft.type === TileType.TREE || ft.type === TileType.SMALL_TREE || ft.type === TileType.SAPLING) {
+        if (this.player.useStamina(TOOLS.axe.staminaCost - (tier.axe - 1))) {
+          this.farm.chopTree(x, z)
+          this.player.addItem('wood', ft.type === TileType.TREE ? 3 : ft.type === TileType.SMALL_TREE ? 2 : 1)
+          this.player.useToolDurability('axe')
+          this.playToolAnim('swing')
+          this.actionCooldown = 0.5
+        } else sound.error()
+      } else if (ft.type === TileType.STUMP) {
+        if (this.player.useStamina(TOOLS.axe.staminaCost - (tier.axe - 1))) {
+          this.farm.clearDebris(x, z); this.player.addItem('wood', 1)
+          this.player.useToolDurability('axe')
+          this.playToolAnim('swing')
+          this.actionCooldown = 0.4
+        } else sound.error()
+      } else sound.error()
+      return
+    }
+
+    if (sel?.id === 'pickaxe') {
+      if (!checkDurability('pickaxe')) return
+      if (ft.type === TileType.STONE || ft.type === TileType.ROCK) {
+        if (this.player.useStamina(TOOLS.pickaxe.staminaCost - (tier.pickaxe - 1))) {
+          this.farm.breakStone(x, z)
+          this.player.addItem('stone_item', 1 + Math.floor(Math.random() * 2))
+          this.player.useToolDurability('pickaxe')
+          this.playToolAnim('swing')
+          this.actionCooldown = 0.5
+        } else sound.error()
+      } else sound.error()
+      return
+    }
+
+    if (sel?.id === 'hoe') {
+      if (!checkDurability('hoe')) return
+      if (ft.type === TileType.WEED) {
+        if (this.player.useStamina(TOOLS.hoe.staminaCost - (tier.hoe - 1))) {
+          this.farm.clearDebris(x, z)
+          this.player.useToolDurability('hoe')
+          this.playToolAnim('dig')
+          this.actionCooldown = 0.35
+        } else sound.error()
+      } else if (ft.type === TileType.DIRT || ft.type === TileType.GRASS) {
+        if (this.player.useStamina(TOOLS.hoe.staminaCost - (tier.hoe - 1))) {
+          this.farm.till(x, z)
+          this.player.useToolDurability('hoe')
+          this.playToolAnim('dig')
+          this.actionCooldown = 0.35
+        } else sound.error()
+      } else sound.error()
+      return
+    }
+
+    if (sel?.id === 'water') {
+      if (ft.cropId && !ft.watered) {
+        if (this.player.useStamina(TOOLS.water.staminaCost - (tier.water - 1))) {
+          this.farm.water(x, z)
+          this.playToolAnim('pour')
+          this.actionCooldown = 0.4
+        } else sound.error()
+      } else sound.error()
+      return
+    }
+
+    if (sel?.id === 'shovel') {
+      if (!checkDurability('shovel')) return
+      if (ft.type === TileType.WEED || ft.type === TileType.STUMP) {
+        if (this.player.useStamina(TOOLS.shovel.staminaCost - (tier.shovel - 1))) {
+          this.farm.clearDebris(x, z)
+          this.player.useToolDurability('shovel')
+          this.playToolAnim('dig')
+          this.actionCooldown = 0.35
+        } else sound.error()
+      } else sound.error()
+      return
+    }
+
+    if (sel?.id.startsWith('seed_')) {
+      const cropId = sel.id.replace('seed_', '')
+      if (this.farm.plant(x, z, cropId)) {
+        this.player.removeItem(sel.id)
+        this.actionCooldown = 0.25
+      } else sound.error()
+      return
+    }
+
+    // Harvest
+    if (this.farm.isRipe(x, z)) {
+      const cropId = this.farm.harvest(x, z)
+      if (cropId) {
+        this.showHarvestAnim(cropId)
+        this.player.addItem(cropId)
+        this.actionCooldown = 0.3
+      }
+    }
+  }
+
+  // ─── TOOL ANIMATIONS ───
+  private playToolAnim(type: 'swing' | 'pour' | 'dig') {
+    this.toolAnimType = type
+    this.toolAnimTimer = 0
+  }
+
+  private updateToolAnimation(dt: number) {
+    if (this.toolAnimType === 'none') return
+    this.toolAnimTimer += dt
+
+    const rightArm = this.playerModel.getObjectByName('rightArm') as THREE.Group | undefined
+    if (!rightArm) return
+
+    const duration = this.toolAnimType === 'pour' ? 0.6 : 0.35
+    const t = Math.min(this.toolAnimTimer / duration, 1)
+
+    if (this.toolAnimType === 'swing') {
+      // Axe/pickaxe swing arc
+      rightArm.rotation.x = -Math.sin(t * Math.PI) * 1.5
+      rightArm.rotation.z = Math.sin(t * Math.PI) * 0.3
+    } else if (this.toolAnimType === 'pour') {
+      // Watering can tilt forward
+      rightArm.rotation.x = -0.5 - Math.sin(t * Math.PI) * 0.8
+      rightArm.rotation.z = 0
+    } else if (this.toolAnimType === 'dig') {
+      // Hoe/shovel dig motion
+      rightArm.rotation.x = -Math.sin(t * Math.PI) * 1.0
+      rightArm.rotation.z = 0
+    }
+
+    if (t >= 1) {
+      this.toolAnimType = 'none'
+      rightArm.rotation.set(0, 0, 0)
+    }
+  }
+
+  private showHarvestAnim(itemId: string) {
+    // Phase 1: Hold big item above head with both hands
+    const mesh = createItemDropMesh(itemId, true)
+    mesh.position.set(0, 1.5, 0)
+    this.playerModel.add(mesh)
+
+    // Raise both arms
+    const leftArm = this.playerModel.getObjectByName('leftArm') as THREE.Group | undefined
+    const rightArm = this.playerModel.getObjectByName('rightArm') as THREE.Group | undefined
+    if (leftArm) leftArm.rotation.x = -2.5
+    if (rightArm) rightArm.rotation.x = -2.5
+
+    let phase = 0 // 0=hold, 1=throw
+    let t = 0
+    const binPos = this.binPosition.clone()
+
+    const anim = () => {
+      t += 0.025
+      if (phase === 0) {
+        // Hold above head, slight bob
+        mesh.position.y = 1.5 + Math.sin(t * 6) * 0.05
+        mesh.rotation.y += 0.08
+        if (t > 0.8) {
+          // Phase 2: Throw toward bin
+          phase = 1
+          t = 0
+          this.playerModel.remove(mesh)
+          // Get world position for thrown item
+          const worldPos = new THREE.Vector3()
+          this.playerModel.getWorldPosition(worldPos)
+          worldPos.y = 1.5
+          mesh.position.copy(worldPos)
+          this.scene.add(mesh)
+          // Reset arms
+          if (leftArm) leftArm.rotation.x = 0
+          if (rightArm) rightArm.rotation.x = 0
+        }
+        requestAnimationFrame(anim)
+      } else {
+        // Arc toward bin
+        const progress = Math.min(t / 0.5, 1)
+        const startPos = new THREE.Vector3(this.playerModel.position.x, 1.5, this.playerModel.position.z)
+        mesh.position.lerpVectors(startPos, binPos, progress)
+        mesh.position.y += Math.sin(progress * Math.PI) * 1.5 // Arc height
+        mesh.rotation.x += 0.2
+        mesh.rotation.y += 0.15
+        if (progress >= 1) {
+          this.scene.remove(mesh)
+          sound.collect()
+        } else {
+          requestAnimationFrame(anim)
+        }
+      }
+    }
+    anim()
+  }
+
+  private updateHeldVisual() {
+    if (this.heldToolMesh) { this.playerModel.remove(this.heldToolMesh); this.heldToolMesh = null }
+
+    const sel = this.player.getSelectedItem()
+    if (!sel) return
+
+    if (TOOLS[sel.id]) {
+      this.heldToolMesh = createToolMesh(sel.id)
+      const rightArm = this.playerModel.getObjectByName('rightArm') as THREE.Group | undefined
+      if (rightArm) {
+        // Watering can held above head when selected
+        if (sel.id === 'water') {
+          this.heldToolMesh.position.set(0, 0.35, 0.1)
+          this.heldToolMesh.rotation.x = -0.5
+        } else {
+          this.heldToolMesh.position.set(0, -0.15, 0.15)
+          this.heldToolMesh.rotation.x = -0.3
+        }
+        rightArm.add(this.heldToolMesh)
+      }
+    } else {
+      // Items float above head
+      const itemMesh = createItemDropMesh(sel.id)
+      itemMesh.position.set(0, 1.4, 0)
+      itemMesh.scale.set(0.8, 0.8, 0.8)
+      this.playerModel.add(itemMesh)
+      this.heldToolMesh = itemMesh as unknown as THREE.Group
+    }
+  }
+
+  // ─── DOG NPC ───
+  private updateDog(dt: number) {
+    if (!this.dogModel) return
+    this.dogTimer += dt
+    this.dogBarkTimer += dt
+
+    const tail = this.dogModel.getObjectByName('tail') as THREE.Group | undefined
+
+    switch (this.dogState) {
+      case 'idle':
+        // Wag tail slowly
+        if (tail) tail.rotation.y = Math.sin(this.dogTimer * 3) * 0.3
+        // Random bark
+        if (this.dogBarkTimer > 8 + Math.random() * 15) {
+          this.dogState = 'bark'
+          this.dogTimer = 0
+          this.dogBarkTimer = 0
+          sound.menuSelect() // bark placeholder
+        }
+        // Random walk
+        if (this.dogTimer > 3 + Math.random() * 5) {
+          this.dogState = 'walk'
+          this.dogTimer = 0
+          // Pick random spot near house
+          this.dogTargetPos.set(
+            0.5 + (Math.random() - 0.5) * 4,
+            0,
+            0.5 + (Math.random() - 0.5) * 4
+          )
+        }
+        break
+
+      case 'walk':
+        if (tail) tail.rotation.y = Math.sin(this.dogTimer * 8) * 0.5
+        const dir = new THREE.Vector3().subVectors(this.dogTargetPos, this.dogModel.position)
+        dir.y = 0
+        const dist = dir.length()
+        if (dist > 0.2) {
+          dir.normalize()
+          this.dogModel.position.add(dir.multiplyScalar(1.5 * dt))
+          this.dogModel.rotation.y = Math.atan2(dir.x, dir.z)
+        } else {
+          this.dogState = Math.random() > 0.5 ? 'play' : 'idle'
+          this.dogTimer = 0
+        }
+        break
+
+      case 'bark':
+        if (tail) tail.rotation.y = Math.sin(this.dogTimer * 12) * 0.6
+        // Head bob
+        this.dogModel.children[1].position.y = 0.35 + Math.sin(this.dogTimer * 15) * 0.03
+        if (this.dogTimer > 0.5) {
+          this.dogState = 'idle'
+          this.dogTimer = 0
+          this.dogModel.children[1].position.y = 0.35
+        }
+        break
+
+      case 'play':
+        if (tail) tail.rotation.y = Math.sin(this.dogTimer * 15) * 0.8
+        // Spin in circle
+        this.dogModel.rotation.y += 3 * dt
+        if (this.dogTimer > 1.5) {
+          this.dogState = 'idle'
+          this.dogTimer = 0
+        }
+        break
+    }
+  }
+
+  // ─── SHIPPING BIN ───
+  private shipItems() {
+    const sel = this.player.getSelectedItem()
+    if (!sel || sel.count <= 0) { sound.error(); return }
+    const info = getItemInfo(sel.id)
+    if (!info || info.sellPrice <= 0 || info.type === 'Tool') { sound.error(); return }
+
+    const count = sel.count
+    this.player.removeItem(sel.id, count)
+    this.farm.addToBin(sel.id, count)
+    this.updateHeldVisual()
+  }
+
+  // ─── MORNING BUYER NPC ───
+  private triggerMorningBuyer() {
+    const items = this.farm.clearBin()
+    if (items.length === 0) return
+
+    this.morningBuyerActive = true
+    this.morningBuyerPhase = 'walking'
+    this.buyerTimer = 0
+
+    this.npcModel = createNPCModel()
+    this.npcModel.position.set(0, 0, -2)
+    this.npcModel.rotation.y = Math.PI
+    this.scene.add(this.npcModel)
+
+    let totalGold = 0
+    const lines: Array<{name:string; count:number; price:number; total:number}> = []
+    for (const item of items) {
+      const info = getItemInfo(item.id)
+      const price = info?.sellPrice || 0
+      const lineTotal = price * item.count
+      totalGold += lineTotal
+      lines.push({ name: info?.name || item.id, count: item.count, price, total: lineTotal })
+    }
+
+    ;(this as any)._buyerLines = lines
+    ;(this as any)._buyerTotal = totalGold
+  }
+
+  private updateMorningBuyer(dt: number) {
+    this.buyerTimer += dt
+    const npc = this.npcModel
+    if (!npc) return
+
+    if (this.morningBuyerPhase === 'walking') {
+      const dir = new THREE.Vector3().subVectors(this.binPosition, npc.position).normalize()
+      const dist = npc.position.distanceTo(this.binPosition)
+      if (dist > 0.5) {
+        npc.position.add(dir.multiplyScalar(2.5 * dt))
+        npc.rotation.y = Math.atan2(dir.x, dir.z)
+      } else {
+        this.morningBuyerPhase = 'counting'
+        this.buyerTimer = 0
+        this.showPaymentOverlay()
+      }
+    } else if (this.morningBuyerPhase === 'counting') {
+      if (this.buyerTimer > 3) {
+        this.morningBuyerPhase = 'leaving'
+        this.buyerTimer = 0
+        document.getElementById('payment-overlay')!.style.display = 'none'
+      }
+    } else if (this.morningBuyerPhase === 'leaving') {
+      const exitPos = new THREE.Vector3(0, 0, -3)
+      const dir = new THREE.Vector3().subVectors(exitPos, npc.position).normalize()
+      const dist = npc.position.distanceTo(exitPos)
+      if (dist > 0.3) {
+        npc.position.add(dir.multiplyScalar(2.5 * dt))
+        npc.rotation.y = Math.atan2(dir.x, dir.z)
+      } else {
+        this.scene.remove(npc)
+        this.npcModel = null
+        this.morningBuyerActive = false
+        this.morningBuyerPhase = 'idle'
+      }
+    }
+  }
+
+  private showPaymentOverlay() {
+    const lines = (this as any)._buyerLines as Array<{name:string; count:number; price:number; total:number}>
+    const total = (this as any)._buyerTotal as number
+
+    const overlay = document.getElementById('payment-overlay')!
+    const linesEl = document.getElementById('pay-lines')!
+    const totalEl = document.getElementById('pay-total')!
+
+    linesEl.innerHTML = ''
+    lines.forEach((line, i) => {
+      const div = document.createElement('div')
+      div.className = 'pay-line'
+      div.innerHTML = `<span>${line.name} x${line.count}</span><span class="pay-amt">+${line.total}g</span>`
+      div.style.opacity = '0'; div.style.transform = 'translateX(-20px)'; div.style.transition = 'all 0.4s ease-out'
+      linesEl.appendChild(div)
+      setTimeout(() => {
+        div.style.opacity = '1'; div.style.transform = 'translateX(0)'
+        sound.menuSelect()
+        // Spawn coin particles for each line
+        this.spawnCoinParticles(3)
+      }, i * 500)
+    })
+
+    totalEl.textContent = ''
+    setTimeout(() => {
+      let current = 0
+      const step = Math.max(1, Math.floor(total / 25))
+      const countInterval = setInterval(() => {
+        current = Math.min(current + step, total)
+        totalEl.textContent = `💰 ${current}g`
+        totalEl.style.transform = `scale(${1 + Math.sin(current * 0.1) * 0.05})`
+        if (current >= total) {
+          clearInterval(countInterval)
+          this.player.gold += total
+          totalEl.style.transform = 'scale(1.2)'
+          setTimeout(() => { totalEl.style.transform = 'scale(1)' }, 200)
+          sound.harvest()
+          this.spawnCoinParticles(15)
+        }
+      }, 40)
+    }, lines.length * 500 + 300)
+
+    overlay.style.display = 'block'
+  }
+
+  private spawnCoinParticles(count: number) {
+    for (let i = 0; i < count; i++) {
+      const coin = createCoinParticle()
+      const startX = this.binPosition.x + (Math.random() - 0.5) * 2
+      const startZ = this.binPosition.z + (Math.random() - 0.5) * 2
+      coin.position.set(startX, 1.5, startZ)
+      this.scene.add(coin)
+      const vel = new THREE.Vector3((Math.random() - 0.5) * 3, 3 + Math.random() * 2, (Math.random() - 0.5) * 3)
+      let t = 0
+      const anim = () => {
+        t += 0.02
+        vel.y -= 9.8 * 0.02
+        coin.position.add(vel.clone().multiplyScalar(0.02))
+        coin.rotation.x += 0.15
+        coin.rotation.z += 0.1
+        if (coin.position.y < 0 || t > 2) {
+          this.scene.remove(coin)
+        } else {
+          requestAnimationFrame(anim)
+        }
+      }
+      setTimeout(() => requestAnimationFrame(anim), i * 50)
+    }
+  }
+
+  // ─── MINE SCENE TRANSITION ───
+  private enterMine() {
+    this.inMine = true
+    this.mine.enter()
+    this.playerModel.position.set(0.5, 0, 0.5)
+
+    this.mineScene = new THREE.Scene()
+    this.mineScene.fog = new THREE.Fog(0x1a1510, 4, 14)
+    this.mineScene.background = new THREE.Color(0x0e0a08)
+
+    // Brighter ambient so player/walls are always visible
+    this.mineScene.add(new THREE.AmbientLight(0x887766, 0.9))
+    // Player-following torch (updated each frame)
+    const torch = new THREE.PointLight(0xffaa44, 1.5, 12)
+    torch.position.set(0.5, 2.5, 0.5)
+    torch.name = 'torch'
+    this.mineScene.add(torch)
+    // Extra fill light from above
+    const fillLight = new THREE.PointLight(0x665544, 0.5, 20)
+    fillLight.position.set(sz / 2, 3, sz / 2)
+    this.mineScene.add(fillLight)
+
+    this.mineScene.add(this.playerModel)
+    this.mineScene.add(this.mine.group)
+
+    const fl = this.mine.floors[this.mine.currentFloor]
+    const sz = fl?.length || 10
+
+    // Textured floor
+    const floorTex = getTileTexture('mineFloor')
+    const floorGeo = new THREE.PlaneGeometry(sz + 2, sz + 2)
+    floorGeo.rotateX(-Math.PI / 2)
+    const floorMesh = new THREE.Mesh(floorGeo, new THREE.MeshLambertMaterial({ map: floorTex }))
+    floorMesh.position.set(sz / 2 - 0.5, -0.01, sz / 2 - 0.5)
+    floorMesh.receiveShadow = true
+    this.mineScene.add(floorMesh)
+
+    // Textured walls
+    const wallTex = getTileTexture('mineWall')
+    const wallMat = new THREE.MeshLambertMaterial({ map: wallTex })
+    for (let x = -1; x <= sz; x++) {
+      for (const z of [-1, sz]) {
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(1, 3.5, 1), wallMat)
+        wall.position.set(x, 1.75, z); wall.castShadow = true
+        this.mineScene.add(wall)
+      }
+    }
+    for (let z = 0; z < sz; z++) {
+      for (const x of [-1, sz]) {
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(1, 3.5, 1), wallMat)
+        wall.position.set(x, 1.75, z); wall.castShadow = true
+        this.mineScene.add(wall)
+      }
+    }
+
+    // Textured ceiling
+    const ceilGeo = new THREE.PlaneGeometry(sz + 2, sz + 2)
+    ceilGeo.rotateX(Math.PI / 2)
+    const ceiling = new THREE.Mesh(ceilGeo, new THREE.MeshLambertMaterial({ map: wallTex }))
+    ceiling.position.set(sz / 2 - 0.5, 3.5, sz / 2 - 0.5)
+    this.mineScene.add(ceiling)
+
+    // Scatter stone obstacles in mine
+    const mineRng = new SeededRNG(this.mine.currentFloor * 1337)
+    for (let i = 0; i < 4 + this.mine.currentFloor * 2; i++) {
+      const sx = mineRng.range(0, sz - 1)
+      const sz2 = mineRng.range(0, sz - 1)
+      const stone = createStone(mineRng.int(0, 1))
+      stone.position.set(sx, 0, sz2)
+      stone.scale.set(0.7, 0.7, 0.7)
+      this.mineScene.add(stone)
+    }
+
+    // Wall torches (point lights) for atmosphere
+    const torchPositions = [[0, 2.5, 0], [sz - 1, 2.5, 0], [0, 2.5, sz - 1], [sz - 1, 2.5, sz - 1]]
+    for (const [tx, ty, tz] of torchPositions) {
+      const tl = new THREE.PointLight(0xff8833, 0.6, 6)
+      tl.position.set(tx, ty, tz)
+      this.mineScene.add(tl)
+      // Torch mesh
+      const torchMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.3, 0.08), new THREE.MeshLambertMaterial({ color: COLORS.wood }))
+      torchMesh.position.set(tx, ty - 0.3, tz)
+      this.mineScene.add(torchMesh)
+      const flame = new THREE.Mesh(new THREE.SphereGeometry(0.06, 4, 4), new THREE.MeshBasicMaterial({ color: 0xffaa33 }))
+      flame.position.set(tx, ty - 0.1, tz)
+      this.mineScene.add(flame)
+    }
+
+    sound.menuOpen()
+  }
+
+  private exitMine() {
+    const result = this.mine.exit()
+    this.inMine = false
+
+    // Move player back to farm scene
+    if (this.mineScene) {
+      this.mineScene.remove(this.playerModel)
+      this.mineScene.remove(this.mine.group)
+      this.mineScene = null
+    }
+    this.scene.add(this.playerModel)
+
+    this.playerModel.position.set(0.5, 0, GAME_CONFIG.farmHeight - 0.5)
+    for (const [id, count] of Object.entries(result.items)) this.player.addItem(id, count)
+    sound.menuClose()
+  }
+
+  private handleMineAction() {
+    const sel = this.player.getSelectedItem()
+    if (sel?.id !== 'shovel' && sel?.id !== 'pickaxe') { sound.error(); return }
+    if (sel && this.player.getToolDurability(sel.id) <= 0) { sound.error(); return }
+
+    const { x, z } = this.getFacingTile()
+    const result = this.mine.dig(x, z, this.player.toolTiers[sel?.id || 'pickaxe'] || 1)
+    if (result.blocked) { sound.error(); return }
+    if (result.success) {
+      const toolId = sel?.id || 'pickaxe'
+      this.player.useStamina(TOOLS[toolId]?.staminaCost || 5)
+      this.player.useToolDurability(toolId)
+      this.playToolAnim('dig')
+      this.actionCooldown = 0.3
+      if (result.foundLadder && this.mine.currentFloor < GAME_CONFIG.mineFloors - 1) this.mine.descend()
+      if (this.mine.digsLeft <= 0) this.exitMine()
+    }
+  }
+
+  private collectMineItems() {
+    const items = this.mine.collectNearby(this.playerModel.position.x, this.playerModel.position.z, 0.8)
+    for (const id of items) this.player.addItem(id)
+  }
+
+  // ─── SLEEP ───
+  private handleSleep() {
+    if (!this.input.isJustPressed('Enter')) return
+    const { x, z } = this.getFacingTile()
+    const ft = this.farm.getTile(x, z)
+    if (ft?.type !== TileType.HOUSE) return
+    sound.sleep()
+    this.player.advanceDay()
+    const spoiled = this.farm.advanceDay()
+    this.saveGame()
+
+    setTimeout(() => this.triggerMorningBuyer(), 500)
+
+    if (spoiled.length > 0) { this.dialogue.show('spoil_notice'); return }
+    if (this.player.debt <= 0 && !this.player.debtPaid) {
+      this.player.debtPaid = true
+      this.dialogue.show('win', a => { if (a === 'reset') this.player.reset() })
+    } else if (this.player.day > GAME_CONFIG.debtDeadline && this.player.debt > 0) {
+      this.dialogue.show('lose', a => { if (a === 'reset') this.player.reset() })
+    }
+  }
+
+  private checkStoryTriggers() {
+    if (!this.started) return
+    if (!this.player.introSeen) { this.player.introSeen = true; this.dialogue.show('intro_1'); return }
+    if (!this.player.grimesFirstSeen && this.player.day >= 2) { this.player.grimesFirstSeen = true; this.dialogue.show('grimes_first'); return }
+    if (this.player.grimesFirstSeen && !this.player.debtPaid && this.player.day % 5 === 0 && !this.dialogue.active && !this.morningBuyerActive) {
+      this.dialogue.show('grimes_visit', action => {
+        if (action === 'pay_full' && this.player.gold >= this.player.debt) { this.player.gold -= this.player.debt; this.player.debt = 0; this.dialogue.show('grimes_paid') }
+        else if (action === 'pay_partial' && this.player.gold >= 500) { this.player.gold -= 500; this.player.debt -= 500; this.dialogue.show('grimes_partial') }
+      })
+    }
+  }
+
+  private openShop() {
+    this.ui.openShop(this.player, (action, id) => {
+      if (action === 'buy_seed') {
+        const crop = CROPS[id]
+        if (crop && this.player.gold >= crop.seedPrice) { this.player.gold -= crop.seedPrice; this.player.addItem(`seed_${id}`); sound.menuSelect() }
+        else sound.error()
+      } else if (action === 'upgrade_tool') {
+        const tool = TOOLS[id]; const tier = this.player.toolTiers[id] || 1; const cost = tool.upgradeCost * tier
+        if (tier < 3 && this.player.gold >= cost) { this.player.gold -= cost; this.player.toolTiers[id] = tier + 1; sound.harvest() }
+        else sound.error()
+      } else if (action === 'repair_tool') {
+        const cost = this.player.repairTool(id)
+        if (cost > 0 && this.player.gold >= cost) { this.player.gold -= cost; sound.harvest() }
+        else sound.error()
+      }
+      this.ui.updateHUD(this.player)
+      this.updateHeldVisual()
+    })
+  }
+
+  private saveGame() {
+    this.player.save()
+    localStorage.setItem('till_debt_farm', JSON.stringify(this.farm.saveState()))
+  }
+}
+
+new Game()
