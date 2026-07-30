@@ -1,6 +1,8 @@
 # Till Debt Do Us Part
 
-A compact Harvest Moon-style life-sim that runs fully in the browser with WebGL (Three.js).
+![Till Debt Do Us Part](og-image.png)
+
+A tiny Harvest Moon-style farming sim in the browser. Clear your rundown farm, plant crops, dig the mine, upgrade your tools… and pay back the pesky guy who wants his money.
 
 ## 🎮 [Play Now](https://sc0d3r.github.io/till-debt-do-us-part/)
 
