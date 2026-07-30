@@ -1,5 +1,5 @@
 import { PlayerState } from '../player/PlayerState'
-import { CROPS, TOOLS, MINE_ITEMS, MATERIAL_ITEMS, getItemInfo, TOOL_MAX_DURABILITY } from '../data/gameData'
+import { CROPS, TOOLS, MINE_ITEMS, MATERIAL_ITEMS, getItemInfo, getItemTexture, TOOL_MAX_DURABILITY } from '../data/gameData'
 import { sound } from '../core/SoundManager'
 
 const ITEM_COLORS: Record<string, string> = {
@@ -15,6 +15,14 @@ const ITEM_COLORS: Record<string, string> = {
 
 const TOOL_EMOJIS: Record<string, string> = {
   hoe: '⛏️', water: '💧', pickaxe: '🪨', axe: '🪓', shovel: '🥄',
+}
+
+const TOOL_VISUALS: Record<string, { label: string; bg: string; border: string }> = {
+  hoe:     { label: 'HOE',  bg: '#8b6914', border: '#c8a030' },
+  water:   { label: 'H₂O',  bg: '#2266aa', border: '#44aadd' },
+  pickaxe: { label: 'PICK', bg: '#666666', border: '#999999' },
+  axe:     { label: 'AXE',  bg: '#8b4513', border: '#c06030' },
+  shovel:  { label: 'DIG',  bg: '#7a6030', border: '#aa8844' },
 }
 
 export class UIManager {
@@ -49,7 +57,13 @@ export class UIManager {
       const dur = player.getToolDurability(sel.id)
       const durPct = Math.round((dur / TOOL_MAX_DURABILITY) * 100)
       const color = durPct > 50 ? '#4caf50' : durPct > 20 ? '#f39c12' : '#e74c3c'
-      durEl.innerHTML = `<span style="color:${color}">🔧${durPct}%</span>`
+      let html = `<span style="color:${color}">🔧${durPct}%</span>`
+      if (sel.id === 'water') {
+        const wPct = Math.round((player.waterLevel / player.maxWater) * 100)
+        const wColor = wPct > 50 ? '#4488cc' : wPct > 20 ? '#f39c12' : '#e74c3c'
+        html += ` <span style="color:${wColor}">💧${player.waterLevel}/${player.maxWater}</span>`
+      }
+      durEl.innerHTML = html
     } else {
       durEl.textContent = ''
     }
@@ -75,30 +89,39 @@ export class UIManager {
         const isTool = !!TOOLS[item.id]
 
         if (isTool) {
-          // Tool: show emoji icon + durability bar
+          const tv = TOOL_VISUALS[item.id]
           const icon = document.createElement('div')
           icon.className = 'slot-icon'
-          icon.style.display = 'flex'
-          icon.style.alignItems = 'center'
-          icon.style.justifyContent = 'center'
-          icon.style.fontSize = '22px'
-          icon.style.width = '36px'
-          icon.style.height = '36px'
-          icon.textContent = TOOL_EMOJIS[item.id] || '🔧'
+          icon.style.cssText = `display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;width:48px;height:48px;background:${tv?.bg || '#444'};border:2px solid ${tv?.border || '#666'};border-radius:6px;color:#fff;text-shadow:1px 1px 0 #000;letter-spacing:1px`
+          icon.textContent = tv?.label || item.id.toUpperCase().slice(0,4)
           slot.appendChild(icon)
 
-          // Durability bar at bottom of slot
           const dur = player.getToolDurability(item.id)
           const durPct = Math.round((dur / TOOL_MAX_DURABILITY) * 100)
           const durBar = document.createElement('div')
           durBar.className = 'inv-dur-bar'
-          durBar.style.cssText = `position:absolute;bottom:2px;left:3px;right:3px;height:4px;background:#333;border-radius:2px;overflow:hidden`
+          durBar.style.cssText = 'position:absolute;bottom:2px;left:3px;right:3px;height:4px;background:#333;border-radius:2px;overflow:hidden'
           const durFill = document.createElement('div')
           durFill.style.cssText = `height:100%;width:${durPct}%;background:${durPct > 50 ? '#4caf50' : durPct > 20 ? '#f39c12' : '#e74c3c'};border-radius:2px;transition:width 0.2s`
           durBar.appendChild(durFill)
           slot.appendChild(durBar)
 
-          // Tier indicator
+          const durText = document.createElement('span')
+          durText.className = 'inv-dur'
+          durText.textContent = `${dur}`
+          durText.style.cssText = 'position:absolute;top:1px;left:2px;font-size:6px;color:#ccc;text-shadow:1px 1px 0 #000'
+          slot.appendChild(durText)
+
+          if (item.id === 'water') {
+            const wPct = Math.round((player.waterLevel / player.maxWater) * 100)
+            const wBar = document.createElement('div')
+            wBar.style.cssText = 'position:absolute;bottom:7px;left:3px;right:3px;height:3px;background:#224;border-radius:2px;overflow:hidden'
+            const wFill = document.createElement('div')
+            wFill.style.cssText = `height:100%;width:${wPct}%;background:${wPct > 50 ? '#4488cc' : wPct > 20 ? '#f39c12' : '#e74c3c'};border-radius:2px`
+            wBar.appendChild(wFill)
+            slot.appendChild(wBar)
+          }
+
           const tier = player.toolTiers[item.id] || 1
           if (tier > 1) {
             const tierEl = document.createElement('span')
@@ -108,16 +131,24 @@ export class UIManager {
             slot.appendChild(tierEl)
           }
         } else {
-          // Non-tool: colored icon + count
-          const color = ITEM_COLORS[item.id] || '#888'
-          const icon = document.createElement('div')
-          icon.className = 'slot-icon'
-          icon.style.background = color
-          icon.style.width = '34px'
-          icon.style.height = '34px'
-          icon.style.borderRadius = item.id.startsWith('gem_') ? '50%' : '4px'
-          icon.style.boxShadow = 'inset 0 -2px 4px rgba(0,0,0,0.3), 0 1px 2px rgba(255,255,255,0.1)'
-          slot.appendChild(icon)
+          const texPath = getItemTexture(item.id)
+          if (texPath) {
+            const img = document.createElement('img')
+            img.src = texPath
+            img.className = 'slot-icon'
+            img.style.cssText = 'width:48px;height:48px;object-fit:contain;image-rendering:pixelated;border-radius:6px'
+            img.draggable = false
+            slot.appendChild(img)
+          } else {
+            const info = getItemInfo(item.id)
+            const col = ITEM_COLORS[item.id] || '#555'
+            const label = (info?.name || item.id).slice(0, 4).toUpperCase()
+            const icon = document.createElement('div')
+            icon.className = 'slot-icon'
+            icon.style.cssText = `display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;width:48px;height:48px;background:${col};border:2px solid rgba(255,255,255,0.2);border-radius:6px;color:#fff;text-shadow:1px 1px 0 #000`
+            icon.textContent = label
+            slot.appendChild(icon)
+          }
 
           const countEl = document.createElement('span')
           countEl.className = 'inv-count'

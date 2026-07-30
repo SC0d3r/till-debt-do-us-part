@@ -56,6 +56,11 @@ const DIALOGUES: Record<string, DialogueEntry> = {
     text: "This tool is worn out and can't be used anymore! Visit the shop to repair it, or buy a replacement.",
     choices: [{ label: 'Got it.', action: 'close' }],
   },
+  no_water: {
+    speaker: '💧 Empty!',
+    text: "Your watering can is empty! Go to the well and press E to refill it.",
+    choices: [{ label: 'OK', action: 'close' }],
+  },
 }
 
 export class DialogueSystem {

@@ -34,6 +34,7 @@ class Game {
   private morningBuyerPhase: 'walking' | 'counting' | 'leaving' | 'idle' = 'idle'
   private buyerTimer = 0
   private binPosition = new THREE.Vector3(2, 0.1, 1)
+  private binArrowTimer = 0
   // Tool animation state
   private toolAnimTimer = 0
   private toolAnimType: 'none' | 'swing' | 'pour' | 'dig' = 'none'
@@ -165,12 +166,21 @@ class Game {
         if (torch) {
           torch.position.set(this.playerModel.position.x, 2.5, this.playerModel.position.z)
         }
+        const pglow = this.mineScene.getObjectByName('playerGlow') as THREE.PointLight | undefined
+        if (pglow) {
+          pglow.position.set(this.playerModel.position.x, 1.5, this.playerModel.position.z)
+        }
       }
     }
     if (this.morningBuyerActive) this.updateMorningBuyer(dt)
     this.updateToolAnimation(dt)
     this.updateDog(dt)
     this.checkStoryTriggers()
+    this.binArrowTimer += dt
+    if (this.farm.binGroup) {
+      const arrow = this.farm.binGroup.getObjectByName('binArrow')
+      if (arrow) arrow.position.y = 2.5 + Math.sin(this.binArrowTimer * 3) * 0.15
+    }
     this.ui.updateHUD(this.player)
     this.updateCamera(dt)
 
@@ -263,7 +273,7 @@ class Game {
       if (!ft) return
       if (ft.type === TileType.SHOP) { this.openShop(); return }
       if (ft.type === TileType.MINE) { this.enterMine(); return }
-      if (ft.type === TileType.WELL) { sound.water(); this.actionCooldown = 0.3; return }
+      if (ft.type === TileType.WELL) { this.player.refillWater(); sound.water(); this.actionCooldown = 0.3; return }
       return
     }
 
@@ -344,8 +354,10 @@ class Game {
     }
 
     if (sel?.id === 'water') {
+      if (this.player.waterLevel <= 0) { this.dialogue.show('no_water'); sound.error(); return }
       if (ft.cropId && !ft.watered) {
         if (this.player.useStamina(TOOLS.water.staminaCost - (tier.water - 1))) {
+          this.player.useWater()
           this.farm.water(x, z)
           this.playToolAnim('pour')
           this.actionCooldown = 0.4
@@ -368,6 +380,10 @@ class Game {
     }
 
     if (sel?.id.startsWith('seed_')) {
+      if (ft.type !== TileType.TILLED && ft.type !== TileType.WATERED) {
+        sound.error()
+        return
+      }
       const cropId = sel.id.replace('seed_', '')
       if (this.farm.plant(x, z, cropId)) {
         this.player.removeItem(sel.id)
@@ -398,28 +414,56 @@ class Game {
     this.toolAnimTimer += dt
 
     const rightArm = this.playerModel.getObjectByName('rightArm') as THREE.Group | undefined
+    const leftArm = this.playerModel.getObjectByName('leftArm') as THREE.Group | undefined
     if (!rightArm) return
 
     const duration = this.toolAnimType === 'pour' ? 0.6 : 0.35
     const t = Math.min(this.toolAnimTimer / duration, 1)
+    const sel = this.player.getSelectedItem()
 
     if (this.toolAnimType === 'swing') {
-      // Axe/pickaxe swing arc
-      rightArm.rotation.x = -Math.sin(t * Math.PI) * 1.5
-      rightArm.rotation.z = Math.sin(t * Math.PI) * 0.3
+      // Axe/pickaxe: big overhead swing arc
+      const swingAngle = Math.sin(t * Math.PI)
+      rightArm.rotation.x = -swingAngle * 2.2
+      rightArm.rotation.z = swingAngle * 0.4
+      if (leftArm) { leftArm.rotation.x = -swingAngle * 0.8; leftArm.rotation.z = -swingAngle * 0.2 }
+      // Tool mesh wobbles during swing
+      if (this.heldToolMesh) {
+        this.heldToolMesh.rotation.x = -0.3 - swingAngle * 0.5
+      }
     } else if (this.toolAnimType === 'pour') {
-      // Watering can tilt forward
-      rightArm.rotation.x = -0.5 - Math.sin(t * Math.PI) * 0.8
-      rightArm.rotation.z = 0
+      // Watering can: tilt forward and pour
+      const pourT = Math.sin(t * Math.PI)
+      rightArm.rotation.x = -0.8 - pourT * 1.0
+      rightArm.rotation.z = pourT * 0.3
+      if (this.heldToolMesh) {
+        this.heldToolMesh.rotation.x = -0.5 - pourT * 0.8
+      }
     } else if (this.toolAnimType === 'dig') {
-      // Hoe/shovel dig motion
-      rightArm.rotation.x = -Math.sin(t * Math.PI) * 1.0
+      // Hoe/shovel: downward digging motion
+      const digT = Math.sin(t * Math.PI)
+      rightArm.rotation.x = -digT * 1.4
       rightArm.rotation.z = 0
+      if (leftArm) { leftArm.rotation.x = -digT * 0.5 }
+      if (this.heldToolMesh) {
+        this.heldToolMesh.rotation.x = -0.3 - digT * 0.6
+      }
     }
 
     if (t >= 1) {
       this.toolAnimType = 'none'
       rightArm.rotation.set(0, 0, 0)
+      if (leftArm) leftArm.rotation.set(0, 0, 0)
+      // Reset tool mesh to held position
+      if (this.heldToolMesh && sel) {
+        if (sel.id === 'water') {
+          this.heldToolMesh.position.set(0, 0.35, 0.1)
+          this.heldToolMesh.rotation.x = -0.5
+        } else {
+          this.heldToolMesh.position.set(0, -0.15, 0.15)
+          this.heldToolMesh.rotation.x = -0.3
+        }
+      }
     }
   }
 
@@ -736,62 +780,41 @@ class Game {
     this.playerModel.position.set(0.5, 0, 0.5)
 
     this.mineScene = new THREE.Scene()
-    this.mineScene.fog = new THREE.Fog(0x1a1510, 4, 14)
-    this.mineScene.background = new THREE.Color(0x0e0a08)
-
-    // Brighter ambient so player/walls are always visible
-    this.mineScene.add(new THREE.AmbientLight(0x887766, 0.9))
-    // Player-following torch (updated each frame)
-    const torch = new THREE.PointLight(0xffaa44, 1.5, 12)
-    torch.position.set(0.5, 2.5, 0.5)
-    torch.name = 'torch'
-    this.mineScene.add(torch)
-    // Extra fill light from above
-    const fillLight = new THREE.PointLight(0x665544, 0.5, 20)
-    fillLight.position.set(sz / 2, 3, sz / 2)
-    this.mineScene.add(fillLight)
-
-    this.mineScene.add(this.playerModel)
-    this.mineScene.add(this.mine.group)
+    this.mineScene.fog = new THREE.Fog(0x3a3028, 10, 30)
+    this.mineScene.background = new THREE.Color(0x2a2018)
 
     const fl = this.mine.floors[this.mine.currentFloor]
     const sz = fl?.length || 10
 
-    // Textured floor
+    this.mineScene.add(new THREE.AmbientLight(0xccbbaa, 1.5))
+    const torch = new THREE.PointLight(0xffcc66, 2.5, 20)
+    torch.position.set(0.5, 3, 0.5)
+    torch.name = 'torch'
+    this.mineScene.add(torch)
+    const fillLight = new THREE.PointLight(0xaa9988, 1.2, 30)
+    fillLight.position.set(sz / 2, 5, sz / 2)
+    this.mineScene.add(fillLight)
+    const playerGlow = new THREE.PointLight(0xffeedd, 1.0, 8)
+    playerGlow.position.set(0.5, 1.5, 0.5)
+    playerGlow.name = 'playerGlow'
+    this.mineScene.add(playerGlow)
+    const overheadLight = new THREE.DirectionalLight(0xffeebb, 0.6)
+    overheadLight.position.set(sz / 2, 8, sz / 2)
+    this.mineScene.add(overheadLight)
+
+    this.mineScene.add(this.playerModel)
+    this.mineScene.add(this.mine.group)
+
     const floorTex = getTileTexture('mineFloor')
-    const floorGeo = new THREE.PlaneGeometry(sz + 2, sz + 2)
+    floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping
+    floorTex.repeat.set(3, 3)
+    const floorGeo = new THREE.PlaneGeometry(sz + 8, sz + 8)
     floorGeo.rotateX(-Math.PI / 2)
     const floorMesh = new THREE.Mesh(floorGeo, new THREE.MeshLambertMaterial({ map: floorTex }))
     floorMesh.position.set(sz / 2 - 0.5, -0.01, sz / 2 - 0.5)
     floorMesh.receiveShadow = true
     this.mineScene.add(floorMesh)
 
-    // Textured walls
-    const wallTex = getTileTexture('mineWall')
-    const wallMat = new THREE.MeshLambertMaterial({ map: wallTex })
-    for (let x = -1; x <= sz; x++) {
-      for (const z of [-1, sz]) {
-        const wall = new THREE.Mesh(new THREE.BoxGeometry(1, 3.5, 1), wallMat)
-        wall.position.set(x, 1.75, z); wall.castShadow = true
-        this.mineScene.add(wall)
-      }
-    }
-    for (let z = 0; z < sz; z++) {
-      for (const x of [-1, sz]) {
-        const wall = new THREE.Mesh(new THREE.BoxGeometry(1, 3.5, 1), wallMat)
-        wall.position.set(x, 1.75, z); wall.castShadow = true
-        this.mineScene.add(wall)
-      }
-    }
-
-    // Textured ceiling
-    const ceilGeo = new THREE.PlaneGeometry(sz + 2, sz + 2)
-    ceilGeo.rotateX(Math.PI / 2)
-    const ceiling = new THREE.Mesh(ceilGeo, new THREE.MeshLambertMaterial({ map: wallTex }))
-    ceiling.position.set(sz / 2 - 0.5, 3.5, sz / 2 - 0.5)
-    this.mineScene.add(ceiling)
-
-    // Scatter stone obstacles in mine
     const mineRng = new SeededRNG(this.mine.currentFloor * 1337)
     for (let i = 0; i < 4 + this.mine.currentFloor * 2; i++) {
       const sx = mineRng.range(0, sz - 1)
@@ -802,18 +825,19 @@ class Game {
       this.mineScene.add(stone)
     }
 
-    // Wall torches (point lights) for atmosphere
-    const torchPositions = [[0, 2.5, 0], [sz - 1, 2.5, 0], [0, 2.5, sz - 1], [sz - 1, 2.5, sz - 1]]
-    for (const [tx, ty, tz] of torchPositions) {
-      const tl = new THREE.PointLight(0xff8833, 0.6, 6)
-      tl.position.set(tx, ty, tz)
+    const torchSpots: number[][] = []
+    for (let i = 0; i < 3 + this.mine.currentFloor; i++) {
+      torchSpots.push([mineRng.range(0, sz - 1), mineRng.range(0, sz - 1)])
+    }
+    for (const [tx, tz] of torchSpots) {
+      const tl = new THREE.PointLight(0xff9944, 0.8, 8)
+      tl.position.set(tx, 2, tz)
       this.mineScene.add(tl)
-      // Torch mesh
-      const torchMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.3, 0.08), new THREE.MeshLambertMaterial({ color: COLORS.wood }))
-      torchMesh.position.set(tx, ty - 0.3, tz)
+      const torchMesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.25, 0.06), new THREE.MeshLambertMaterial({ color: COLORS.wood }))
+      torchMesh.position.set(tx, 0.12, tz)
       this.mineScene.add(torchMesh)
-      const flame = new THREE.Mesh(new THREE.SphereGeometry(0.06, 4, 4), new THREE.MeshBasicMaterial({ color: 0xffaa33 }))
-      flame.position.set(tx, ty - 0.1, tz)
+      const flame = new THREE.Mesh(new THREE.SphereGeometry(0.05, 4, 4), new THREE.MeshBasicMaterial({ color: 0xffaa33 }))
+      flame.position.set(tx, 0.28, tz)
       this.mineScene.add(flame)
     }
 

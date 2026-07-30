@@ -73,8 +73,8 @@ export class MineSystem {
     for (let x = 0; x < floor.length; x++) {
       for (let z = 0; z < floor[x].length; z++) {
         const tile = floor[x][z]
-        const color = tile.isRock ? 0x666666 : 0x5c4033
-        const mat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide })
+        const color = tile.isRock ? 0x888888 : 0x7a5c43
+        const mat = new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide })
         const mesh = new THREE.Mesh(geo, mat)
         mesh.position.set(x, 0.01, z)
         this.group.add(mesh)
@@ -118,8 +118,8 @@ export class MineSystem {
     sound.toolSwing()
 
     if (tile.mesh instanceof THREE.Mesh) {
-      const mat = tile.mesh.material as THREE.MeshBasicMaterial
-      mat.color.setHex(tile.hasLadder ? 0xd4a017 : 0x2a1a0a)
+      const mat = tile.mesh.material as THREE.MeshLambertMaterial
+      mat.color.setHex(tile.hasLadder ? 0xd4a017 : 0x3a2a1a)
     }
 
     if (tile.itemId) {

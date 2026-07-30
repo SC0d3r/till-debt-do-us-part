@@ -26,7 +26,7 @@ export const COLORS = {
   leaf: 0x3a8e3a, leafDark: 0x2d7a2d, leafLight: 0x5ab85a,
   trunk: 0x6b4226,
   houseWall: 0xd4a574, houseRoof: 0xb85c38,
-  shopWall: 0x6a9ec4, shopRoof: 0x4a7ea4,
+  shopWall: 0xc8956a, shopRoof: 0x8b5e3c,
   mineWall: 0x4a4a4a,
   wellStone: 0x999999,
   binWood: 0x7a4a2a,
@@ -107,16 +107,18 @@ export function getDirtTexture(): THREE.Texture {
 export function getTilledTexture(): THREE.Texture {
   if (texCache.tilled) return texCache.tilled
   texCache.tilled = makeTexture(128, (ctx, w, h) => {
-    ctx.fillStyle = '#7b5e20'; ctx.fillRect(0, 0, w, h)
-    noise(ctx, 10)
-    // Furrow lines
-    ctx.strokeStyle = '#6a4e18'; ctx.lineWidth = 2
-    for (let y = 8; y < h; y += 12) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y + (Math.random()-0.5)*3); ctx.stroke()
+    ctx.fillStyle = '#d4b896'; ctx.fillRect(0, 0, w, h)
+    noise(ctx, 12)
+    for (let i = 0; i < 40; i++) {
+      ctx.fillStyle = Math.random() > 0.5 ? '#c8a880' : '#dcc8a8'
+      ctx.beginPath(); ctx.arc(Math.random()*w, Math.random()*h, 1+Math.random()*2, 0, Math.PI*2); ctx.fill()
     }
-    // Lighter ridges
-    ctx.strokeStyle = '#8b6e30'; ctx.lineWidth = 1
-    for (let y = 14; y < h; y += 12) {
+    ctx.strokeStyle = '#bfa070'; ctx.lineWidth = 2
+    for (let y = 8; y < h; y += 14) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y + (Math.random()-0.5)*2); ctx.stroke()
+    }
+    ctx.strokeStyle = '#e0cca8'; ctx.lineWidth = 1
+    for (let y = 15; y < h; y += 14) {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y + (Math.random()-0.5)*2); ctx.stroke()
     }
   })
@@ -126,16 +128,19 @@ export function getTilledTexture(): THREE.Texture {
 export function getWateredTexture(): THREE.Texture {
   if (texCache.watered) return texCache.watered
   texCache.watered = makeTexture(128, (ctx, w, h) => {
-    ctx.fillStyle = '#5a4418'; ctx.fillRect(0, 0, w, h)
-    noise(ctx, 8)
-    // Darker furrows (wet)
-    ctx.strokeStyle = '#4a3410'; ctx.lineWidth = 3
-    for (let y = 8; y < h; y += 12) {
+    ctx.fillStyle = '#6b4c28'; ctx.fillRect(0, 0, w, h)
+    noise(ctx, 10)
+    ctx.strokeStyle = '#5a3c18'; ctx.lineWidth = 3
+    for (let y = 8; y < h; y += 14) {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y + (Math.random()-0.5)*2); ctx.stroke()
     }
-    // Wet sheen
-    ctx.fillStyle = 'rgba(80,140,200,0.15)'
+    ctx.fillStyle = 'rgba(60,120,180,0.18)'
     ctx.fillRect(0, 0, w, h)
+    for (let i = 0; i < 6; i++) {
+      ctx.strokeStyle = 'rgba(150,200,255,0.12)'; ctx.lineWidth = 1
+      const x = Math.random()*w, y = Math.random()*h
+      ctx.beginPath(); ctx.ellipse(x, y, 6+Math.random()*8, 3+Math.random()*4, Math.random(), 0, Math.PI*2); ctx.stroke()
+    }
   })
   return texCache.watered
 }
@@ -173,19 +178,30 @@ export function getWaterTexture(): THREE.Texture {
 
 export function getMineFloorTexture(): THREE.Texture {
   if (texCache.mineFloor) return texCache.mineFloor
-  texCache.mineFloor = makeTexture(128, (ctx, w, h) => {
-    ctx.fillStyle = '#3a3028'; ctx.fillRect(0, 0, w, h)
-    noise(ctx, 25)
-    for (let i = 0; i < 30; i++) {
-      ctx.fillStyle = Math.random() > 0.5 ? '#4a3e30' : '#2a2018'
-      ctx.beginPath(); ctx.arc(Math.random()*w, Math.random()*h, 2+Math.random()*4, 0, Math.PI*2); ctx.fill()
+  texCache.mineFloor = makeTexture(256, (ctx, w, h) => {
+    ctx.fillStyle = '#1a1510'; ctx.fillRect(0, 0, w, h)
+    noise(ctx, 30)
+    for (let i = 0; i < 60; i++) {
+      ctx.fillStyle = Math.random() > 0.5 ? '#2a2218' : '#120e08'
+      ctx.beginPath(); ctx.arc(Math.random()*w, Math.random()*h, 2+Math.random()*5, 0, Math.PI*2); ctx.fill()
     }
-    // Cracks
-    ctx.strokeStyle = '#221a10'; ctx.lineWidth = 1
-    for (let i = 0; i < 8; i++) {
-      ctx.beginPath(); ctx.moveTo(Math.random()*w, Math.random()*h)
-      ctx.lineTo(Math.random()*w, Math.random()*h); ctx.stroke()
+    ctx.strokeStyle = '#0e0a06'; ctx.lineWidth = 1.5
+    for (let i = 0; i < 15; i++) {
+      const sx = Math.random()*w, sy = Math.random()*h
+      ctx.beginPath(); ctx.moveTo(sx, sy)
+      let cx = sx, cy = sy
+      for (let j = 0; j < 4; j++) {
+        cx += (Math.random()-0.5)*30; cy += (Math.random()-0.5)*30
+        ctx.lineTo(cx, cy)
+      }
+      ctx.stroke()
     }
+    for (let i = 0; i < 10; i++) {
+      ctx.fillStyle = ['#8b6030', '#707070', '#aa8830'][Math.floor(Math.random()*3)]
+      ctx.globalAlpha = 0.15
+      ctx.beginPath(); ctx.arc(Math.random()*w, Math.random()*h, 1+Math.random()*2, 0, Math.PI*2); ctx.fill()
+    }
+    ctx.globalAlpha = 1
   })
   return texCache.mineFloor
 }
@@ -300,11 +316,24 @@ export function createHouse(): THREE.Group {
 
 export function createShop(): THREE.Group {
   const g = new THREE.Group()
-  const wall = createBox(1.6, 1.4, 1.6, COLORS.shopWall); wall.position.y = 0.7; wall.castShadow = true; g.add(wall)
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(1.3, 0.8, 4), new THREE.MeshLambertMaterial({ color: COLORS.shopRoof }))
-  roof.position.y = 1.8; roof.rotation.y = Math.PI/4; roof.castShadow = true; g.add(roof)
-  const sign = createBox(0.6, 0.3, 0.05, COLORS.gold); sign.position.set(0, 1.1, 0.81); g.add(sign)
-  const awning = createBox(1.2, 0.05, 0.5, 0xcc4444); awning.position.set(0, 1.0, 1.0); g.add(awning)
+  const wallTex = makeTexture(64, (ctx, w, h) => {
+    ctx.fillStyle = '#c8956a'; ctx.fillRect(0, 0, w, h)
+    noise(ctx, 15)
+    for (let y = 0; y < h; y += 8) {
+      ctx.strokeStyle = 'rgba(100,60,30,0.2)'; ctx.lineWidth = 1
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke()
+    }
+  })
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.6, 1.8), new THREE.MeshLambertMaterial({ map: wallTex }))
+  wall.position.y = 0.8; wall.castShadow = true; g.add(wall)
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(1.5, 0.9, 4), new THREE.MeshLambertMaterial({ color: COLORS.shopRoof }))
+  roof.position.y = 2.05; roof.rotation.y = Math.PI/4; roof.castShadow = true; g.add(roof)
+  const sign = createBox(0.8, 0.35, 0.06, COLORS.gold); sign.position.set(0, 1.3, 0.91); g.add(sign)
+  const awning = createBox(1.6, 0.06, 0.7, 0xcc4444); awning.position.set(0, 1.1, 1.1); g.add(awning)
+  const door = createBox(0.45, 0.8, 0.05, 0x5a3218); door.position.set(0, 0.45, 0.91); g.add(door)
+  for (const sx of [-0.5, 0.5]) {
+    const win = createBox(0.3, 0.3, 0.05, 0xffeebb); win.position.set(sx, 1.0, 0.91); g.add(win)
+  }
   return g
 }
 
@@ -322,49 +351,92 @@ export function createMineEntrance(): THREE.Group {
 
 export function createWell(): THREE.Group {
   const g = new THREE.Group()
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 0.6, 8), new THREE.MeshLambertMaterial({ color: COLORS.wellStone }))
-  base.position.y = 0.3; base.castShadow = true; g.add(base)
-  const water = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.05, 8), new THREE.MeshLambertMaterial({ color: COLORS.water }))
-  water.position.y = 0.55; g.add(water)
-  for (const sx of [-0.35, 0.35]) {
-    const post = createBox(0.08, 0.8, 0.08, COLORS.trunk); post.position.set(sx, 0.8, 0); g.add(post)
+  const stoneTex = makeTexture(64, (ctx, w, h) => {
+    ctx.fillStyle = '#999999'; ctx.fillRect(0, 0, w, h)
+    noise(ctx, 20)
+    ctx.strokeStyle = '#777777'; ctx.lineWidth = 2
+    for (let y = 0; y < h; y += 12) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke()
+      const off = (y / 12) % 2 === 0 ? 0 : 10
+      for (let x = off; x < w; x += 20) {
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 12); ctx.stroke()
+      }
+    }
+  })
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.75, 0.8, 10), new THREE.MeshLambertMaterial({ map: stoneTex }))
+  base.position.y = 0.4; base.castShadow = true; g.add(base)
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.06, 6, 12), new THREE.MeshLambertMaterial({ color: 0x777777 }))
+  rim.position.y = 0.8; rim.rotation.x = Math.PI / 2; g.add(rim)
+  const water = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.05, 10), new THREE.MeshLambertMaterial({ color: COLORS.water, transparent: true, opacity: 0.8 }))
+  water.position.y = 0.7; g.add(water)
+  for (const sx of [-0.5, 0.5]) {
+    const post = createBox(0.1, 1.2, 0.1, COLORS.trunk); post.position.set(sx, 1.2, 0); post.castShadow = true; g.add(post)
   }
-  const beam = createBox(0.8, 0.06, 0.08, COLORS.wood); beam.position.y = 1.2; g.add(beam)
-  // Bucket
-  const bucket = createBox(0.1, 0.08, 0.1, COLORS.woodDark); bucket.position.set(0, 0.9, 0); g.add(bucket)
+  const beam = createBox(1.1, 0.08, 0.1, COLORS.wood); beam.position.y = 1.8; g.add(beam)
+  const rope = createBox(0.02, 0.5, 0.02, 0x8b7355); rope.position.set(0, 1.55, 0); g.add(rope)
+  const bucket = createBox(0.14, 0.12, 0.14, COLORS.woodDark); bucket.position.set(0, 1.3, 0); g.add(bucket)
+  const bucketBand = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.01, 4, 8), new THREE.MeshLambertMaterial({ color: 0x666666 }))
+  bucketBand.position.set(0, 1.32, 0); g.add(bucketBand)
+  const wellLight = new THREE.PointLight(0x88ccff, 0.4, 3)
+  wellLight.position.set(0, 1.0, 0)
+  g.add(wellLight)
   return g
 }
 
 export function createShippingBin(): THREE.Group {
   const g = new THREE.Group()
-  // Bigger bin body
-  const body = createBox(1.4, 0.9, 0.9, COLORS.binWood); body.position.y = 0.45; body.castShadow = true; g.add(body)
-  // Inner dark
-  const inner = createBox(1.2, 0.1, 0.7, 0x2a1a0a); inner.position.set(0, 0.88, 0); g.add(inner)
-  // Lid (open)
-  const lid = createBox(1.42, 0.07, 0.92, COLORS.woodLight); lid.position.set(0, 0.95, -0.2); lid.rotation.x = -0.5; g.add(lid)
-  // Gold label with glow
-  const label = createBox(0.5, 0.25, 0.02, COLORS.gold); label.position.set(0, 0.55, 0.46); g.add(label)
-  // Glowing sign above bin
-  const signGlow = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.8, 0.3),
-    new THREE.MeshBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0.6 })
+  const woodTex = makeTexture(64, (ctx, w, h) => {
+    ctx.fillStyle = '#7a4a2a'; ctx.fillRect(0, 0, w, h)
+    noise(ctx, 18)
+    for (let y = 0; y < h; y += 6) {
+      ctx.strokeStyle = 'rgba(50,25,10,0.25)'; ctx.lineWidth = 1
+      ctx.beginPath(); ctx.moveTo(0, y + (Math.random()-0.5)*2); ctx.lineTo(w, y + (Math.random()-0.5)*2); ctx.stroke()
+    }
+    for (let i = 0; i < 5; i++) {
+      ctx.fillStyle = 'rgba(100,60,30,0.15)'
+      ctx.beginPath(); ctx.arc(Math.random()*w, Math.random()*h, 3+Math.random()*5, 0, Math.PI*2); ctx.fill()
+    }
+  })
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.2, 1.2), new THREE.MeshLambertMaterial({ map: woodTex }))
+  body.position.y = 0.6; body.castShadow = true; g.add(body)
+  const inner = createBox(1.6, 0.15, 1.0, 0x2a1a0a); inner.position.set(0, 1.18, 0); g.add(inner)
+  const lid = createBox(1.84, 0.08, 1.22, COLORS.woodLight); lid.position.set(0, 1.25, -0.3); lid.rotation.x = -0.6; g.add(lid)
+  const label = createBox(0.7, 0.35, 0.03, COLORS.gold); label.position.set(0, 0.7, 0.61); g.add(label)
+  const signPost = createBox(0.08, 0.8, 0.08, COLORS.woodDark); signPost.position.set(0, 1.6, 0.5); g.add(signPost)
+  const signBoard = createBox(0.9, 0.35, 0.06, 0xd4a020); signBoard.position.set(0, 2.05, 0.5); g.add(signBoard)
+  const signText = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.7, 0.2),
+    new THREE.MeshBasicMaterial({ color: 0xfff0aa })
   )
-  signGlow.position.set(0, 1.3, 0)
+  signText.position.set(0, 2.05, 0.54)
+  g.add(signText)
+  const signGlow = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.2, 0.5),
+    new THREE.MeshBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0.35 })
+  )
+  signGlow.position.set(0, 2.05, 0.48)
   signGlow.name = 'binSign'
   g.add(signGlow)
-  // Point light to make bin stand out
-  const binLight = new THREE.PointLight(0xffd700, 0.5, 4)
-  binLight.position.set(0, 1.5, 0)
+  const binLight = new THREE.PointLight(0xffd700, 1.0, 6)
+  binLight.position.set(0, 2.2, 0.5)
   g.add(binLight)
-  // Metal bands
-  for (const y of [0.25, 0.65]) {
-    const band = createBox(1.44, 0.04, 0.94, 0x666666); band.position.y = y; g.add(band)
+  const binLight2 = new THREE.PointLight(0xff8800, 0.5, 4)
+  binLight2.position.set(0, 0.8, 0.8)
+  g.add(binLight2)
+  for (const y of [0.3, 0.9]) {
+    const band = createBox(1.84, 0.05, 1.24, 0x777777); band.position.y = y; g.add(band)
   }
-  // Sturdy legs
-  for (const [lx, lz] of [[-0.55,-0.35],[0.55,-0.35],[-0.55,0.35],[0.55,0.35]]) {
-    const leg = createBox(0.1, 0.12, 0.1, COLORS.woodDark); leg.position.set(lx, 0.02, lz); g.add(leg)
+  for (const [lx, lz] of [[-0.7,-0.45],[0.7,-0.45],[-0.7,0.45],[0.7,0.45]]) {
+    const leg = createBox(0.14, 0.15, 0.14, COLORS.woodDark); leg.position.set(lx, 0.02, lz); g.add(leg)
   }
+  const arrow = new THREE.Mesh(
+    new THREE.ConeGeometry(0.15, 0.3, 4),
+    new THREE.MeshBasicMaterial({ color: 0xffdd44 })
+  )
+  arrow.position.set(0, 2.5, 0.5)
+  arrow.rotation.z = Math.PI
+  arrow.name = 'binArrow'
+  g.add(arrow)
   return g
 }
 
@@ -542,23 +614,36 @@ export function createItemDropMesh(itemId: string, big = false): THREE.Mesh {
 // ─── World Scenery ───
 export function createMountain(scale: number): THREE.Group {
   const g = new THREE.Group()
-  // Rocky base with texture
-  const baseGeo = new THREE.ConeGeometry(3 * scale, 5 * scale, 8)
-  const rockTex = makeTexture(64, (ctx, w, h) => {
-    ctx.fillStyle = '#556655'; ctx.fillRect(0, 0, w, h)
-    noise(ctx, 30)
-    // Rock striations
-    ctx.strokeStyle = '#445544'; ctx.lineWidth = 2
-    for (let i = 0; i < 12; i++) {
+  const baseGeo = new THREE.ConeGeometry(3 * scale, 5 * scale, 12)
+  const rockTex = makeTexture(128, (ctx, w, h) => {
+    const grad = ctx.createLinearGradient(0, 0, 0, h)
+    grad.addColorStop(0, '#7a8a7a')
+    grad.addColorStop(0.3, '#5a6a5a')
+    grad.addColorStop(0.7, '#4a5a48')
+    grad.addColorStop(1, '#3a4a38')
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h)
+    noise(ctx, 25)
+    ctx.globalAlpha = 0.4
+    for (let i = 0; i < 20; i++) {
+      const y = Math.random() * h
+      ctx.strokeStyle = i % 2 === 0 ? '#3a4a38' : '#6a7a68'
+      ctx.lineWidth = 1 + Math.random() * 2
       ctx.beginPath()
-      ctx.moveTo(Math.random() * w, Math.random() * h)
-      ctx.lineTo(Math.random() * w, Math.random() * h)
+      ctx.moveTo(0, y)
+      for (let x = 0; x < w; x += 8) {
+        ctx.lineTo(x, y + (Math.random() - 0.5) * 6)
+      }
       ctx.stroke()
     }
-    // Lighter patches
-    for (let i = 0; i < 8; i++) {
-      ctx.fillStyle = 'rgba(120,130,110,0.3)'
-      ctx.beginPath(); ctx.arc(Math.random()*w, Math.random()*h, 5+Math.random()*8, 0, Math.PI*2); ctx.fill()
+    ctx.globalAlpha = 1
+    for (let i = 0; i < 15; i++) {
+      ctx.fillStyle = Math.random() > 0.5 ? 'rgba(100,115,95,0.3)' : 'rgba(70,85,65,0.25)'
+      ctx.beginPath(); ctx.arc(Math.random()*w, Math.random()*h, 4+Math.random()*10, 0, Math.PI*2); ctx.fill()
+    }
+    for (let i = 0; i < 30; i++) {
+      ctx.fillStyle = `rgba(${50+Math.random()*40},${55+Math.random()*40},${45+Math.random()*30},0.2)`
+      const cx = Math.random() * w, cy = Math.random() * h
+      ctx.fillRect(cx, cy, 2 + Math.random() * 4, 1 + Math.random() * 3)
     }
   })
   const baseMat = new THREE.MeshLambertMaterial({ map: rockTex })
@@ -566,28 +651,47 @@ export function createMountain(scale: number): THREE.Group {
   base.position.y = 2.5 * scale
   base.castShadow = true
   g.add(base)
-  // Snow cap with gradient
-  const snowGeo = new THREE.ConeGeometry(1.3 * scale, 1.8 * scale, 8)
-  const snowTex = makeTexture(32, (ctx, w, h) => {
-    ctx.fillStyle = '#eeeeff'; ctx.fillRect(0, 0, w, h)
-    noise(ctx, 10)
-    ctx.fillStyle = 'rgba(200,210,230,0.3)'
-    for (let i = 0; i < 5; i++) {
-      ctx.beginPath(); ctx.arc(Math.random()*w, Math.random()*h, 3+Math.random()*5, 0, Math.PI*2); ctx.fill()
+  const snowGeo = new THREE.ConeGeometry(1.3 * scale, 1.8 * scale, 12)
+  const snowTex = makeTexture(64, (ctx, w, h) => {
+    const grad = ctx.createLinearGradient(0, 0, 0, h)
+    grad.addColorStop(0, '#ffffff')
+    grad.addColorStop(0.5, '#eef0ff')
+    grad.addColorStop(1, '#d0d8ee')
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h)
+    noise(ctx, 8)
+    ctx.globalAlpha = 0.2
+    for (let i = 0; i < 10; i++) {
+      ctx.fillStyle = '#c0c8dd'
+      ctx.beginPath(); ctx.arc(Math.random()*w, Math.random()*h, 3+Math.random()*6, 0, Math.PI*2); ctx.fill()
+    }
+    ctx.globalAlpha = 0.15
+    for (let i = 0; i < 8; i++) {
+      ctx.strokeStyle = '#b0b8cc'; ctx.lineWidth = 1
+      ctx.beginPath()
+      const y = Math.random() * h
+      ctx.moveTo(0, y)
+      for (let x = 0; x < w; x += 6) ctx.lineTo(x, y + (Math.random()-0.5)*4)
+      ctx.stroke()
     }
   })
   const snowMat = new THREE.MeshLambertMaterial({ map: snowTex })
   const snow = new THREE.Mesh(snowGeo, snowMat)
   snow.position.y = 4.0 * scale
   g.add(snow)
-  // Secondary peak for more interesting silhouette
   const peak2 = new THREE.Mesh(
-    new THREE.ConeGeometry(1.5 * scale, 3 * scale, 6),
+    new THREE.ConeGeometry(1.5 * scale, 3 * scale, 8),
     new THREE.MeshLambertMaterial({ map: rockTex })
   )
   peak2.position.set(1.5 * scale, 1.5 * scale, 0.5 * scale)
   peak2.castShadow = true
   g.add(peak2)
+  const peak3 = new THREE.Mesh(
+    new THREE.ConeGeometry(0.8 * scale, 2 * scale, 6),
+    new THREE.MeshLambertMaterial({ map: rockTex })
+  )
+  peak3.position.set(-1.0 * scale, 1.0 * scale, 0.8 * scale)
+  peak3.castShadow = true
+  g.add(peak3)
   return g
 }
 

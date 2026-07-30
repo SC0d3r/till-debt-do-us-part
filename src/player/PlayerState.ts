@@ -14,6 +14,8 @@ export class PlayerState {
   inventory: (InventoryItem | null)[] = new Array(8).fill(null)
   toolTiers: Record<string, number> = { hoe: 1, water: 1, pickaxe: 1, axe: 1, shovel: 1 }
   toolDurability: Record<string, number> = {}
+  waterLevel = 10
+  maxWater = 10
   selectedSlot = 0
   introSeen = false
   grimesFirstSeen = false
@@ -96,11 +98,18 @@ export class PlayerState {
   restoreStamina() { this.stamina = this.maxStamina }
   advanceDay() { this.day++; this.restoreStamina() }
 
+  refillWater() { this.waterLevel = this.maxWater }
+  useWater(): boolean {
+    if (this.waterLevel <= 0) return false
+    this.waterLevel--
+    return true
+  }
+
   save() {
     localStorage.setItem('till_debt_save', JSON.stringify({
       gold: this.gold, debt: this.debt, day: this.day, stamina: this.stamina,
       inventory: this.inventory, toolTiers: this.toolTiers,
-      toolDurability: this.toolDurability,
+      toolDurability: this.toolDurability, waterLevel: this.waterLevel,
       introSeen: this.introSeen, grimesFirstSeen: this.grimesFirstSeen, debtPaid: this.debtPaid,
     }))
   }
