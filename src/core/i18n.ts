@@ -49,12 +49,7 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     dlg_more_time_denied: "No more excuses! You've had your chance. The farm is mine now.",
     dlg_not_enough_gold: "You don't have enough gold for that payment!",
     dlg_score_title: '📊 Final Score',
-    dlg_score_detail: 'Gold Earned: {earned}g
-Items Sold: {sold}
-Items Mined: {mined}
-Days Without Petting Dog: {nopet}
-
-Total Score: {score}',
+    dlg_score_detail: 'Gold Earned: {earned}g\nItems Sold: {sold}\nItems Mined: {mined}\nDays Without Petting Dog: {nopet}\n\nTotal Score: {score}',
     dlg_thank_goodness: 'Thank goodness!',
     dlg_keep_working: "I'll keep working.",
     dlg_keep_farming: 'Keep Farming!',
@@ -114,12 +109,7 @@ Total Score: {score}',
     dlg_more_time_denied: 'دیگه بهانه کافی نیست! فرصتت تمام شد. مزرعه مال منه.',
     dlg_not_enough_gold: 'سکه کافی برای این پرداخت نداری!',
     dlg_score_title: '📊 امتیاز نهایی',
-    dlg_score_detail: 'سکه کسب‌شده: {earned}
-آیتم فروخته: {sold}
-آیتم معدن: {mined}
-روز بدون نوازش سگ: {nopet}
-
-امتیاز کل: {score}',
+    dlg_score_detail: 'سکه کسب‌شده: {earned}\nآیتم فروخته: {sold}\nآیتم معدن: {mined}\nروز بدون نوازش سگ: {nopet}\n\nامتیاز کل: {score}',
     dlg_thank_goodness: 'خدایا شکرت!',
     dlg_keep_working: 'به کار ادامه می‌دهم.',
     dlg_keep_farming: 'ادامه کشاورزی!',
