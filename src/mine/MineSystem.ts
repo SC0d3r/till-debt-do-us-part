@@ -18,6 +18,7 @@ interface BouncingItem {
   baseY: number
   time: number
   collected: boolean
+  settled: boolean
 }
 
 export class MineSystem {
@@ -37,26 +38,40 @@ export class MineSystem {
     if (this.floors[floorNum]) return this.floors[floorNum]
     const size = 14 + Math.min(floorNum, 6)
     const floor: MineTile[][] = []
-    let ladderPlaced = false
+    let downLadderPlaced = false
+    const isLastFloor = floorNum >= GAME_CONFIG.mineFloors - 1
     for (let x = 0; x < size; x++) {
       floor[x] = []
       for (let z = 0; z < size; z++) {
-        const isRock = Math.random() < 0.15 + floorNum * 0.05
-        const hasLadder = !ladderPlaced && Math.random() < 0.03 && x > 0 && z > 0
-        if (hasLadder) ladderPlaced = true
+        const isRock = Math.random() < 0.15 + floorNum * 0.04
+        // Down ladder chance increases with depth
+        const downLadderChance = 0.03 + floorNum * 0.02
+        const hasDownLadder = !isLastFloor && !downLadderPlaced && Math.random() < downLadderChance && x > 0 && z > 0
+        if (hasDownLadder) downLadderPlaced = true
+        // Exit ladder on last floor
+        const hasExitLadder = isLastFloor && !downLadderPlaced && Math.random() < 0.05 && x > 0 && z > 0
+        if (hasExitLadder) downLadderPlaced = true
+        const hasLadder = hasDownLadder || hasExitLadder
         let itemId: string | null = null
-        if (!isRock && !hasLadder && Math.random() < 0.2 + floorNum * 0.05) {
+        // Item chance and rarity scale with depth
+        const itemChance = 0.15 + floorNum * 0.04
+        if (!isRock && !hasLadder && Math.random() < itemChance) {
+          // Shift rarity toward rarer items on deeper floors
+          const depthBonus = floorNum * 0.03
           const roll = Math.random()
           let cumulative = 0
           for (const item of MINE_ITEMS) {
-            cumulative += item.rarity
+            // Boost rare items on deeper floors
+            const adjustedRarity = item.rarity + (item.tier === 'epic' || item.tier === 'legendary' ? depthBonus : 0)
+            cumulative += adjustedRarity
             if (roll <= cumulative) { itemId = item.id; break }
           }
         }
         floor[x][z] = { dug: false, hasLadder, itemId, isRock, mesh: null }
       }
     }
-    if (!ladderPlaced && size > 1) {
+    // Guarantee a ladder if none placed
+    if (!downLadderPlaced && size > 1) {
       floor[Math.floor(Math.random() * (size - 1)) + 1][Math.floor(Math.random() * (size - 1)) + 1].hasLadder = true
     }
     this.floors[floorNum] = floor
@@ -138,13 +153,6 @@ export class MineSystem {
     sprite.center.set(0.5, 0.3)
     this.group.add(sprite)
 
-    const itemDef = MINE_ITEMS.find(m => m.id === itemId)
-    if (itemDef && (itemDef.tier === 'epic' || itemDef.tier === 'legendary')) {
-      sound.collectRare()
-    } else {
-      sound.collect()
-    }
-
     this.bouncingItems.push({
       sprite,
       itemId,
@@ -156,20 +164,20 @@ export class MineSystem {
       baseY: 0.3,
       time: 0,
       collected: false,
+      settled: false,
     })
   }
 
   collectNearby(px: number, pz: number, radius: number): string[] {
     const collected: string[] = []
     for (const bi of this.bouncingItems) {
-      if (bi.collected) continue
+      if (bi.collected || !bi.settled) continue
       const dx = bi.sprite.position.x - px
       const dz = bi.sprite.position.z - pz
       if (dx * dx + dz * dz < radius * radius) {
         bi.collected = true
         collected.push(bi.itemId)
         this.group.remove(bi.sprite)
-        // Play rare or normal sound based on item tier
         const itemDef = MINE_ITEMS.find(m => m.id === bi.itemId)
         if (itemDef && (itemDef.tier === 'epic' || itemDef.tier === 'legendary')) {
           sound.collectRare()
@@ -188,6 +196,10 @@ export class MineSystem {
     this.digsLeft = GAME_CONFIG.mineDigsPerFloor
     this.buildFloorVisuals(this.currentFloor)
     return true
+  }
+
+  isLastFloor(): boolean {
+    return this.currentFloor >= GAME_CONFIG.mineFloors - 1
   }
 
   update(dt: number) {
@@ -209,6 +221,7 @@ export class MineSystem {
         // Stop bouncing when nearly still
         if (Math.abs(bi.velocity.y) < 0.3) {
           bi.velocity.set(0, 0, 0)
+          bi.settled = true
           bi.sprite.position.y = bi.baseY + Math.sin(bi.time * 3) * 0.05
         }
       }

@@ -30,6 +30,8 @@ class Game {
   private shopNpcModel: THREE.Group | null = null
   private shopNpcTimer = 0
   private sweatSprite: THREE.Sprite | null = null
+  private dogHeartTimer = 0
+  private dogHeartSprite: THREE.Sprite | null = null
   private clock = new THREE.Clock()
   private inMine = false
   private actionCooldown = 0
@@ -325,6 +327,17 @@ class Game {
       this.playerModel.remove(this.sweatSprite)
     }
 
+    // Dog heart icon
+    if (this.dogHeartTimer > 0) {
+      this.dogHeartTimer -= dt
+      if (this.dogHeartSprite && this.dogHeartSprite.parent) {
+        this.dogHeartSprite.material.opacity = Math.min(1, this.dogHeartTimer)
+        this.dogHeartSprite.position.y = 1.0 + Math.sin(this.dogHeartTimer * 5) * 0.1
+      }
+    } else if (this.dogHeartSprite && this.dogHeartSprite.parent && this.dogModel) {
+      this.dogModel.remove(this.dogHeartSprite)
+    }
+
     this.ui.updateHUD(this.player)
     this.updateCamera(dt)
 
@@ -493,12 +506,11 @@ class Game {
     if (interact) {
       if (this.inMine) { this.exitMine(); return }
 
-      // Check proximity to buildings (not just facing tile)
+      // Check proximity to buildings (walls count, not just center)
       const px = this.playerModel.position.x
       const pz = this.playerModel.position.z
-      const buildingRange = 2.8
+      const buildingRange = 3.5
 
-      // Check each building by position
       const housePos = new THREE.Vector3(0, 0, 0)
       const shopPos = new THREE.Vector3(this.farm.width - 1, 0, 0)
       const minePos = new THREE.Vector3(0, 0, this.farm.height - 1)
@@ -524,6 +536,15 @@ class Game {
             this.actionCooldown = 0.5
             return
           }
+        }
+      }
+
+      // Dog petting
+      if (this.dogModel) {
+        const dogDist = this.playerModel.position.distanceTo(this.dogModel.position)
+        if (dogDist < 2.5) {
+          this.petDog()
+          return
         }
       }
 
@@ -854,6 +875,29 @@ class Game {
   }
 
   // ─── DOG NPC ───
+  private petDog() {
+    if (this.dogHeartTimer > 0) return
+    this.dogHeartTimer = 2.0
+    sound.menuSelect()
+    if (!this.dogHeartSprite) {
+      const canvas = document.createElement('canvas')
+      canvas.width = 64; canvas.height = 64
+      const ctx = canvas.getContext('2d')!
+      ctx.font = '48px serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText('❤️', 32, 32)
+      const tex = new THREE.CanvasTexture(canvas)
+      tex.magFilter = THREE.NearestFilter
+      this.dogHeartSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }))
+      this.dogHeartSprite.scale.set(0.6, 0.6, 1)
+    }
+    if (!this.dogHeartSprite.parent && this.dogModel) {
+      this.dogHeartSprite.position.set(0, 1.0, 0)
+      this.dogModel.add(this.dogHeartSprite)
+    }
+  }
+
   private updateDog(dt: number) {
     if (!this.dogModel) return
     this.dogTimer += dt
@@ -961,7 +1005,7 @@ class Game {
   // ─── SHIPPING BIN ───
   private isNearBin(): boolean {
     const dist = this.playerModel.position.distanceTo(this.binPosition)
-    return dist < 2.5
+    return dist < 3.5
   }
 
   private shipItems() {
@@ -1253,7 +1297,14 @@ class Game {
       this.player.useToolDurability(toolId)
       this.playToolAnim('dig')
       this.actionCooldown = 0.3
-      if (result.foundLadder && this.mine.currentFloor < GAME_CONFIG.mineFloors - 1) this.mine.descend()
+      if (result.foundLadder) {
+        if (this.mine.isLastFloor()) {
+          // Exit ladder on last floor
+          this.exitMine()
+        } else {
+          this.mine.descend()
+        }
+      }
       if (this.mine.digsLeft <= 0) this.exitMine()
     }
   }

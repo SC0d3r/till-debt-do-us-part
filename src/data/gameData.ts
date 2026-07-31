@@ -1,7 +1,7 @@
 export const GAME_CONFIG = {
   farmWidth: 16,
   farmHeight: 12,
-  mineFloors: 5,
+  mineFloors: 10,
   mineDigsPerFloor: 15,
   debtDeadline: 21,
   startingDebt: 5000,
