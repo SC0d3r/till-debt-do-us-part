@@ -119,6 +119,7 @@ export class DialogueSystem {
 
     this.speakerEl.textContent = speakerText
     this.textEl.textContent = ''
+    this.textEl.style.whiteSpace = 'normal'
     this.choicesEl.innerHTML = ''
     this.dialogBox.style.display = 'block'
 
@@ -174,9 +175,10 @@ export class DialogueSystem {
     sound.menuOpen()
     this.speakerEl.textContent = speaker
     this.textEl.textContent = text
+    this.textEl.style.whiteSpace = 'pre-line'
     this.choicesEl.innerHTML = ''
     this.dialogBox.style.display = 'block'
-    this.showChoices([{ labelKey: 'dlg_ok', action: 'close' }])
+    this.showChoices([{ labelKey: 'dlg_try_again', action: 'reset' }])
   }
 
   close() {

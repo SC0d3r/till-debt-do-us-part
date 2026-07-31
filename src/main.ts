@@ -1368,11 +1368,14 @@ class Game {
     return Math.min(visit * 100, this.player.debt)
   }
 
+  private lastGrimesDay = 0
+
   private checkStoryTriggers() {
     if (!this.started) return
     if (!this.player.introSeen) { this.player.introSeen = true; this.dialogue.show('intro_1'); return }
     if (!this.player.grimesFirstSeen && this.player.day >= 2) { this.player.grimesFirstSeen = true; this.dialogue.show('grimes_first'); return }
-    if (this.player.grimesFirstSeen && !this.player.debtPaid && this.player.day % 5 === 0 && !this.dialogue.active && !this.morningBuyerActive) {
+    if (this.player.grimesFirstSeen && !this.player.debtPaid && this.player.day % 5 === 0 && this.lastGrimesDay !== this.player.day && !this.dialogue.active && !this.morningBuyerActive) {
+      this.lastGrimesDay = this.player.day
       this.player.grimesVisitCount++
       const partialAmt = this.getPartialPaymentAmount()
       // Update partial button label dynamically
