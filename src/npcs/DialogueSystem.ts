@@ -24,8 +24,23 @@ const DIALOGUES: Record<string, DialogueEntry> = {
     choices: [
       { labelKey: 'dlg_pay_full', action: 'pay_full' },
       { labelKey: 'dlg_pay_partial', action: 'pay_partial' },
-      { labelKey: 'dlg_more_time', action: 'close' },
+      { labelKey: 'dlg_more_time', action: 'more_time' },
     ],
+  },
+  grimes_more_time_granted: {
+    speakerKey: 'dlg_grimes',
+    textKey: 'dlg_more_time_granted',
+    choices: [{ labelKey: 'dlg_thank_goodness', action: 'close' }],
+  },
+  grimes_more_time_denied: {
+    speakerKey: 'dlg_grimes',
+    textKey: 'dlg_more_time_denied',
+    choices: [{ labelKey: 'dlg_try_again', action: 'reset' }],
+  },
+  grimes_no_gold: {
+    speakerKey: 'dlg_grimes',
+    textKey: 'dlg_not_enough_gold',
+    choices: [{ labelKey: 'dlg_ok', action: 'close' }],
   },
   grimes_paid: {
     speakerKey: 'dlg_grimes',
@@ -45,6 +60,11 @@ const DIALOGUES: Record<string, DialogueEntry> = {
   lose: {
     speakerKey: 'dlg_game_over',
     textKey: 'dlg_lose',
+    choices: [{ labelKey: 'dlg_try_again', action: 'reset' }],
+  },
+  lose_score: {
+    speakerKey: 'dlg_score_title',
+    textKey: 'dlg_score_detail',
     choices: [{ labelKey: 'dlg_try_again', action: 'reset' }],
   },
   spoil_notice: {
@@ -76,6 +96,7 @@ export class DialogueSystem {
   private textEl: HTMLElement
   private choicesEl: HTMLElement
   private onChoice: ((action: string) => void) | null = null
+  private labelOverrides: Record<string, string> | null = null
 
   constructor() {
     this.dialogBox = document.getElementById('dialog-box')!
@@ -84,12 +105,13 @@ export class DialogueSystem {
     this.choicesEl = document.getElementById('dialog-choices')!
   }
 
-  show(id: string, onChoice?: (action: string) => void) {
+  show(id: string, onChoice?: (action: string) => void, labelOverrides?: Record<string, string>) {
     const entry = DIALOGUES[id]
     if (!entry) return
 
     this.active = true
     this.onChoice = onChoice || null
+    this.labelOverrides = labelOverrides || null
     sound.menuOpen()
 
     const speakerText = t(entry.speakerKey)
@@ -133,7 +155,7 @@ export class DialogueSystem {
     for (const choice of choices) {
       const btn = document.createElement('button')
       btn.className = 'dialog-choice'
-      btn.textContent = t(choice.labelKey)
+      btn.textContent = this.labelOverrides?.[choice.labelKey] || t(choice.labelKey)
       btn.onclick = (e) => {
         e.stopPropagation()
         sound.menuSelect()
@@ -161,5 +183,6 @@ export class DialogueSystem {
     this.active = false
     this.dialogBox.style.display = 'none'
     this.onChoice = null
+    this.labelOverrides = null
   }
 }

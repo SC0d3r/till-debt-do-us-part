@@ -896,6 +896,7 @@ class Game {
   private petDog() {
     if (this.dogHeartTimer > 0) return
     this.dogHeartTimer = 2.0
+    this.player.petDog()
     sound.menuSelect()
     if (!this.dogHeartSprite) {
       const canvas = document.createElement('canvas')
@@ -1333,6 +1334,7 @@ class Game {
     for (const id of items) {
       if (this.player.isFull()) { sound.error(); break }
       this.player.addItem(id)
+      this.player.totalItemsMined++
     }
   }
 
@@ -1355,9 +1357,15 @@ class Game {
     if (this.player.debt <= 0 && !this.player.debtPaid) {
       this.player.debtPaid = true
       this.dialogue.show('win', a => { if (a === 'reset') this.player.reset() })
-    } else if (this.player.day > GAME_CONFIG.debtDeadline && this.player.debt > 0) {
-      this.dialogue.show('lose', a => { if (a === 'reset') this.player.reset() })
+    } else if (this.player.day > GAME_CONFIG.debtDeadline + (this.player.debtDeadlineBonus || 0) && this.player.debt > 0) {
+      this.showGameOverWithScore()
     }
+  }
+
+  private getPartialPaymentAmount(): number {
+    // Escalating: visit 1=100g, visit 2=200g, visit 3=300g, etc.
+    const visit = this.player.grimesVisitCount + 1
+    return Math.min(visit * 100, this.player.debt)
   }
 
   private checkStoryTriggers() {
@@ -1365,11 +1373,50 @@ class Game {
     if (!this.player.introSeen) { this.player.introSeen = true; this.dialogue.show('intro_1'); return }
     if (!this.player.grimesFirstSeen && this.player.day >= 2) { this.player.grimesFirstSeen = true; this.dialogue.show('grimes_first'); return }
     if (this.player.grimesFirstSeen && !this.player.debtPaid && this.player.day % 5 === 0 && !this.dialogue.active && !this.morningBuyerActive) {
+      this.player.grimesVisitCount++
+      const partialAmt = this.getPartialPaymentAmount()
+      // Update partial button label dynamically
+      const partialLabel = t('dlg_pay_partial').replace('{amount}', String(partialAmt))
       this.dialogue.show('grimes_visit', action => {
-        if (action === 'pay_full' && this.player.gold >= this.player.debt) { this.player.gold -= this.player.debt; this.player.debt = 0; this.dialogue.show('grimes_paid') }
-        else if (action === 'pay_partial' && this.player.gold >= 500) { this.player.gold -= 500; this.player.debt -= 500; this.dialogue.show('grimes_partial') }
-      })
+        if (action === 'pay_full') {
+          if (this.player.gold >= this.player.debt) {
+            this.player.gold -= this.player.debt; this.player.debt = 0
+            this.dialogue.show('grimes_paid')
+          } else {
+            this.dialogue.show('grimes_no_gold')
+          }
+        } else if (action === 'pay_partial') {
+          if (this.player.gold >= partialAmt) {
+            this.player.gold -= partialAmt; this.player.debt -= partialAmt
+            this.dialogue.show('grimes_partial')
+          } else {
+            this.dialogue.show('grimes_no_gold')
+          }
+        } else if (action === 'more_time') {
+          if (this.player.grimesVisitCount <= 1) {
+            // First time asking: grant 1 extra day
+            this.player.debtDeadlineBonus = (this.player.debtDeadlineBonus || 0) + 1
+            this.dialogue.show('grimes_more_time_granted')
+          } else {
+            // Second time: game over with score
+            this.showGameOverWithScore()
+          }
+        }
+      }, { dlg_pay_partial: partialLabel })
     }
+  }
+
+  private showGameOverWithScore() {
+    const score = this.player.getScore()
+    const detail = t('dlg_score_detail')
+      .replace('{earned}', String(this.player.totalGoldEarned))
+      .replace('{sold}', String(this.player.totalItemsSold))
+      .replace('{mined}', String(this.player.totalItemsMined))
+      .replace('{nopet}', String(this.player.daysWithoutPettingDog))
+      .replace('{score}', String(score))
+    this.dialogue.showRaw(t('dlg_score_title'), detail, action => {
+      if (action === 'reset') this.player.reset()
+    })
   }
 
   private openShop() {

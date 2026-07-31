@@ -1,5 +1,5 @@
 import { PlayerState } from '../player/PlayerState'
-import { CROPS, TOOLS, MINE_ITEMS, MATERIAL_ITEMS, getItemInfo, getItemTexture, TOOL_MAX_DURABILITY } from '../data/gameData'
+import { GAME_CONFIG, CROPS, TOOLS, MINE_ITEMS, MATERIAL_ITEMS, getItemInfo, getItemTexture, TOOL_MAX_DURABILITY } from '../data/gameData'
 import { sound } from '../core/SoundManager'
 
 const ITEM_COLORS: Record<string, string> = {
@@ -62,7 +62,7 @@ export class UIManager {
   updateHUD(player: PlayerState) {
     document.getElementById('day-display')!.textContent = String(player.day)
     document.getElementById('gold-display')!.textContent = String(player.gold)
-    document.getElementById('debt-display')!.textContent = String(player.debt)
+    document.getElementById('debt-display')!.textContent = `${player.debt}/${GAME_CONFIG.startingDebt}g`
     const pct = Math.max(0, (player.stamina / player.maxStamina) * 100)
     const fill = document.getElementById('stamina-fill')!
     fill.style.width = `${pct}%`

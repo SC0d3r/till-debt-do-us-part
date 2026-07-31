@@ -20,6 +20,13 @@ export class PlayerState {
   introSeen = false
   grimesFirstSeen = false
   debtPaid = false
+  grimesVisitCount = 0
+  totalGoldEarned = 0
+  totalItemsSold = 0
+  totalItemsMined = 0
+  dogPettedToday = false
+  daysWithoutPettingDog = 0
+  debtDeadlineBonus = 0
 
   constructor() {
     // Start with essential tools and some seeds
@@ -106,7 +113,20 @@ export class PlayerState {
   }
 
   restoreStamina() { this.stamina = this.maxStamina }
-  advanceDay() { this.day++; this.restoreStamina() }
+  advanceDay() {
+    this.day++
+    this.restoreStamina()
+    if (!this.dogPettedToday) this.daysWithoutPettingDog++
+    else this.daysWithoutPettingDog = 0
+    this.dogPettedToday = false
+  }
+
+  petDog() { this.dogPettedToday = true; this.daysWithoutPettingDog = 0 }
+
+  getScore(): number {
+    return this.totalGoldEarned + (this.totalItemsSold * 5) + (this.totalItemsMined * 10)
+      - (this.daysWithoutPettingDog * 20)
+  }
 
   refillWater() { this.waterLevel = this.maxWater }
   useWater(): boolean {
@@ -121,6 +141,9 @@ export class PlayerState {
       inventory: this.inventory, toolTiers: this.toolTiers,
       toolDurability: this.toolDurability, waterLevel: this.waterLevel,
       introSeen: this.introSeen, grimesFirstSeen: this.grimesFirstSeen, debtPaid: this.debtPaid,
+      grimesVisitCount: this.grimesVisitCount, totalGoldEarned: this.totalGoldEarned,
+      totalItemsSold: this.totalItemsSold, totalItemsMined: this.totalItemsMined,
+      daysWithoutPettingDog: this.daysWithoutPettingDog, debtDeadlineBonus: this.debtDeadlineBonus,
     }))
   }
 

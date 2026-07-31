@@ -4,7 +4,7 @@ export const GAME_CONFIG = {
   mineFloors: 10,
   mineDigsPerFloor: 15,
   debtDeadline: 21,
-  startingDebt: 5000,
+  startingDebt: 500,
   startingGold: 100,
   maxStamina: 100,
 }
