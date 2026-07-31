@@ -78,6 +78,12 @@ export class PlayerState {
     return true
   }
 
+  swapSlots(a: number, b: number) {
+    const tmp = this.inventory[a]
+    this.inventory[a] = this.inventory[b]
+    this.inventory[b] = tmp
+  }
+
   hasItem(id: string, count = 1): boolean {
     const slot = this.inventory.find(s => s && s.id === id)
     return !!slot && slot.count >= count

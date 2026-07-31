@@ -494,9 +494,7 @@ export class UIManager {
           const fromIdx = parseInt(e.dataTransfer!.getData('text/plain'))
           const toIdx = i
           if (fromIdx !== toIdx) {
-            const temp = player.inventory[fromIdx]
-            player.inventory[fromIdx] = player.inventory[toIdx]
-            player.inventory[toIdx] = temp
+            player.swapSlots(fromIdx, toIdx)
             sound.menuSelect()
             this.renderInventoryPanel(player)
           }

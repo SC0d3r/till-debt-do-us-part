@@ -76,7 +76,7 @@
 
     /* ─── DIALOGUE ─── */
     #dialog-box {
-      display: none; position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+      display: none; position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%);
       width: min(560px, 88vw);
       background: rgba(25,15,5,0.97); border: 3px solid #8b6914; border-radius: 8px;
       padding: 14px 18px; z-index: 50;
@@ -84,14 +84,25 @@
     }
     #dialog-speaker { color: #ffd700; font-size: 12px; margin-bottom: 6px; padding-bottom: 5px; border-bottom: 1px dashed #5a4020; }
     #dialog-text { color: #f0e0c0; font-size: 11px; line-height: 2; min-height: 36px; margin-bottom: 8px; }
-    html[dir="rtl"] #dialog-speaker { font-size: 20px; }
-    html[dir="rtl"] #dialog-text { font-size: 18px; line-height: 2.4; }
+    html[dir="rtl"] #dialog-speaker { font-size: 16px; }
+    html[dir="rtl"] #dialog-text { font-size: 14px; line-height: 2; }
     #dialog-choices { display: flex; flex-wrap: wrap; gap: 5px; }
     .dialog-choice {
       background: #3a2810; color: #f0e0c0; border: 2px solid #5a4020; border-radius: 4px;
       padding: 7px 12px; font-family: 'Press Start 2P', monospace; font-size: 9px; cursor: pointer; transition: all 0.1s;
     }
-    html[dir="rtl"] .dialog-choice { font-size: 16px; padding: 10px 18px; }
+    html[dir="rtl"] .dialog-choice { font-size: 13px; padding: 10px 18px; }
+    html[dir="rtl"] #hud { font-size: 14px; }
+    html[dir="rtl"] .hud-label { font-size: 12px; }
+    html[dir="rtl"] .hud-value { font-size: 15px; }
+    html[dir="rtl"] .hud-icon { font-size: 16px; }
+    html[dir="rtl"] #start-overlay h1 { font-size: 30px; }
+    html[dir="rtl"] #start-overlay p { font-size: 14px; line-height: 2.2; }
+    html[dir="rtl"] .seed-input-wrap label { font-size: 13px; }
+    html[dir="rtl"] #world-seed { font-size: 14px; }
+    html[dir="rtl"] #start-btn { font-size: 16px; }
+    html[dir="rtl"] #inventory-panel p { font-size: 12px !important; line-height: 2; }
+    html[dir="rtl"] #inventory-panel h2 { font-size: 20px; }
     html[dir="rtl"] .inv-panel-slot div[style*="font-size:6px"] { font-size: 10px !important; }
     html[dir="rtl"] .inv-count { font-size: 10px; }
     html[dir="rtl"] .inv-key { font-size: 9px; }
