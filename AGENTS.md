@@ -7,6 +7,7 @@ Rules:
 - After EVERY tool result, immediately decide the next action and call a tool or continue the plan.
 - Never end your turn while todos are pending/in-progress or the user's full request is unfinished.
 - Only stop when you can truthfully say: all requirements done, typecheck/tests green, and no remaining todos.
+- Always check the opencode todos UI after finishing work; if all tasks are done, clear/remove them.
 
 ## Commands
 - `npm run dev` — start Vite dev server
