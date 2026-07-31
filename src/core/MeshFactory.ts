@@ -349,6 +349,82 @@ export function createMineEntrance(): THREE.Group {
   return g
 }
 
+export function createHoleModel(): THREE.Group {
+  const g = new THREE.Group()
+
+  // Dark pit opening
+  const holeDisc = new THREE.Mesh(
+    new THREE.CircleGeometry(0.34, 16),
+    new THREE.MeshLambertMaterial({ color: 0x050302 })
+  )
+  holeDisc.name = 'hole'
+  holeDisc.rotation.x = -Math.PI / 2
+  holeDisc.position.y = 0.03
+  g.add(holeDisc)
+
+  // Glowing cyan rim so it stands out in the dark mine
+  const rim = new THREE.Mesh(
+    new THREE.RingGeometry(0.34, 0.41, 24),
+    new THREE.MeshBasicMaterial({ color: 0x33ffdd, transparent: true, opacity: 0.85, side: THREE.DoubleSide })
+  )
+  rim.name = 'rim'
+  rim.rotation.x = -Math.PI / 2
+  rim.position.y = 0.035
+  g.add(rim)
+
+  const rim2 = new THREE.Mesh(
+    new THREE.RingGeometry(0.41, 0.46, 24),
+    new THREE.MeshBasicMaterial({ color: 0x33ffdd, transparent: true, opacity: 0.3, side: THREE.DoubleSide })
+  )
+  rim2.name = 'rim2'
+  rim2.rotation.x = -Math.PI / 2
+  rim2.position.y = 0.032
+  g.add(rim2)
+
+  // Wooden ladder leaning down into the pit
+  const ladder = new THREE.Group()
+  ladder.name = 'ladder'
+  const railGeo = new THREE.BoxGeometry(0.06, 1.1, 0.06)
+  const railMat = new THREE.MeshLambertMaterial({ color: COLORS.wood })
+  for (const sx of [-0.11, 0.11]) {
+    const rail = new THREE.Mesh(railGeo, railMat)
+    rail.position.set(sx, 0.5, 0)
+    ladder.add(rail)
+  }
+  const rungMat = new THREE.MeshLambertMaterial({ color: COLORS.woodLight })
+  for (let i = 0; i < 5; i++) {
+    const rung = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.05, 0.05), rungMat)
+    rung.position.set(0, 0.18 + i * 0.2, 0)
+    ladder.add(rung)
+  }
+  ladder.rotation.x = 0.12
+  ladder.position.y = 0.02
+  g.add(ladder)
+
+  // Pulsing "descend" indicator floating above the hole
+  const c = document.createElement('canvas')
+  c.width = 64; c.height = 64
+  const cx = c.getContext('2d')!
+  const grad = cx.createRadialGradient(32, 32, 4, 32, 32, 30)
+  grad.addColorStop(0, 'rgba(51,255,221,1)')
+  grad.addColorStop(1, 'rgba(51,255,221,0)')
+  cx.fillStyle = grad
+  cx.beginPath(); cx.arc(32, 32, 30, 0, Math.PI * 2); cx.fill()
+  cx.fillStyle = '#063b33'
+  cx.beginPath(); cx.moveTo(32, 46); cx.lineTo(14, 22); cx.lineTo(50, 22); cx.closePath(); cx.fill()
+  cx.fillStyle = '#33ffdd'
+  cx.beginPath(); cx.moveTo(32, 42); cx.lineTo(18, 25); cx.lineTo(46, 25); cx.closePath(); cx.fill()
+  const tex = new THREE.CanvasTexture(c)
+  tex.magFilter = THREE.NearestFilter
+  const indicator = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }))
+  indicator.name = 'indicator'
+  indicator.scale.set(0.55, 0.55, 1)
+  indicator.position.y = 1.3
+  g.add(indicator)
+
+  return g
+}
+
 export function createWell(): THREE.Group {
   const g = new THREE.Group()
   const stoneTex = makeTexture(64, (ctx, w, h) => {

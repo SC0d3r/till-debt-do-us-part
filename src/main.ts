@@ -522,7 +522,22 @@ class Game {
     }
 
     if (interact) {
-      if (this.inMine) { this.exitMine(); return }
+      if (this.inMine) {
+        const hole = this.mine.getNearbyHole(this.playerModel.position.x, this.playerModel.position.z, 1.8)
+        if (hole) {
+          this.dialogue.show('mine_descend', (action) => {
+            if (action === 'descend') {
+              sound.menuClose()
+              this.mine.descend()
+              this.playerModel.position.set(hole.x, 0, hole.z + 0.5)
+              this.updateMineHUD()
+            }
+          })
+        } else {
+          this.exitMine()
+        }
+        return
+      }
 
       // Check proximity to buildings (walls count, not just center)
       const px = this.playerModel.position.x
@@ -1284,6 +1299,7 @@ class Game {
     }
 
     sound.menuOpen()
+    this.updateMineHUD()
   }
 
   private exitMine() {
@@ -1301,6 +1317,62 @@ class Game {
     this.playerModel.position.set(0.5, 0, GAME_CONFIG.farmHeight - 0.5)
     for (const [id, count] of Object.entries(result.items)) this.player.addItem(id, count)
     sound.menuClose()
+    this.updateMineHUD()
+  }
+
+  // ─── MINE HUD ───
+  private mineHudFloor = -1
+  private mineHudDigs = -1
+  private mineToastTimer: number | null = null
+
+  private updateMineHUD() {
+    const hud = document.getElementById('mine-hud')
+    const mainHud = document.getElementById('hud')
+    if (mainHud) mainHud.style.display = this.inMine ? 'none' : ''
+    if (!hud) return
+    if (!this.inMine) {
+      hud.style.display = 'none'
+      this.hideMineToast()
+      return
+    }
+    hud.style.display = 'flex'
+    const lvl = this.mine.currentFloor + 1
+    document.getElementById('mine-level')!.textContent = String(lvl)
+    document.getElementById('mine-exit')!.textContent = `${Math.round(this.mine.getExitChance() * 100)}%`
+
+    const digs = this.mine.digsLeft
+    if (digs !== this.mineHudDigs) {
+      this.mineHudDigs = digs
+      const digsEl = document.getElementById('mine-digs')!
+      digsEl.textContent = `${digs}/${GAME_CONFIG.mineDigsPerFloor}`
+      hud.classList.toggle('low', digs <= 0)
+    }
+    if (lvl !== this.mineHudFloor) {
+      this.mineHudFloor = lvl
+      const pips = document.getElementById('mine-pips')!
+      pips.innerHTML = ''
+      for (let i = 1; i <= GAME_CONFIG.mineFloors; i++) {
+        const pip = document.createElement('div')
+        pip.className = i <= lvl ? 'mine-pip filled' : 'mine-pip'
+        if (i === lvl) pip.classList.add('current')
+        pips.appendChild(pip)
+      }
+    }
+  }
+
+  private showMineToast(msg: string) {
+    const toast = document.getElementById('mine-toast')
+    if (!toast) return
+    toast.textContent = msg
+    toast.classList.add('show')
+    if (this.mineToastTimer) clearTimeout(this.mineToastTimer)
+    this.mineToastTimer = window.setTimeout(() => toast.classList.remove('show'), 2400)
+  }
+
+  private hideMineToast() {
+    if (this.mineToastTimer) { clearTimeout(this.mineToastTimer); this.mineToastTimer = null }
+    const toast = document.getElementById('mine-toast')
+    if (toast) toast.classList.remove('show')
   }
 
   private handleMineAction() {
@@ -1308,24 +1380,35 @@ class Game {
     if (sel?.id !== 'shovel' && sel?.id !== 'pickaxe') { sound.error(); return }
     if (sel && this.player.getToolDurability(sel.id) <= 0) { sound.error(); return }
 
+    if (this.mine.digsLeft <= 0) {
+      sound.error()
+      this.showMineToast(t('mine_toast_energy'))
+      this.updateMineHUD()
+      return
+    }
+
     const { x, z } = this.getFacingTile()
     const result = this.mine.dig(x, z, this.player.toolTiers[sel?.id || 'pickaxe'] || 1)
     if (result.blocked) { sound.error(); return }
     if (result.success) {
       const toolId = sel?.id || 'pickaxe'
-      this.player.useStamina(TOOLS[toolId]?.staminaCost || 5)
+      const tier = this.player.toolTiers[toolId] || 1
+      let cost = TOOLS[toolId]?.staminaCost || 5
+      if (toolId === 'shovel') cost = Math.max(1, cost - (tier - 1) * 2)
+      this.player.useStamina(cost)
       this.player.useToolDurability(toolId)
       this.playToolAnim('dig')
       this.actionCooldown = 0.3
-      if (result.foundLadder) {
-        if (this.mine.isLastFloor()) {
-          // Exit ladder on last floor
-          this.exitMine()
-        } else {
-          this.mine.descend()
-        }
+      if (result.exitMine) {
+        sound.menuOpen()
+        this.exitMine()
+        return
       }
-      if (this.mine.digsLeft <= 0) this.exitMine()
+      if (result.foundHole) {
+        sound.collectRare()
+        this.showMineToast(t('mine_toast_hole'))
+      }
+      this.updateMineHUD()
     }
   }
 

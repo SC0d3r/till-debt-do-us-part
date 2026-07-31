@@ -60,6 +60,17 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     dlg_ok: 'OK',
     dlg_sleep_yes: 'Sleep',
     dlg_sleep_no: 'Not yet',
+    // Mine
+    dlg_mine: '⛏️ Mine Hole',
+    dlg_mine_descend: 'You found a glowing hole with a ladder leading deeper. Climb down to the next level?',
+    dlg_descend: 'Descend',
+    dlg_stay: 'Stay here',
+    mine_hud_title: '⛏ MINE',
+    mine_depth_label: 'DEPTH',
+    mine_digs_label: 'DIGS',
+    mine_exit_label: 'ESCAPE',
+    mine_toast_energy: 'No digging energy left! Press E to leave or climb a hole.',
+    mine_toast_hole: 'A hole opened up! Press E to descend deeper.',
   },
   fa: {
     title: '🌾 تا بدهکاری ما را جدا کند',
@@ -120,6 +131,17 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     dlg_ok: 'باشه',
     dlg_sleep_yes: 'بخواب',
     dlg_sleep_no: 'هنوز نه',
+    // Mine
+    dlg_mine: '⛏️ گودال معدن',
+    dlg_mine_descend: 'یک گودال درخشان با نردبانی که به عمق می‌رود پیدا کردی. به طبقه بعد پایین می‌روی؟',
+    dlg_descend: 'پایین برو',
+    dlg_stay: 'اینجا بمان',
+    mine_hud_title: '⛏ معدن',
+    mine_depth_label: 'عمق',
+    mine_digs_label: 'حفاری',
+    mine_exit_label: 'خروج',
+    mine_toast_energy: 'انرژی حفاری تمام شد! برای خروج یا رفتن به گودال E را بزن.',
+    mine_toast_hole: 'گودالی باز شد! برای رفتن به عمق E را بزن.',
   },
 }
 
@@ -183,6 +205,12 @@ function applyLangToDOM() {
 
   // Controls hint
   setHtml('controls-hint', 'controls')
+
+  // Mine HUD
+  setText('mine-hud-title', 'mine_hud_title')
+  setText('mine-depth-label', 'mine_depth_label')
+  setText('mine-digs-label', 'mine_digs_label')
+  setText('mine-exit-label', 'mine_exit_label')
 
   // Update lang button active states
   document.querySelectorAll('.lang-btn[data-lang]').forEach(btn => {

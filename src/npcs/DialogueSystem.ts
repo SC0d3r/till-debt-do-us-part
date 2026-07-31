@@ -87,6 +87,11 @@ const DIALOGUES: Record<string, DialogueEntry> = {
     textKey: 'dlg_sleep_confirm',
     choices: [{ labelKey: 'dlg_sleep_yes', action: 'sleep' }, { labelKey: 'dlg_sleep_no', action: 'close' }],
   },
+  mine_descend: {
+    speakerKey: 'dlg_mine',
+    textKey: 'dlg_mine_descend',
+    choices: [{ labelKey: 'dlg_descend', action: 'descend' }, { labelKey: 'dlg_stay', action: 'close' }],
+  },
 }
 
 export class DialogueSystem {

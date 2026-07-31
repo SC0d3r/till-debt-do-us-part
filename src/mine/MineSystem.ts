@@ -1,14 +1,16 @@
 import * as THREE from 'three'
 import { GAME_CONFIG, MINE_ITEMS } from '../data/gameData'
 import { loadTexture, createSprite } from '../core/AssetLoader'
+import { createHoleModel } from '../core/MeshFactory'
 import { sound } from '../core/SoundManager'
 
 export interface MineTile {
   dug: boolean
-  hasLadder: boolean
+  hasHole: boolean
   itemId: string | null
   isRock: boolean
   mesh: THREE.Object3D | null
+  holeModel: THREE.Group | null
 }
 
 interface BouncingItem {
@@ -21,6 +23,15 @@ interface BouncingItem {
   settled: boolean
 }
 
+export interface DigResult {
+  success: boolean
+  foundHole: boolean
+  exitMine: boolean
+  itemId: string | null
+  blocked: boolean
+  outOfEnergy: boolean
+}
+
 export class MineSystem {
   group: THREE.Group
   currentFloor = 0
@@ -28,6 +39,9 @@ export class MineSystem {
   floors: MineTile[][][] = []
   active = false
   private bouncingItems: BouncingItem[] = []
+  private holeModels: THREE.Group[] = []
+  private digsThisFloor = 0
+  private holeRevealed = false
 
   constructor() {
     this.group = new THREE.Group()
@@ -38,41 +52,26 @@ export class MineSystem {
     if (this.floors[floorNum]) return this.floors[floorNum]
     const size = 14 + Math.min(floorNum, 6)
     const floor: MineTile[][] = []
-    let downLadderPlaced = false
-    const isLastFloor = floorNum >= GAME_CONFIG.mineFloors - 1
     for (let x = 0; x < size; x++) {
       floor[x] = []
       for (let z = 0; z < size; z++) {
         const isRock = Math.random() < 0.15 + floorNum * 0.04
-        // Down ladder chance increases with depth
-        const downLadderChance = 0.03 + floorNum * 0.02
-        const hasDownLadder = !isLastFloor && !downLadderPlaced && Math.random() < downLadderChance && x > 0 && z > 0
-        if (hasDownLadder) downLadderPlaced = true
-        // Exit ladder on last floor
-        const hasExitLadder = isLastFloor && !downLadderPlaced && Math.random() < 0.05 && x > 0 && z > 0
-        if (hasExitLadder) downLadderPlaced = true
-        const hasLadder = hasDownLadder || hasExitLadder
         let itemId: string | null = null
-        // Item chance and rarity scale with depth
-        const itemChance = 0.15 + floorNum * 0.04
-        if (!isRock && !hasLadder && Math.random() < itemChance) {
-          // Shift rarity toward rarer items on deeper floors
-          const depthBonus = floorNum * 0.03
+        // Item chance scales with depth
+        const itemChance = 0.16 + floorNum * 0.025
+        if (!isRock && Math.random() < itemChance) {
+          // Shift rarity toward rarer items on deeper levels
+          const depthBonus = 0.035 * (floorNum + 1)
           const roll = Math.random()
           let cumulative = 0
           for (const item of MINE_ITEMS) {
-            // Boost rare items on deeper floors
-            const adjustedRarity = item.rarity + (item.tier === 'epic' || item.tier === 'legendary' ? depthBonus : 0)
+            const adjustedRarity = item.rarity + (item.tier !== 'common' ? depthBonus : 0)
             cumulative += adjustedRarity
             if (roll <= cumulative) { itemId = item.id; break }
           }
         }
-        floor[x][z] = { dug: false, hasLadder, itemId, isRock, mesh: null }
+        floor[x][z] = { dug: false, hasHole: false, itemId, isRock, mesh: null, holeModel: null }
       }
-    }
-    // Guarantee a ladder if none placed
-    if (!downLadderPlaced && size > 1) {
-      floor[Math.floor(Math.random() * (size - 1)) + 1][Math.floor(Math.random() * (size - 1)) + 1].hasLadder = true
     }
     this.floors[floorNum] = floor
     return floor
@@ -81,6 +80,9 @@ export class MineSystem {
   buildFloorVisuals(floorNum: number) {
     while (this.group.children.length > 0) this.group.remove(this.group.children[0])
     this.bouncingItems = []
+    this.holeModels = []
+    this.digsThisFloor = 0
+    this.holeRevealed = false
     const floor = this.generateFloor(floorNum)
     const geo = new THREE.PlaneGeometry(1, 1)
     geo.rotateX(-Math.PI / 2)
@@ -122,28 +124,75 @@ export class MineSystem {
     return { items, floorReached: this.currentFloor }
   }
 
-  dig(x: number, z: number, pickaxeTier: number): { success: boolean; foundLadder: boolean; itemId: string | null; blocked: boolean } {
+  // Only one ladder per level. It's a gamble: each dig has a small flat chance
+  // to reveal it (early finds are lucky), with only a small pity bump after
+  // many misses so it stays a real search. Deeper levels are harder to find.
+  getHoleChance(): number {
+    if (this.holeRevealed || this.isLastFloor()) return 0
+    const flat = Math.max(0.02, 0.05 - this.currentFloor * 0.0025)
+    const pity = Math.max(0, 0.006 - this.currentFloor * 0.0004)
+    return Math.min(flat + this.digsThisFloor * pity, 0.3)
+  }
+
+  // Very small chance to accidentally stumble back to the surface, grows with depth.
+  getExitChance(): number {
+    return 0.01 + this.currentFloor * 0.012
+  }
+
+  dig(x: number, z: number, pickaxeTier: number): DigResult {
     const floor = this.floors[this.currentFloor]
-    if (!floor?.[x]?.[z]) return { success: false, foundLadder: false, itemId: null, blocked: false }
+    if (!floor?.[x]?.[z]) return { success: false, foundHole: false, exitMine: false, itemId: null, blocked: false, outOfEnergy: false }
     const tile = floor[x][z]
-    if (tile.dug) return { success: false, foundLadder: false, itemId: null, blocked: false }
-    if (tile.isRock && pickaxeTier < 2) { sound.error(); return { success: false, foundLadder: false, itemId: null, blocked: true } }
-    if (this.digsLeft <= 0) return { success: false, foundLadder: false, itemId: null, blocked: false }
+    if (tile.dug) return { success: false, foundHole: false, exitMine: false, itemId: null, blocked: false, outOfEnergy: false }
+    if (tile.isRock && pickaxeTier < 2) { sound.error(); return { success: false, foundHole: false, exitMine: false, itemId: null, blocked: true, outOfEnergy: false } }
+    if (this.digsLeft <= 0) { sound.error(); return { success: false, foundHole: false, exitMine: false, itemId: null, blocked: true, outOfEnergy: true } }
 
     this.digsLeft--
+    this.digsThisFloor++
     tile.dug = true
     sound.toolSwing()
 
     if (tile.mesh instanceof THREE.Mesh) {
       const mat = tile.mesh.material as THREE.MeshLambertMaterial
-      mat.color.setHex(tile.hasLadder ? 0xd4a017 : 0x1a0e08)
+      mat.color.setHex(0x1a0e08)
     }
 
     if (tile.itemId) {
       this.spawnBouncingItem(x, z, tile.itemId)
     }
 
-    return { success: true, foundLadder: tile.hasLadder, itemId: null, blocked: false }
+    // Roll exit first (mutually exclusive with the ladder)
+    if (Math.random() < this.getExitChance()) {
+      return { success: true, foundHole: false, exitMine: true, itemId: null, blocked: false, outOfEnergy: false }
+    }
+
+    // Roll the single ladder — only once per level
+    if (!this.holeRevealed && Math.random() < this.getHoleChance()) {
+      this.holeRevealed = true
+      tile.hasHole = true
+      const model = createHoleModel()
+      model.position.set(x, 0.02, z)
+      this.group.add(model)
+      tile.holeModel = model
+      this.holeModels.push(model)
+      return { success: true, foundHole: true, exitMine: false, itemId: null, blocked: false, outOfEnergy: false }
+    }
+
+    return { success: true, foundHole: false, exitMine: false, itemId: null, blocked: false, outOfEnergy: false }
+  }
+
+  getNearbyHole(px: number, pz: number, radius: number): { x: number; z: number } | null {
+    const floor = this.floors[this.currentFloor]
+    if (!floor) return null
+    const r2 = radius * radius
+    for (const hole of this.holeModels) {
+      const dx = hole.position.x - px
+      const dz = hole.position.z - pz
+      if (dx * dx + dz * dz < r2) {
+        return { x: Math.round(hole.position.x), z: Math.round(hole.position.z) }
+      }
+    }
+    return null
   }
 
   private spawnBouncingItem(x: number, z: number, itemId: string) {
@@ -231,6 +280,20 @@ export class MineSystem {
       // Gentle float once settled
       if (bi.velocity.lengthSq() < 0.01) {
         bi.sprite.position.y = bi.baseY + Math.sin(bi.time * 3) * 0.08
+      }
+    }
+
+    // Animate revealed holes: pulse rim + bob indicator
+    for (const model of this.holeModels) {
+      const t = performance.now() / 1000
+      const rim = model.getObjectByName('rim') as THREE.Mesh | null
+      if (rim) {
+        const mat = rim.material as THREE.MeshBasicMaterial
+        mat.opacity = 0.55 + Math.sin(t * 4) * 0.3
+      }
+      const indicator = model.getObjectByName('indicator') as THREE.Sprite | null
+      if (indicator) {
+        indicator.position.y = 1.3 + Math.sin(t * 3) * 0.12
       }
     }
   }
