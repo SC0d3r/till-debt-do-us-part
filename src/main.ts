@@ -180,7 +180,7 @@ class Game {
         if (this.started && !this.dialogue.active && !this.morningBuyerActive) this.togglePause()
         return
       }
-      if (!this.started || this.paused || this.dialogue.active || this.morningBuyerActive) return
+      if (!this.started || this.paused || this.dialogue.active) return
       if (e.key === 'i' || e.key === 'I') {
         if (this.ui.inventoryOpen) this.ui.closeInventory()
         else if (!this.ui.shopOpen) this.ui.openInventory(this.player)
@@ -285,7 +285,7 @@ class Game {
 
     if (!this.dialogue.active && !this.ui.shopOpen) {
       this.handleMovement(dt)
-      if (!this.morningBuyerActive) this.handleActions()
+      this.handleActions()
     }
     if (this.inMine) {
       this.mine.update(dt)
