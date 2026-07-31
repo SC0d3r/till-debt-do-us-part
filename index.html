@@ -91,7 +91,25 @@
       background: #3a2810; color: #f0e0c0; border: 2px solid #5a4020; border-radius: 4px;
       padding: 7px 12px; font-family: 'Press Start 2P', monospace; font-size: 9px; cursor: pointer; transition: all 0.1s;
     }
-    html[dir="rtl"] .dialog-choice { font-size: 13px; padding: 9px 16px; }
+    html[dir="rtl"] .dialog-choice { font-size: 16px; padding: 10px 18px; }
+    html[dir="rtl"] .inv-panel-slot div[style*="font-size:6px"] { font-size: 10px !important; }
+    html[dir="rtl"] .inv-count { font-size: 10px; }
+    html[dir="rtl"] .inv-key { font-size: 9px; }
+    html[dir="rtl"] .inv-dur { font-size: 9px; }
+
+    /* ─── DELETE CONFIRM ─── */
+    #delete-confirm-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      z-index: 90; align-items: center; justify-content: center;
+    }
+    #delete-confirm-box {
+      background: linear-gradient(180deg, #3d2b1a 0%, #2a1c0e 100%);
+      border: 3px solid #d4a84b; border-radius: 12px; padding: 24px;
+      min-width: 260px; text-align: center;
+      box-shadow: 0 0 40px rgba(212,168,75,0.25), 0 10px 40px rgba(0,0,0,0.85);
+    }
+    html[dir="rtl"] #delete-confirm-box p { font-size: 14px; }
+    html[dir="rtl"] #del-item-name { font-size: 14px !important; }
     .dialog-choice:hover { background: #5a4020; color: #ffd700; border-color: #ffd700; }
 
     /* ─── PAYMENT OVERLAY ─── */
@@ -311,6 +329,18 @@
         <span class="pause-fps" id="pause-fps">--</span>
       </div>
       <button class="pause-btn" id="resume-btn">RESUME</button>
+    </div>
+  </div>
+
+  <div id="delete-confirm-overlay">
+    <div id="delete-confirm-box">
+      <div id="del-item-icon" style="font-size:48px;margin-bottom:10px"></div>
+      <div id="del-item-name" style="font-size:10px;color:#f0e0c0;margin-bottom:16px;text-align:center"></div>
+      <p style="font-size:9px;color:#a08860;margin-bottom:16px;text-align:center">Are you sure you want to discard this item?</p>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button id="del-yes" class="dialog-choice" style="background:#8b2020;border-color:#cc4040">Yes, Discard</button>
+        <button id="del-no" class="dialog-choice">Cancel</button>
+      </div>
     </div>
   </div>
 

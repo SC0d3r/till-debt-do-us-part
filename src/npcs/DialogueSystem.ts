@@ -137,8 +137,10 @@ export class DialogueSystem {
       btn.onclick = (e) => {
         e.stopPropagation()
         sound.menuSelect()
+        const cb = this.onChoice
+        const action = choice.action
         this.close()
-        this.onChoice?.(choice.action)
+        cb?.(action)
       }
       this.choicesEl.appendChild(btn)
     }

@@ -318,6 +318,37 @@ export class UIManager {
     this.inventoryPanel.style.display = 'none'
   }
 
+  private showDeleteConfirm(player: PlayerState, itemId: string, count: number, slotIdx: number) {
+    this.closeInventory()
+    const info = getItemInfo(itemId)
+    const emoji = info?.emoji || '❓'
+    const name = info?.name || itemId
+    const overlay = document.getElementById('delete-confirm-overlay')!
+    document.getElementById('del-item-icon')!.textContent = emoji
+    document.getElementById('del-item-name')!.textContent = `${name} x${count}`
+    overlay.style.display = 'flex'
+    sound.menuOpen()
+
+    const yesBtn = document.getElementById('del-yes')!
+    const noBtn = document.getElementById('del-no')!
+    const cleanup = () => {
+      overlay.style.display = 'none'
+      yesBtn.replaceWith(yesBtn.cloneNode(true))
+      noBtn.replaceWith(noBtn.cloneNode(true))
+    }
+    yesBtn.addEventListener('click', () => {
+      player.removeItem(itemId, count)
+      sound.error()
+      cleanup()
+      this.openInventory(player)
+    })
+    noBtn.addEventListener('click', () => {
+      sound.menuClose()
+      cleanup()
+      this.openInventory(player)
+    })
+  }
+
   private renderInventoryPanel(player: PlayerState) {
     const content = document.getElementById('inv-content')!
     content.innerHTML = ''
@@ -397,9 +428,7 @@ export class UIManager {
         delBtn.textContent = '✕'
         delBtn.onclick = (e) => {
           e.stopPropagation()
-          player.removeItem(item.id, item.count)
-          sound.error()
-          this.renderInventoryPanel(player)
+          this.showDeleteConfirm(player, item.id, item.count, i)
         }
         slot.appendChild(delBtn)
 

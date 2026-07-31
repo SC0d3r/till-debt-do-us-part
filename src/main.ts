@@ -29,6 +29,7 @@ class Game {
   private dogModel: THREE.Group | null = null
   private shopNpcModel: THREE.Group | null = null
   private shopNpcTimer = 0
+  private sweatSprite: THREE.Sprite | null = null
   private clock = new THREE.Clock()
   private inMine = false
   private actionCooldown = 0
@@ -104,6 +105,7 @@ class Game {
     this.mine = new MineSystem()
     this.dialogue = new DialogueSystem()
     this.ui = new UIManager()
+    this.ui.setOnSelectSlot(() => this.updateHeldVisual())
 
     // Player model
     this.playerModel = createPlayerModel()
@@ -228,9 +230,12 @@ class Game {
     }
   }
 
+  private sweatTimer = 0
+
   private triggerTiredAnimation() {
     if (this.tiredCooldown > 0) return
-    this.tiredCooldown = 0.6
+    this.tiredCooldown = 1.5
+    this.sweatTimer = 1.0
     const bar = document.getElementById('stamina-bar')!
     const fill = document.getElementById('stamina-fill')!
     bar.classList.remove('tired-shake')
@@ -255,9 +260,9 @@ class Game {
     this.input.update()
     this.actionCooldown = Math.max(0, this.actionCooldown - dt)
 
-    if (!this.dialogue.active && !this.ui.shopOpen && !this.morningBuyerActive) {
+    if (!this.dialogue.active && !this.ui.shopOpen) {
       this.handleMovement(dt)
-      this.handleActions()
+      if (!this.morningBuyerActive) this.handleActions()
     }
     if (this.inMine) {
       this.mine.update(dt)
@@ -292,6 +297,32 @@ class Game {
       const arrow = this.farm.binGroup.getObjectByName('binArrow')
       if (arrow) arrow.position.y = 2.5 + Math.sin(this.binArrowTimer * 3) * 0.15
     }
+    // Sweat icon above player head
+    if (this.sweatTimer > 0) {
+      this.sweatTimer -= dt
+      if (!this.sweatSprite) {
+        const canvas = document.createElement('canvas')
+        canvas.width = 64; canvas.height = 64
+        const ctx = canvas.getContext('2d')!
+        ctx.font = '48px serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText('💦', 32, 32)
+        const tex = new THREE.CanvasTexture(canvas)
+        tex.magFilter = THREE.NearestFilter
+        this.sweatSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }))
+        this.sweatSprite.scale.set(0.5, 0.5, 1)
+      }
+      if (!this.sweatSprite.parent) {
+        this.sweatSprite.position.set(0, 1.5, 0)
+        this.playerModel.add(this.sweatSprite)
+      }
+      this.sweatSprite.material.opacity = Math.min(1, this.sweatTimer * 2)
+      this.sweatSprite.position.y = 1.5 + Math.sin(this.sweatTimer * 8) * 0.05
+    } else if (this.sweatSprite && this.sweatSprite.parent) {
+      this.playerModel.remove(this.sweatSprite)
+    }
+
     this.ui.updateHUD(this.player)
     this.updateCamera(dt)
 
@@ -469,7 +500,7 @@ class Game {
 
       if (px ** 2 + pz ** 2 < buildingRange ** 2) {
         this.dialogue.show('sleep_confirm', (action) => {
-          if (action === 'sleep') this.doSleep()
+          if (action === 'sleep') setTimeout(() => this.doSleep(), 50)
         })
         return
       }
@@ -621,7 +652,7 @@ class Game {
       return
     }
 
-    if (sel?.id.startsWith('seed_')) {
+      if (sel?.id.startsWith('seed_')) {
       if (ft.type !== TileType.TILLED && ft.type !== TileType.WATERED) {
         sound.error()
         return
@@ -629,6 +660,7 @@ class Game {
       const cropId = sel.id.replace('seed_', '')
       if (this.farm.plant(x, z, cropId)) {
         this.player.removeItem(sel.id)
+        this.updateHeldVisual() // clears ghost if no more seeds
         this.actionCooldown = 0.25
       } else sound.error()
       return
