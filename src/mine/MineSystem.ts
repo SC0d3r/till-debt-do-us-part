@@ -35,7 +35,7 @@ export class MineSystem {
 
   generateFloor(floorNum: number) {
     if (this.floors[floorNum]) return this.floors[floorNum]
-    const size = 8 + Math.min(floorNum, 4)
+    const size = 14 + Math.min(floorNum, 6)
     const floor: MineTile[][] = []
     let ladderPlaced = false
     for (let x = 0; x < size; x++) {
@@ -131,21 +131,27 @@ export class MineSystem {
 
   private spawnBouncingItem(x: number, z: number, itemId: string) {
     const texPath = `/assets/items/${itemId}.png`
-    const sprite = createSprite(loadTexture(texPath), 0.6)
-    // Pop up from ground with random horizontal scatter
-    const scatterX = (Math.random() - 0.5) * 0.6
-    const scatterZ = (Math.random() - 0.5) * 0.6
-    sprite.position.set(x + scatterX, 0.1, z + scatterZ)
+    const sprite = createSprite(loadTexture(texPath), 0.8)
+    const angle = Math.random() * Math.PI * 2
+    const force = 1.5 + Math.random() * 2.5
+    sprite.position.set(x, 0.1, z)
     sprite.center.set(0.5, 0.3)
     this.group.add(sprite)
+
+    const itemDef = MINE_ITEMS.find(m => m.id === itemId)
+    if (itemDef && (itemDef.tier === 'epic' || itemDef.tier === 'legendary')) {
+      sound.collectRare()
+    } else {
+      sound.collect()
+    }
 
     this.bouncingItems.push({
       sprite,
       itemId,
       velocity: new THREE.Vector3(
-        (Math.random() - 0.5) * 2,
-        3 + Math.random() * 2,
-        (Math.random() - 0.5) * 2
+        Math.cos(angle) * force,
+        4 + Math.random() * 3,
+        Math.sin(angle) * force
       ),
       baseY: 0.3,
       time: 0,

@@ -11,7 +11,7 @@ export class PlayerState {
   day = 1
   stamina = GAME_CONFIG.maxStamina
   maxStamina = GAME_CONFIG.maxStamina
-  inventory: (InventoryItem | null)[] = new Array(8).fill(null)
+  inventory: (InventoryItem | null)[] = new Array(16).fill(null)
   toolTiers: Record<string, number> = { hoe: 1, water: 1, pickaxe: 1, axe: 1, shovel: 1 }
   toolDurability: Record<string, number> = {}
   waterLevel = 10
@@ -52,6 +52,10 @@ export class PlayerState {
     if (cost <= 0) return 0
     this.toolDurability[toolId] = TOOL_MAX_DURABILITY
     return cost
+  }
+
+  isFull(): boolean {
+    return !this.inventory.some(s => s === null)
   }
 
   addItem(id: string, count = 1): boolean {

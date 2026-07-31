@@ -14,29 +14,46 @@ const ITEM_COLORS: Record<string, string> = {
 }
 
 const TOOL_EMOJIS: Record<string, string> = {
-  hoe: '⛏️', water: '💧', pickaxe: '🪨', axe: '🪓', shovel: '🥄',
+  hoe: '🌾', water: '🚿', pickaxe: '⛏️', axe: '🪓', shovel: '🔨',
 }
 
-const TOOL_VISUALS: Record<string, { label: string; bg: string; border: string }> = {
-  hoe:     { label: 'HOE',  bg: '#8b6914', border: '#c8a030' },
-  water:   { label: 'H₂O',  bg: '#2266aa', border: '#44aadd' },
-  pickaxe: { label: 'PICK', bg: '#666666', border: '#999999' },
-  axe:     { label: 'AXE',  bg: '#8b4513', border: '#c06030' },
-  shovel:  { label: 'DIG',  bg: '#7a6030', border: '#aa8844' },
+const TOOL_EMOJI_MAP: Record<string, string> = {
+  hoe: '🌾', water: '🚿', pickaxe: '⛏️', axe: '🪓', shovel: '🔨',
+}
+
+const SEED_EMOJI_MAP: Record<string, string> = {
+  seed_turnip: '🟣', seed_potato: '🥔', seed_tomato: '🍅',
+  seed_corn: '🌽', seed_flower: '🌸', seed_rare: '💎', seed_star: '⭐',
+}
+
+const ITEM_EMOJI_MAP: Record<string, string> = {
+  wood: '🪵', stone_item: '🪨',
+  ore_copper: '🟤', ore_iron: '⬜', ore_gold: '🟡',
+  gem_ruby: '🔴', gem_sapphire: '🔵', fossil: '🦴',
+  turnip: '🟣', potato: '🥔', tomato: '🍅', corn: '🌽',
+  flower: '🌸', rare: '✨',
+}
+
+const TOOL_BG: Record<string, string> = {
+  hoe: '#8b6914', water: '#2266aa', pickaxe: '#666666', axe: '#8b4513', shovel: '#7a6030',
 }
 
 export class UIManager {
   shopOpen = false
+  inventoryOpen = false
   private tooltipEl: HTMLElement
   private dialogBox: HTMLElement
   private shopPanel: HTMLElement
+  private inventoryPanel: HTMLElement
   private onShopAction: ((action: string, id: string) => void) | null = null
 
   constructor() {
     this.tooltipEl = document.getElementById('item-tooltip')!
     this.dialogBox = document.getElementById('dialog-box')!
     this.shopPanel = document.getElementById('shop-panel')!
+    this.inventoryPanel = document.getElementById('inventory-panel')!
     document.getElementById('shop-close')!.addEventListener('click', () => this.closeShop())
+    document.getElementById('inv-close')!.addEventListener('click', () => this.closeInventory())
     document.addEventListener('mousemove', (e) => {
       if (!(e.target as HTMLElement).closest('.inv-slot')) this.hideTooltip()
     })
@@ -89,11 +106,12 @@ export class UIManager {
         const isTool = !!TOOLS[item.id]
 
         if (isTool) {
-          const tv = TOOL_VISUALS[item.id]
+          const emoji = TOOL_EMOJI_MAP[item.id] || '🔧'
+          const bg = TOOL_BG[item.id] || '#444'
           const icon = document.createElement('div')
           icon.className = 'slot-icon'
-          icon.style.cssText = `display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;width:48px;height:48px;background:${tv?.bg || '#444'};border:2px solid ${tv?.border || '#666'};border-radius:6px;color:#fff;text-shadow:1px 1px 0 #000;letter-spacing:1px`
-          icon.textContent = tv?.label || item.id.toUpperCase().slice(0,4)
+          icon.style.cssText = `display:flex;align-items:center;justify-content:center;font-size:28px;width:48px;height:48px;background:${bg};border:2px solid rgba(255,255,255,0.2);border-radius:6px`
+          icon.textContent = emoji
           slot.appendChild(icon)
 
           const dur = player.getToolDurability(item.id)
@@ -131,16 +149,27 @@ export class UIManager {
             slot.appendChild(tierEl)
           }
         } else {
-          const texPath = getItemTexture(item.id)
-          if (texPath) {
-            const img = document.createElement('img')
-            img.src = texPath
-            img.className = 'slot-icon'
-            img.style.cssText = 'width:48px;height:48px;object-fit:contain;image-rendering:pixelated;border-radius:6px'
-            img.draggable = false
-            slot.appendChild(img)
+          const isSeed = item.id.startsWith('seed_')
+          const seedEmoji = SEED_EMOJI_MAP[item.id]
+          const itemEmoji = ITEM_EMOJI_MAP[item.id]
+          if (isSeed && seedEmoji) {
+            // Seed bag: 🛍️ background + seed emoji centered
+            const icon = document.createElement('div')
+            icon.className = 'slot-icon'
+            const seedCol = ITEM_COLORS[item.id] || '#3a6e2a'
+            icon.style.cssText = `display:flex;align-items:center;justify-content:center;font-size:28px;width:48px;height:48px;background:${seedCol};border:2px solid rgba(255,255,255,0.2);border-radius:6px;position:relative`
+            icon.innerHTML = `<span style="font-size:36px;opacity:0.4">🛍️</span><span style="position:absolute;font-size:22px">${seedEmoji}</span>`
+            slot.appendChild(icon)
+          } else if (itemEmoji) {
+            // Items with emoji icons
+            const icon = document.createElement('div')
+            icon.className = 'slot-icon'
+            const col = ITEM_COLORS[item.id] || '#555'
+            icon.style.cssText = `display:flex;align-items:center;justify-content:center;font-size:28px;width:48px;height:48px;background:${col};border:2px solid rgba(255,255,255,0.2);border-radius:6px`
+            icon.textContent = itemEmoji
+            slot.appendChild(icon)
           } else {
-            const info = getItemInfo(item.id)
+            // Fallback: text label
             const col = ITEM_COLORS[item.id] || '#555'
             const label = (info?.name || item.id).slice(0, 4).toUpperCase()
             const icon = document.createElement('div')
@@ -252,5 +281,135 @@ export class UIManager {
       upgSec.appendChild(div)
     }
     content.appendChild(upgSec)
+  }
+
+  openInventory(player: PlayerState) {
+    this.inventoryOpen = true
+    sound.menuOpen()
+    this.renderInventoryPanel(player)
+    this.inventoryPanel.style.display = 'block'
+  }
+
+  closeInventory() {
+    this.inventoryOpen = false
+    sound.menuClose()
+    this.inventoryPanel.style.display = 'none'
+  }
+
+  private renderInventoryPanel(player: PlayerState) {
+    const content = document.getElementById('inv-content')!
+    content.innerHTML = ''
+    for (let i = 0; i < 16; i++) {
+      const slot = document.createElement('div')
+      slot.className = `inv-panel-slot${i === player.selectedSlot ? ' active' : ''}`
+      slot.dataset.idx = String(i)
+
+      const keyHint = document.createElement('span')
+      keyHint.className = 'inv-key'
+      keyHint.textContent = String(i + 1)
+      slot.appendChild(keyHint)
+
+      const item = player.inventory[i]
+      if (item && item.count > 0) {
+        const info = getItemInfo(item.id)
+        const isTool = !!TOOLS[item.id]
+
+        if (isTool) {
+          const emoji = TOOL_EMOJI_MAP[item.id] || '🔧'
+          const bg = TOOL_BG[item.id] || '#444'
+          const icon = document.createElement('div')
+          icon.style.cssText = `display:flex;align-items:center;justify-content:center;font-size:32px;width:56px;height:56px;background:${bg};border-radius:8px`
+          icon.textContent = emoji
+          slot.appendChild(icon)
+
+          const dur = player.getToolDurability(item.id)
+          const durPct = Math.round((dur / TOOL_MAX_DURABILITY) * 100)
+          const durBar = document.createElement('div')
+          durBar.style.cssText = 'position:absolute;bottom:4px;left:4px;right:4px;height:5px;background:#333;border-radius:3px;overflow:hidden'
+          const durFill = document.createElement('div')
+          durFill.style.cssText = `height:100%;width:${durPct}%;background:${durPct > 50 ? '#4caf50' : durPct > 20 ? '#f39c12' : '#e74c3c'};border-radius:3px`
+          durBar.appendChild(durFill)
+          slot.appendChild(durBar)
+        } else {
+          const isSeed = item.id.startsWith('seed_')
+          const seedEmoji = SEED_EMOJI_MAP[item.id]
+          const itemEmoji = ITEM_EMOJI_MAP[item.id]
+          if (isSeed && seedEmoji) {
+            // Seed bag in panel: 🛍️ + seed emoji
+            const seedCol = ITEM_COLORS[item.id] || '#3a6e2a'
+            const icon = document.createElement('div')
+            icon.style.cssText = `display:flex;align-items:center;justify-content:center;font-size:36px;width:64px;height:64px;background:${seedCol};border-radius:8px;position:relative`
+            icon.innerHTML = `<span style="font-size:48px;opacity:0.4">🛍️</span><span style="position:absolute;font-size:30px">${seedEmoji}</span>`
+            slot.appendChild(icon)
+          } else if (itemEmoji) {
+            const col = ITEM_COLORS[item.id] || '#555'
+            const icon = document.createElement('div')
+            icon.style.cssText = `display:flex;align-items:center;justify-content:center;font-size:32px;width:64px;height:64px;background:${col};border-radius:8px`
+            icon.textContent = itemEmoji
+            slot.appendChild(icon)
+          } else {
+            const col = ITEM_COLORS[item.id] || '#555'
+            const label = (info?.name || item.id).slice(0, 4).toUpperCase()
+            const icon = document.createElement('div')
+            icon.style.cssText = `display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold;width:64px;height:64px;background:${col};border-radius:8px;color:#fff`
+            icon.textContent = label
+            slot.appendChild(icon)
+          }
+
+          const countEl = document.createElement('span')
+          countEl.className = 'inv-count'
+          countEl.textContent = String(item.count)
+          slot.appendChild(countEl)
+        }
+
+        if (info) {
+          const nameEl = document.createElement('div')
+          nameEl.style.cssText = 'position:absolute;bottom:-18px;left:0;right:0;text-align:center;font-size:6px;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'
+          nameEl.textContent = info.name
+          slot.appendChild(nameEl)
+        }
+
+        // Delete button
+        const delBtn = document.createElement('button')
+        delBtn.className = 'inv-del-btn'
+        delBtn.textContent = '✕'
+        delBtn.onclick = (e) => {
+          e.stopPropagation()
+          player.removeItem(item.id, item.count)
+          sound.error()
+          this.renderInventoryPanel(player)
+        }
+        slot.appendChild(delBtn)
+
+        // Click to select
+        slot.addEventListener('click', () => {
+          player.selectedSlot = i
+          sound.menuSelect()
+          this.renderInventoryPanel(player)
+        })
+
+        // Drag support
+        slot.draggable = true
+        slot.addEventListener('dragstart', (e) => {
+          e.dataTransfer!.setData('text/plain', String(i))
+        })
+        slot.addEventListener('dragover', (e) => { e.preventDefault(); slot.style.borderColor = '#ffd700' })
+        slot.addEventListener('dragleave', () => { slot.style.borderColor = '' })
+        slot.addEventListener('drop', (e) => {
+          e.preventDefault()
+          slot.style.borderColor = ''
+          const fromIdx = parseInt(e.dataTransfer!.getData('text/plain'))
+          const toIdx = i
+          if (fromIdx !== toIdx) {
+            const temp = player.inventory[fromIdx]
+            player.inventory[fromIdx] = player.inventory[toIdx]
+            player.inventory[toIdx] = temp
+            sound.menuSelect()
+            this.renderInventoryPanel(player)
+          }
+        })
+      }
+      content.appendChild(slot)
+    }
   }
 }

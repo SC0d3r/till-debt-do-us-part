@@ -124,36 +124,129 @@
     #shop-close { display: block; margin: 12px auto 0; background: linear-gradient(180deg, #7a4420, #5a3010); color: #ffe066; border: 2px solid #d4a84b; border-radius: 6px; padding: 8px 22px; font-family: 'Press Start 2P', monospace; font-size: 8px; cursor: pointer; transition: all 0.15s; text-shadow: 1px 1px 0 rgba(0,0,0,0.4); }
     #shop-close:hover { background: linear-gradient(180deg, #9a5430, #7a4420); transform: scale(1.05); }
 
+    /* ─── INVENTORY PANEL ─── */
+    #inventory-panel {
+      display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: min(520px, 92vw); max-height: 80vh;
+      background: linear-gradient(180deg, #3d2b1a 0%, #2a1c0e 50%, #1e1208 100%);
+      border: 3px solid #d4a84b; border-radius: 12px;
+      padding: 22px; z-index: 65; overflow-y: auto;
+      box-shadow: 0 0 50px rgba(212,168,75,0.25), 0 10px 40px rgba(0,0,0,0.85);
+    }
+    #inventory-panel h2 { color: #ffe066; font-size: 14px; margin-bottom: 10px; text-align: center; text-shadow: 0 0 12px rgba(255,224,102,0.4); }
+    #inv-content { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
+    .inv-panel-slot {
+      width: 72px; height: 72px;
+      background: rgba(60,40,20,0.9); border: 2px solid #6a5030; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; flex-direction: column;
+      cursor: pointer; position: relative; transition: all 0.1s;
+    }
+    .inv-panel-slot:hover { border-color: #aa8824; background: rgba(80,60,30,0.9); }
+    .inv-panel-slot.active { border-color: #ffd700; box-shadow: 0 0 12px rgba(255,215,0,0.5); background: rgba(90,70,35,0.95); }
+    .inv-del-btn {
+      position: absolute; top: 2px; right: 2px; width: 16px; height: 16px;
+      background: #8b2020; color: #fff; border: none; border-radius: 3px;
+      font-size: 9px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity 0.15s;
+    }
+    .inv-panel-slot:hover .inv-del-btn { opacity: 1; }
+    .inv-del-btn:hover { background: #cc3030; }
+    #inv-close {
+      position: absolute; top: 12px; left: 12px;
+      width: 32px; height: 32px; background: #8b2020; color: #fff; border: 2px solid #cc4040; border-radius: 6px;
+      font-family: 'Press Start 2P', monospace; font-size: 14px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+    }
+    #inv-close:hover { background: #cc3030; transform: scale(1.1); }
+
     /* ─── CONTROLS HINT ─── */
     #controls-hint { position: fixed; top: 44px; right: 8px; color: rgba(240,224,192,0.4); font-size: 6px; text-align: right; line-height: 1.8; z-index: 5; text-shadow: 1px 1px 0 #000; }
 
     /* ─── START OVERLAY ─── */
     #start-overlay {
-      position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.9);
+      position: fixed; inset: 0; z-index: 200;
+      background:
+        linear-gradient(135deg, rgba(34,80,20,0.85) 0%, rgba(60,40,15,0.8) 50%, rgba(20,50,80,0.85) 100%),
+        radial-gradient(ellipse at 30% 40%, rgba(120,180,60,0.4) 0%, transparent 60%),
+        radial-gradient(ellipse at 70% 60%, rgba(200,160,60,0.3) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(60,120,180,0.3) 0%, transparent 50%);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
       display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ffd700; text-align: center;
     }
-    #start-overlay h1 { font-size: 18px; margin-bottom: 16px; text-shadow: 2px 2px 0 #8b4513; }
-    #start-overlay p { font-size: 8px; color: #a08860; margin-bottom: 20px; line-height: 1.8; max-width: 400px; }
-    .seed-input-wrap { margin-bottom: 20px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-    .seed-input-wrap label { font-size: 8px; color: #a08860; }
+    #start-overlay h1 { font-size: 26px; margin-bottom: 20px; text-shadow: 3px 3px 0 #8b4513, 0 0 20px rgba(255,215,0,0.3); letter-spacing: 2px; }
+    #start-overlay p { font-size: 11px; color: #d0c0a0; margin-bottom: 24px; line-height: 2; max-width: 500px; text-shadow: 1px 1px 0 #000; }
+    .seed-input-wrap { margin-bottom: 24px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .seed-input-wrap label { font-size: 10px; color: #c0a870; }
     #world-seed {
-      background: #1a0e04; border: 2px solid #5a4020; border-radius: 4px; color: #ffd700;
-      font-family: 'Press Start 2P', monospace; font-size: 10px; padding: 8px 12px; width: 220px; text-align: center;
+      background: rgba(26,14,4,0.9); border: 2px solid #7a5830; border-radius: 6px; color: #ffd700;
+      font-family: 'Press Start 2P', monospace; font-size: 12px; padding: 10px 16px; width: 280px; text-align: center;
     }
-    #world-seed:focus { outline: none; border-color: #ffd700; }
+    #world-seed:focus { outline: none; border-color: #ffd700; box-shadow: 0 0 12px rgba(255,215,0,0.3); }
     #start-btn {
-      background: #3a6830; color: #ffd700; border: 2px solid #ffd700; border-radius: 6px; padding: 12px 28px;
-      font-family: 'Press Start 2P', monospace; font-size: 11px; cursor: pointer; animation: pulse 1.5s infinite;
+      background: linear-gradient(180deg, #4a8840, #2d6620); color: #ffd700; border: 3px solid #ffd700; border-radius: 8px; padding: 16px 36px;
+      font-family: 'Press Start 2P', monospace; font-size: 14px; cursor: pointer; animation: pulse 1.5s infinite;
+      text-shadow: 1px 1px 0 #000; box-shadow: 0 4px 20px rgba(255,215,0,0.2);
     }
     @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+
+    /* ─── LANGUAGE SELECT ─── */
+    .lang-select { display: flex; gap: 8px; margin-bottom: 16px; justify-content: center; }
+    .lang-btn {
+      background: rgba(60,40,20,0.9); color: #a08860; border: 2px solid #5a4020; border-radius: 6px;
+      padding: 8px 16px; font-family: 'Press Start 2P', monospace; font-size: 9px; cursor: pointer;
+    }
+    .lang-btn.active { background: #3a6830; color: #ffd700; border-color: #ffd700; }
+    .lang-btn:hover { border-color: #aa8824; }
+
+    /* ─── PAUSE MENU ─── */
+    #pause-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      z-index: 80; align-items: center; justify-content: center;
+    }
+    #pause-menu {
+      width: min(400px, 90vw); background: linear-gradient(180deg, #3d2b1a 0%, #2a1c0e 50%, #1e1208 100%);
+      border: 3px solid #d4a84b; border-radius: 12px; padding: 24px;
+      box-shadow: 0 0 50px rgba(212,168,75,0.25), 0 10px 40px rgba(0,0,0,0.85);
+      image-rendering: pixelated;
+    }
+    #pause-menu h2 { color: #ffe066; font-size: 14px; text-align: center; margin-bottom: 18px; text-shadow: 0 0 12px rgba(255,224,102,0.4); }
+    .pause-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; color: #f0e0c0; font-size: 9px; }
+    .pause-row label { color: #a08860; }
+    .pause-slider { -webkit-appearance: none; width: 120px; height: 8px; background: #2a1a0a; border: 1px solid #5a4020; border-radius: 4px; outline: none; }
+    .pause-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: #ffd700; border-radius: 3px; cursor: pointer; }
+    .pause-fps { color: #888; font-size: 8px; }
+    .pause-btn {
+      display: block; margin: 18px auto 0; background: #3a6830; color: #ffd700; border: 2px solid #ffd700;
+      border-radius: 6px; padding: 10px 24px; font-family: 'Press Start 2P', monospace; font-size: 9px; cursor: pointer;
+    }
+    .pause-btn:hover { background: #4a8840; transform: scale(1.05); }
+
+    /* ─── TIRED ANIMATION ─── */
+    @keyframes tiredShake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-4px) rotate(-2deg); }
+      40% { transform: translateX(4px) rotate(2deg); }
+      60% { transform: translateX(-3px) rotate(-1deg); }
+      80% { transform: translateX(3px) rotate(1deg); }
+    }
+    .tired-shake { animation: tiredShake 0.3s ease-in-out; }
+    @keyframes tiredBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    .tired-blink { animation: tiredBlink 0.15s ease-in-out 3; }
   </style>
 </head>
 <body>
   <div id="start-overlay">
     <h1>🌾 Till Debt Do Us Part</h1>
-    <p>You inherited a farm with 5,000g in debt.<br>Pay it off by day 21 or lose everything.<br><br>Chop trees 🪓 | Break stones ⛏️ | Till soil 🌱<br>Water crops daily 💧 | Ship items in bin 📦<br>Mine with shovel 🥄 | Tools wear out!</p>
+    <div class="lang-select">
+      <button class="lang-btn active" data-lang="en">EN</button>
+      <button class="lang-btn" data-lang="fa">FA فارسی</button>
+    </div>
+    <p id="start-desc">You inherited a farm with 5,000g in debt.<br>Pay it off by day 21 or lose everything.<br><br>Chop trees 🪓 | Break stones ⛏️ | Till soil 🌱<br>Water crops daily 💧 | Ship items in bin 📦<br>Mine with shovel 🔨 | Tools wear out!</p>
     <div class="seed-input-wrap">
-      <label for="world-seed">World Seed (leave empty for random)</label>
+      <label for="world-seed" id="seed-label">World Seed (leave empty for random)</label>
       <input type="text" id="world-seed" placeholder="e.g. 12345 or myfarm" autocomplete="off" />
     </div>
     <button id="start-btn">START FARMING</button>
@@ -173,7 +266,7 @@
     </div>
   </div>
 
-  <div id="controls-hint">WASD Move<br>SPACE Action<br>E Interact<br>ENTER Sleep<br>B Ship Items<br>1-8 Select Slot</div>
+  <div id="controls-hint">WASD Move<br>SPACE Action<br>E Interact<br>ENTER Sleep<br>B Ship Items<br>I Inventory<br>1-8 Select Slot</div>
 
   <div id="inventory-bar"></div>
   <div id="item-tooltip"><div class="tt-name"></div><div class="tt-type"></div><div class="tt-desc"></div><div class="tt-value"></div><div class="tt-dur"></div></div>
@@ -183,6 +276,35 @@
   <div id="payment-overlay"><h2>💰 Morning Shipment</h2><div id="pay-lines"></div><div id="pay-total"></div></div>
 
   <div id="shop-panel"><h2>General Store</h2><div id="shop-content"></div><button id="shop-close">Close</button></div>
+
+  <div id="inventory-panel">
+    <h2>📦 Inventory</h2>
+    <p style="font-size:7px;color:#a08860;margin-bottom:10px;text-align:center">Click to select · Drag to reorder · ✕ to discard</p>
+    <div id="inv-content"></div>
+    <button id="inv-close">✕</button>
+  </div>
+
+  <div id="pause-overlay">
+    <div id="pause-menu">
+      <h2 id="pause-title">⏸ PAUSED</h2>
+      <div class="pause-row">
+        <label id="lbl-volume">🔊 Volume</label>
+        <input type="range" class="pause-slider" id="vol-slider" min="0" max="100" value="70" />
+      </div>
+      <div class="pause-row">
+        <label id="lbl-lang">🌐 Language</label>
+        <div class="lang-select" style="margin:0">
+          <button class="lang-btn active" data-pause-lang="en">EN</button>
+          <button class="lang-btn" data-pause-lang="fa">FA</button>
+        </div>
+      </div>
+      <div class="pause-row">
+        <label>FPS</label>
+        <span class="pause-fps" id="pause-fps">--</span>
+      </div>
+      <button class="pause-btn" id="resume-btn">RESUME</button>
+    </div>
+  </div>
 
   <script type="module" src="/src/main.ts"></script>
 </body>

@@ -67,17 +67,18 @@ export class FarmGrid {
     }
 
     // Place buildings at fixed positions
+    const midX = Math.floor(W / 2)
     this.setTile(0, 0, TileType.HOUSE)
     this.setTile(W-1, 0, TileType.SHOP)
     this.setTile(0, H-1, TileType.MINE)
-    this.setTile(3, 2, TileType.WELL)
-    this.setTile(2, 1, TileType.BIN)
+    this.setTile(midX, H-2, TileType.WELL)       // well: middle-x, bottom-y
+    this.setTile(midX, 1, TileType.BIN)           // bin: middle-x, top area (opposite side of well)
 
     // Procedural paths: connect buildings with natural-feeling paths
-    this.carvePath(0, 0, 3, 2)   // house to well
-    this.carvePath(3, 2, 2, 1)   // well to bin
-    this.carvePath(0, 0, 0, H-1) // house to mine (left edge)
-    this.carvePath(0, 0, W-1, 0) // house to shop (top edge)
+    this.carvePath(0, 0, midX + 2, 0)   // house to bin (top row)
+    this.carvePath(0, 0, midX, H-2)     // house to well
+    this.carvePath(0, 0, 0, H-1)        // house to mine (left edge)
+    this.carvePath(0, 0, W-1, 0)        // house to shop (top edge)
     this.carvePath(W-1, 0, W-1, Math.floor(H/2)) // shop down right side
 
     // Central farming area: organic blob shape using distance + noise
@@ -105,10 +106,26 @@ export class FarmGrid {
       }
     }
 
+    // Safe zones around buildings (no trees/stones within 3 tiles)
+    const buildingPositions = [
+      { x: 0, z: 0 },       // house
+      { x: W-1, z: 0 },     // shop
+      { x: 0, z: H-1 },     // mine
+      { x: midX, z: H-2 },  // well
+      { x: midX, z: 1 },    // bin
+    ]
+    const isNearBuilding = (tx: number, tz: number) => {
+      for (const b of buildingPositions) {
+        if (Math.abs(tx - b.x) <= 3 && Math.abs(tz - b.z) <= 3) return true
+      }
+      return false
+    }
+
     // Scatter trees, stones, weeds on remaining grass
     for (let x = 0; x < W; x++) {
       for (let z = 0; z < H; z++) {
         if (this.tiles[x][z].type !== TileType.GRASS) continue
+        if (isNearBuilding(x, z)) continue
         const r = rng.next()
         if (r < 0.08) { this.tiles[x][z].type = TileType.TREE; this.tiles[x][z].treeAge = 2 }
         else if (r < 0.13) { this.tiles[x][z].type = TileType.STONE }
@@ -262,7 +279,7 @@ export class FarmGrid {
   }
   water(x: number, z: number): boolean {
     const t = this.tiles[x]?.[z]; if (!t) return false
-    if (t.cropId && !t.watered) {
+    if ((t.type === TileType.TILLED || (t.cropId && !t.watered))) {
       t.watered = true; if (t.type === TileType.TILLED) t.type = TileType.WATERED
       this.updateTileVisual(x, z); sound.water(); return true
     }

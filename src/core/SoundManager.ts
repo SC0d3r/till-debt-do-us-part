@@ -122,6 +122,20 @@ export class SoundManager {
     this.scheduleMusicLoop()
   }
 
+  setVolume(v: number) {
+    if (this.masterGain) this.masterGain.gain.value = Math.max(0, Math.min(1, v))
+  }
+
+  pauseMusic() {
+    this.musicPlaying = false
+    if (this.ctx?.state === 'running') this.ctx.suspend()
+  }
+
+  resumeMusic() {
+    if (this.ctx?.state === 'suspended') this.ctx.resume()
+    if (!this.musicPlaying) { this.musicPlaying = true; this.scheduleMusicLoop() }
+  }
+
   stopMusic() {
     this.musicPlaying = false
     for (const osc of this.musicOscillators) {

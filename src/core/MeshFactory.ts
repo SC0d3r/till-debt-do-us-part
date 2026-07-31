@@ -107,17 +107,17 @@ export function getDirtTexture(): THREE.Texture {
 export function getTilledTexture(): THREE.Texture {
   if (texCache.tilled) return texCache.tilled
   texCache.tilled = makeTexture(128, (ctx, w, h) => {
-    ctx.fillStyle = '#d4b896'; ctx.fillRect(0, 0, w, h)
+    ctx.fillStyle = '#c8a060'; ctx.fillRect(0, 0, w, h)
     noise(ctx, 12)
     for (let i = 0; i < 40; i++) {
-      ctx.fillStyle = Math.random() > 0.5 ? '#c8a880' : '#dcc8a8'
+      ctx.fillStyle = Math.random() > 0.5 ? '#b89050' : '#d8b878'
       ctx.beginPath(); ctx.arc(Math.random()*w, Math.random()*h, 1+Math.random()*2, 0, Math.PI*2); ctx.fill()
     }
-    ctx.strokeStyle = '#bfa070'; ctx.lineWidth = 2
+    ctx.strokeStyle = '#a88040'; ctx.lineWidth = 2
     for (let y = 8; y < h; y += 14) {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y + (Math.random()-0.5)*2); ctx.stroke()
     }
-    ctx.strokeStyle = '#e0cca8'; ctx.lineWidth = 1
+    ctx.strokeStyle = '#d8c090'; ctx.lineWidth = 1
     for (let y = 15; y < h; y += 14) {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y + (Math.random()-0.5)*2); ctx.stroke()
     }
@@ -128,13 +128,13 @@ export function getTilledTexture(): THREE.Texture {
 export function getWateredTexture(): THREE.Texture {
   if (texCache.watered) return texCache.watered
   texCache.watered = makeTexture(128, (ctx, w, h) => {
-    ctx.fillStyle = '#6b4c28'; ctx.fillRect(0, 0, w, h)
+    ctx.fillStyle = '#4a3018'; ctx.fillRect(0, 0, w, h)
     noise(ctx, 10)
-    ctx.strokeStyle = '#5a3c18'; ctx.lineWidth = 3
+    ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 3
     for (let y = 8; y < h; y += 14) {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y + (Math.random()-0.5)*2); ctx.stroke()
     }
-    ctx.fillStyle = 'rgba(60,120,180,0.18)'
+    ctx.fillStyle = 'rgba(40,90,140,0.25)'
     ctx.fillRect(0, 0, w, h)
     for (let i = 0; i < 6; i++) {
       ctx.strokeStyle = 'rgba(150,200,255,0.12)'; ctx.lineWidth = 1
