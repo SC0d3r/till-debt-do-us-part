@@ -93,7 +93,22 @@ export class UIManager {
 
   setOnSelectSlot(cb: (slot: number) => void) { this.onSelectSlot = cb }
 
+  autoFillHotbar(player: PlayerState) {
+    // If any hotbar slot (0-7) is empty, pull next item from overflow (8-15)
+    for (let h = 0; h < 8; h++) {
+      if (player.inventory[h] === null) {
+        for (let o = 8; o < 16; o++) {
+          if (player.inventory[o] !== null) {
+            player.swapSlots(h, o)
+            break
+          }
+        }
+      }
+    }
+  }
+
   private renderInventory(player: PlayerState) {
+    this.autoFillHotbar(player)
     const bar = document.getElementById('inventory-bar')!
     // Only rebuild if slot count changed or first render
     if (bar.childElementCount !== 8) {
@@ -102,17 +117,44 @@ export class UIManager {
         const slot = document.createElement('div')
         slot.className = 'inv-slot'
         slot.dataset.slot = String(i)
+        slot.draggable = true
         slot.addEventListener('click', (e) => {
           e.stopPropagation()
           player.selectedSlot = i
           sound.menuSelect()
-          this.lastRenderedSlot = -1 // force re-render
+          this.lastRenderedSlot = -1
           this.updateHUD(player)
           this.onSelectSlot?.(i)
         })
         slot.addEventListener('mouseenter', (e) => {
           const item = player.inventory[i]
           if (item && item.count > 0) this.showTooltip(e, item.id, player)
+        })
+        slot.addEventListener('dragstart', (e) => {
+          e.dataTransfer!.setData('text/hotbar', String(i))
+          e.dataTransfer!.effectAllowed = 'move'
+        })
+        slot.addEventListener('dragover', (e) => {
+          e.preventDefault()
+          e.dataTransfer!.dropEffect = 'move'
+          slot.style.borderColor = '#ffd700'
+        })
+        slot.addEventListener('dragleave', () => { slot.style.borderColor = '' })
+        slot.addEventListener('drop', (e) => {
+          e.preventDefault()
+          slot.style.borderColor = ''
+          const fromStr = e.dataTransfer!.getData('text/hotbar')
+          if (fromStr === '') return
+          const fromIdx = parseInt(fromStr)
+          if (fromIdx !== i && fromIdx >= 0 && fromIdx < 8) {
+            player.swapSlots(fromIdx, i)
+            if (player.selectedSlot === fromIdx) player.selectedSlot = i
+            else if (player.selectedSlot === i) player.selectedSlot = fromIdx
+            sound.menuSelect()
+            this.lastRenderedSlot = -1
+            this.updateHUD(player)
+            this.onSelectSlot?.(player.selectedSlot)
+          }
         })
         bar.appendChild(slot)
       }

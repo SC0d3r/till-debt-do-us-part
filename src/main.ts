@@ -276,9 +276,11 @@ class Game {
         const torch = this.mineScene.getObjectByName('torch') as THREE.PointLight | undefined
         if (torch) torch.position.set(px, 1.8, pz)
         const pglow = this.mineScene.getObjectByName('playerGlow') as THREE.PointLight | undefined
-        if (pglow) pglow.position.set(px, 1.0, pz)
+        if (pglow) pglow.position.set(px, 1.2, pz)
         const helmetLight = this.mineScene.getObjectByName('helmetLight') as THREE.PointLight | undefined
-        if (helmetLight) helmetLight.position.set(px, 1.6, pz)
+        if (helmetLight) helmetLight.position.set(px, 2.0, pz)
+        const groundFill = this.mineScene.getObjectByName('groundFill') as THREE.PointLight | undefined
+        if (groundFill) groundFill.position.set(px, 0.3, pz)
         const headSpot = this.mineScene.getObjectByName('headSpot') as THREE.SpotLight | undefined
         if (headSpot) {
           const rot = this.playerModel.rotation.y
@@ -345,16 +347,20 @@ class Game {
     const p = this.playerModel.position
     let tx: number, tz: number
     if (this.inMine) {
-      const fl = this.mine.floors[this.mine.currentFloor]
-      const sz = fl?.length || 10
-      tx = sz / 2; tz = sz / 2
+      tx = p.x; tz = p.z
+      // Lower camera in mine so feet are visible
+      this.camTarget.set(tx + 4, 6, tz + 6)
     } else {
       tx = p.x; tz = p.z
+      this.camTarget.set(tx + 6, 10, tz + 10)
     }
-    this.camTarget.set(tx + 6, 10, tz + 10)
     const lerp = 1 - Math.pow(0.005, dt)
     this.camera.position.lerp(this.camTarget, lerp)
-    this.camera.lookAt(this.camera.position.x - 6, 0, this.camera.position.z - 10)
+    if (this.inMine) {
+      this.camera.lookAt(p.x, 0.5, p.z)
+    } else {
+      this.camera.lookAt(this.camera.position.x - 6, 0, this.camera.position.z - 10)
+    }
   }
 
   private walkTime = 0
@@ -1137,37 +1143,42 @@ class Game {
     this.playerModel.position.set(0.5, 0, 0.5)
 
     this.mineScene = new THREE.Scene()
-    this.mineScene.fog = new THREE.Fog(0x3a3028, 10, 30)
+    this.mineScene.fog = new THREE.Fog(0x3a3028, 5, 25)
     this.mineScene.background = new THREE.Color(0x2a2018)
 
     const fl = this.mine.floors[this.mine.currentFloor]
     const sz = fl?.length || 10
 
-    // Brighter mine atmosphere for visibility
-    this.mineScene.add(new THREE.AmbientLight(0x665544, 0.7))
-    const torch = new THREE.PointLight(0xffcc66, 2.5, 22)
+    // Much brighter mine for visibility
+    this.mineScene.add(new THREE.AmbientLight(0x887766, 1.0))
+    const torch = new THREE.PointLight(0xffcc66, 3.0, 25)
     torch.position.set(0.5, 3, 0.5)
     torch.name = 'torch'
     this.mineScene.add(torch)
-    const fillLight = new THREE.PointLight(0xccbbaa, 1.0, 30)
-    fillLight.position.set(sz / 2, 5, sz / 2)
+    const fillLight = new THREE.PointLight(0xddccbb, 1.5, 35)
+    fillLight.position.set(sz / 2, 4, sz / 2)
     this.mineScene.add(fillLight)
-    // Helmet light - bright spot on player head
-    const helmetLight = new THREE.PointLight(0xffffee, 2.0, 14)
-    helmetLight.position.set(0.5, 2.2, 0.5)
+    // Helmet light
+    const helmetLight = new THREE.PointLight(0xffffee, 2.5, 16)
+    helmetLight.position.set(0.5, 2.0, 0.5)
     helmetLight.name = 'helmetLight'
     this.mineScene.add(helmetLight)
-    // Forward-facing spotlight from helmet
-    const headSpot = new THREE.SpotLight(0xffeedd, 2.5, 18, Math.PI / 4, 0.4, 1)
-    headSpot.position.set(0.5, 2.0, 0.5)
+    // Forward spotlight
+    const headSpot = new THREE.SpotLight(0xffeedd, 3.0, 20, Math.PI / 3, 0.3, 1)
+    headSpot.position.set(0.5, 1.8, 0.5)
     headSpot.target.position.set(0.5, 0, 3)
     headSpot.name = 'headSpot'
     this.mineScene.add(headSpot)
     this.mineScene.add(headSpot.target)
-    const playerGlow = new THREE.PointLight(0xffeedd, 1.0, 8)
-    playerGlow.position.set(0.5, 1.5, 0.5)
+    const playerGlow = new THREE.PointLight(0xffeedd, 1.5, 10)
+    playerGlow.position.set(0.5, 1.2, 0.5)
     playerGlow.name = 'playerGlow'
     this.mineScene.add(playerGlow)
+    // Ground-level fill to show feet
+    const groundFill = new THREE.PointLight(0xaa9977, 0.8, 8)
+    groundFill.position.set(0.5, 0.3, 0.5)
+    groundFill.name = 'groundFill'
+    this.mineScene.add(groundFill)
 
     this.mineScene.add(this.playerModel)
     this.mineScene.add(this.mine.group)
