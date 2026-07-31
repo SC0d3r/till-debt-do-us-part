@@ -170,6 +170,18 @@ class Game {
       if (e.key === 'b' || e.key === 'B') this.shipItems()
     })
 
+    // Mouse wheel to cycle inventory slots
+    window.addEventListener('wheel', (e) => {
+      if (!this.started || this.paused || this.dialogue.active || this.ui.shopOpen || this.ui.inventoryOpen) return
+      const dir = e.deltaY > 0 ? 1 : -1
+      let next = this.player.selectedSlot + dir
+      if (next < 0) next = 7
+      if (next > 7) next = 0
+      this.player.selectedSlot = next
+      sound.menuSelect()
+      this.updateHeldVisual()
+    })
+
     // Start button with seed input
     const startBtn = document.getElementById('start-btn')!
     startBtn.addEventListener('click', () => {

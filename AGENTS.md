@@ -8,6 +8,7 @@ Rules:
 - Never end your turn while todos are pending/in-progress or the user's full request is unfinished.
 - Only stop when you can truthfully say: all requirements done, typecheck/tests green, and no remaining todos.
 - Always check the opencode todos UI after finishing work; if all tasks are done, clear/remove them.
+- Persian (FA) fonts should always be larger than English fonts because Persian glyphs render smaller at the same pixel size. Use ~1.5-2x the English font size for all Persian text.
 
 ## Commands
 - `npm run dev` — start Vite dev server

@@ -469,12 +469,14 @@ export function createPlayerModel(): THREE.Group {
   const rightArm = new THREE.Group(); rightArm.name = 'rightArm'
   const ra = createBox(0.1, 0.35, 0.1, COLORS.skin); ra.position.y = -0.15; rightArm.add(ra)
   rightArm.position.set(0.24, 0.7, 0); g.add(rightArm)
-  for (const sx of [-0.08, 0.08]) {
-    const leg = createBox(0.12, 0.3, 0.12, COLORS.pants); leg.position.set(sx, 0.2, 0); g.add(leg)
-  }
-  for (const sx of [-0.08, 0.08]) {
-    const boot = createBox(0.13, 0.08, 0.15, COLORS.boots); boot.position.set(sx, 0.04, 0.01); g.add(boot)
-  }
+  const leftLeg = new THREE.Group(); leftLeg.name = 'leftLeg'
+  const ll = createBox(0.12, 0.3, 0.12, COLORS.pants); ll.position.y = 0.05; leftLeg.add(ll)
+  const lb = createBox(0.13, 0.08, 0.15, COLORS.boots); lb.position.set(0, -0.11, 0.01); leftLeg.add(lb)
+  leftLeg.position.set(-0.08, 0.15, 0); g.add(leftLeg)
+  const rightLeg = new THREE.Group(); rightLeg.name = 'rightLeg'
+  const rl = createBox(0.12, 0.3, 0.12, COLORS.pants); rl.position.y = 0.05; rightLeg.add(rl)
+  const rb = createBox(0.13, 0.08, 0.15, COLORS.boots); rb.position.set(0, -0.11, 0.01); rightLeg.add(rb)
+  rightLeg.position.set(0.08, 0.15, 0); g.add(rightLeg)
   return g
 }
 

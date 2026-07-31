@@ -44,7 +44,7 @@
     /* ─── INVENTORY ─── */
     #inventory-bar {
       position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%);
-      display: flex; gap: 3px; z-index: 10;
+      display: flex; gap: 3px; z-index: 10; direction: ltr;
       background: rgba(30,18,8,0.85); padding: 5px 8px; border-radius: 8px;
       border: 2px solid #5a4020;
     }
@@ -84,8 +84,8 @@
     }
     #dialog-speaker { color: #ffd700; font-size: 12px; margin-bottom: 6px; padding-bottom: 5px; border-bottom: 1px dashed #5a4020; }
     #dialog-text { color: #f0e0c0; font-size: 11px; line-height: 2; min-height: 36px; margin-bottom: 8px; }
-    html[dir="rtl"] #dialog-speaker { font-size: 16px; }
-    html[dir="rtl"] #dialog-text { font-size: 15px; line-height: 2.2; }
+    html[dir="rtl"] #dialog-speaker { font-size: 20px; }
+    html[dir="rtl"] #dialog-text { font-size: 18px; line-height: 2.4; }
     #dialog-choices { display: flex; flex-wrap: wrap; gap: 5px; }
     .dialog-choice {
       background: #3a2810; color: #f0e0c0; border: 2px solid #5a4020; border-radius: 4px;
@@ -124,8 +124,13 @@
     .shop-btn:hover { background: linear-gradient(180deg, #6ab85a, #4a9040); transform: scale(1.08); box-shadow: 0 2px 8px rgba(90,158,74,0.4); }
     .shop-btn.repair { background: linear-gradient(180deg, #c89520, #a07a14); border-color: #8b6910; }
     .shop-btn.repair:hover { background: linear-gradient(180deg, #daa530, #b88a20); box-shadow: 0 2px 8px rgba(200,149,32,0.4); }
-    #shop-close { display: block; margin: 12px auto 0; background: linear-gradient(180deg, #7a4420, #5a3010); color: #ffe066; border: 2px solid #d4a84b; border-radius: 6px; padding: 8px 22px; font-family: 'Press Start 2P', monospace; font-size: 8px; cursor: pointer; transition: all 0.15s; text-shadow: 1px 1px 0 rgba(0,0,0,0.4); }
-    #shop-close:hover { background: linear-gradient(180deg, #9a5430, #7a4420); transform: scale(1.05); }
+    #shop-close {
+      position: absolute; top: 12px; left: 12px;
+      width: 32px; height: 32px; background: #8b2020; color: #fff; border: 2px solid #cc4040; border-radius: 6px;
+      font-family: 'Press Start 2P', monospace; font-size: 14px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+    }
+    #shop-close:hover { background: #cc3030; transform: scale(1.1); }
 
     /* ─── INVENTORY PANEL ─── */
     #inventory-panel {
@@ -137,7 +142,7 @@
       box-shadow: 0 0 50px rgba(212,168,75,0.25), 0 10px 40px rgba(0,0,0,0.85);
     }
     #inventory-panel h2 { color: #ffe066; font-size: 14px; margin-bottom: 10px; text-align: center; text-shadow: 0 0 12px rgba(255,224,102,0.4); }
-    #inv-content { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
+    #inv-content { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; direction: ltr; }
     .inv-panel-slot {
       width: 72px; height: 72px;
       background: rgba(60,40,20,0.9); border: 2px solid #6a5030; border-radius: 8px;
@@ -278,7 +283,7 @@
 
   <div id="payment-overlay"><h2>💰 Morning Shipment</h2><div id="pay-lines"></div><div id="pay-total"></div></div>
 
-  <div id="shop-panel"><h2>General Store</h2><div id="shop-content"></div><button id="shop-close">Close</button></div>
+  <div id="shop-panel"><h2>General Store</h2><div id="shop-content"></div><button id="shop-close">✕</button></div>
 
   <div id="inventory-panel">
     <h2>📦 Inventory</h2>

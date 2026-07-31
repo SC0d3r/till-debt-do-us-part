@@ -88,12 +88,42 @@ export class UIManager {
     this.renderInventory(player)
   }
 
+  private lastRenderedSlot = -1
+  private onSelectSlot: ((slot: number) => void) | null = null
+
+  setOnSelectSlot(cb: (slot: number) => void) { this.onSelectSlot = cb }
+
   private renderInventory(player: PlayerState) {
     const bar = document.getElementById('inventory-bar')!
-    bar.innerHTML = ''
+    // Only rebuild if slot count changed or first render
+    if (bar.childElementCount !== 8) {
+      bar.innerHTML = ''
+      for (let i = 0; i < 8; i++) {
+        const slot = document.createElement('div')
+        slot.className = 'inv-slot'
+        slot.dataset.slot = String(i)
+        slot.addEventListener('click', (e) => {
+          e.stopPropagation()
+          player.selectedSlot = i
+          sound.menuSelect()
+          this.lastRenderedSlot = -1 // force re-render
+          this.updateHUD(player)
+          this.onSelectSlot?.(i)
+        })
+        slot.addEventListener('mouseenter', (e) => {
+          const item = player.inventory[i]
+          if (item && item.count > 0) this.showTooltip(e, item.id, player)
+        })
+        bar.appendChild(slot)
+      }
+    }
+
+    // Update slot contents
     for (let i = 0; i < 8; i++) {
-      const slot = document.createElement('div')
-      slot.className = `inv-slot${i === player.selectedSlot ? ' active' : ''}`
+      const slot = bar.children[i] as HTMLElement
+      const isActive = i === player.selectedSlot
+      slot.className = `inv-slot${isActive ? ' active' : ''}`
+      slot.innerHTML = ''
 
       const keyHint = document.createElement('span')
       keyHint.className = 'inv-key'
@@ -110,30 +140,29 @@ export class UIManager {
           const bg = TOOL_BG[item.id] || '#444'
           const icon = document.createElement('div')
           icon.className = 'slot-icon'
-          icon.style.cssText = `display:flex;align-items:center;justify-content:center;font-size:28px;width:48px;height:48px;background:${bg};border:2px solid rgba(255,255,255,0.2);border-radius:6px`
+          icon.style.cssText = `display:flex;align-items:center;justify-content:center;font-size:28px;width:48px;height:48px;background:${bg};border:2px solid rgba(255,255,255,0.2);border-radius:6px;pointer-events:none`
           icon.textContent = emoji
           slot.appendChild(icon)
 
           const dur = player.getToolDurability(item.id)
           const durPct = Math.round((dur / TOOL_MAX_DURABILITY) * 100)
           const durBar = document.createElement('div')
-          durBar.className = 'inv-dur-bar'
-          durBar.style.cssText = 'position:absolute;bottom:2px;left:3px;right:3px;height:4px;background:#333;border-radius:2px;overflow:hidden'
+          durBar.style.cssText = 'position:absolute;bottom:2px;left:3px;right:3px;height:4px;background:#333;border-radius:2px;overflow:hidden;pointer-events:none'
           const durFill = document.createElement('div')
-          durFill.style.cssText = `height:100%;width:${durPct}%;background:${durPct > 50 ? '#4caf50' : durPct > 20 ? '#f39c12' : '#e74c3c'};border-radius:2px;transition:width 0.2s`
+          durFill.style.cssText = `height:100%;width:${durPct}%;background:${durPct > 50 ? '#4caf50' : durPct > 20 ? '#f39c12' : '#e74c3c'};border-radius:2px`
           durBar.appendChild(durFill)
           slot.appendChild(durBar)
 
           const durText = document.createElement('span')
           durText.className = 'inv-dur'
           durText.textContent = `${dur}`
-          durText.style.cssText = 'position:absolute;top:1px;left:2px;font-size:6px;color:#ccc;text-shadow:1px 1px 0 #000'
+          durText.style.cssText = 'position:absolute;top:1px;left:2px;font-size:6px;color:#ccc;text-shadow:1px 1px 0 #000;pointer-events:none'
           slot.appendChild(durText)
 
           if (item.id === 'water') {
             const wPct = Math.round((player.waterLevel / player.maxWater) * 100)
             const wBar = document.createElement('div')
-            wBar.style.cssText = 'position:absolute;bottom:7px;left:3px;right:3px;height:3px;background:#224;border-radius:2px;overflow:hidden'
+            wBar.style.cssText = 'position:absolute;bottom:7px;left:3px;right:3px;height:3px;background:#224;border-radius:2px;overflow:hidden;pointer-events:none'
             const wFill = document.createElement('div')
             wFill.style.cssText = `height:100%;width:${wPct}%;background:${wPct > 50 ? '#4488cc' : wPct > 20 ? '#f39c12' : '#e74c3c'};border-radius:2px`
             wBar.appendChild(wFill)
@@ -145,7 +174,7 @@ export class UIManager {
             const tierEl = document.createElement('span')
             tierEl.className = 'inv-count'
             tierEl.textContent = `★${tier}`
-            tierEl.style.color = '#ffd700'
+            tierEl.style.cssText = 'color:#ffd700;pointer-events:none'
             slot.appendChild(tierEl)
           }
         } else {
@@ -153,28 +182,25 @@ export class UIManager {
           const seedEmoji = SEED_EMOJI_MAP[item.id]
           const itemEmoji = ITEM_EMOJI_MAP[item.id]
           if (isSeed && seedEmoji) {
-            // Seed bag: 🛍️ background + seed emoji centered
             const icon = document.createElement('div')
             icon.className = 'slot-icon'
             const seedCol = ITEM_COLORS[item.id] || '#3a6e2a'
-            icon.style.cssText = `display:flex;align-items:center;justify-content:center;font-size:28px;width:48px;height:48px;background:${seedCol};border:2px solid rgba(255,255,255,0.2);border-radius:6px;position:relative`
+            icon.style.cssText = `display:flex;align-items:center;justify-content:center;font-size:28px;width:48px;height:48px;background:${seedCol};border:2px solid rgba(255,255,255,0.2);border-radius:6px;position:relative;pointer-events:none`
             icon.innerHTML = `<span style="font-size:36px;opacity:0.4">🛍️</span><span style="position:absolute;font-size:22px">${seedEmoji}</span>`
             slot.appendChild(icon)
           } else if (itemEmoji) {
-            // Items with emoji icons
             const icon = document.createElement('div')
             icon.className = 'slot-icon'
             const col = ITEM_COLORS[item.id] || '#555'
-            icon.style.cssText = `display:flex;align-items:center;justify-content:center;font-size:28px;width:48px;height:48px;background:${col};border:2px solid rgba(255,255,255,0.2);border-radius:6px`
+            icon.style.cssText = `display:flex;align-items:center;justify-content:center;font-size:28px;width:48px;height:48px;background:${col};border:2px solid rgba(255,255,255,0.2);border-radius:6px;pointer-events:none`
             icon.textContent = itemEmoji
             slot.appendChild(icon)
           } else {
-            // Fallback: text label
             const col = ITEM_COLORS[item.id] || '#555'
             const label = (info?.name || item.id).slice(0, 4).toUpperCase()
             const icon = document.createElement('div')
             icon.className = 'slot-icon'
-            icon.style.cssText = `display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;width:48px;height:48px;background:${col};border:2px solid rgba(255,255,255,0.2);border-radius:6px;color:#fff;text-shadow:1px 1px 0 #000`
+            icon.style.cssText = `display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;width:48px;height:48px;background:${col};border:2px solid rgba(255,255,255,0.2);border-radius:6px;color:#fff;text-shadow:1px 1px 0 #000;pointer-events:none`
             icon.textContent = label
             slot.appendChild(icon)
           }
@@ -182,16 +208,12 @@ export class UIManager {
           const countEl = document.createElement('span')
           countEl.className = 'inv-count'
           countEl.textContent = String(item.count)
+          countEl.style.pointerEvents = 'none'
           slot.appendChild(countEl)
         }
 
         if (info) slot.title = info.name
-
-        slot.addEventListener('mouseenter', (e) => { if (item && item.count > 0) this.showTooltip(e, item.id, player) })
-        slot.addEventListener('click', (e) => { if (item && item.count > 0) this.showTooltip(e, item.id, player); sound.menuSelect() })
       }
-      slot.addEventListener('click', () => { player.selectedSlot = i; this.updateHUD(player); sound.menuSelect() })
-      bar.appendChild(slot)
     }
   }
 

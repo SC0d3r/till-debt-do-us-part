@@ -169,7 +169,7 @@ function applyLangToDOM() {
   const shopH2 = document.querySelector('#shop-panel h2')
   if (shopH2) shopH2.textContent = t('shopTitle')
   const shopClose = el('shop-close')
-  if (shopClose) shopClose.textContent = t('close')
+  if (shopClose) shopClose.textContent = '✕'
 
   // Controls hint
   setHtml('controls-hint', 'controls')
