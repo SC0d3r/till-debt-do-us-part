@@ -1,6 +1,6 @@
 # Till Debt Do Us Part
 
-![Till Debt Do Us Part](og-image.png)
+![Till Debt Do Us Part](./public/og-image.png)
 
 A tiny Harvest Moon-style farming sim in the browser. Clear your rundown farm, plant crops, dig the mine, upgrade your tools… and pay back the pesky guy who wants his money.
 
