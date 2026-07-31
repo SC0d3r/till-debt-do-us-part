@@ -594,21 +594,60 @@ export function createToolMesh(toolId: string): THREE.Group {
   return g
 }
 
+const ITEM_EMOJI_FOR_MESH: Record<string, string> = {
+  turnip: '🟣', potato: '🥔', tomato: '🍅', corn: '🌽', flower: '🌸', rare: '✨',
+  wood: '🪵', stone_item: '🪨',
+  ore_copper: '🟤', ore_iron: '⬜', ore_gold: '🟡',
+  gem_ruby: '🔴', gem_sapphire: '🔵', fossil: '🦴', seed_star: '⭐',
+  seed_turnip: '🟣', seed_potato: '🥔', seed_tomato: '🍅', seed_corn: '🌽',
+  seed_flower: '🌸', seed_rare: '💎',
+}
+
+const ITEM_BG_COLORS: Record<string, string> = {
+  turnip: '#d0b8e0', potato: '#c8a86e', tomato: '#ff3030', corn: '#ffe030',
+  flower: '#e080f0', rare: '#90e0ff', wood: '#8b5a36', stone_item: '#999999',
+  ore_copper: '#b87333', ore_iron: '#c0c0c0', ore_gold: '#ffd700',
+  gem_ruby: '#e0115f', gem_sapphire: '#0f52ba', fossil: '#d2b48c', seed_star: '#90e0ff',
+  seed_turnip: '#4a8e3a', seed_potato: '#3a7e2a', seed_tomato: '#3a8e2a',
+  seed_corn: '#4a9e3a', seed_flower: '#3a7e3a', seed_rare: '#2a6e4a',
+}
+
+function makeEmojiTexture(emoji: string, bgColor: string, size: number): THREE.Texture {
+  const canvas = document.createElement('canvas')
+  canvas.width = size; canvas.height = size
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = bgColor
+  ctx.beginPath()
+  ctx.roundRect(0, 0, size, size, size * 0.15)
+  ctx.fill()
+  ctx.font = `${size * 0.6}px serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(emoji, size / 2, size / 2 + size * 0.03)
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.magFilter = THREE.NearestFilter
+  tex.minFilter = THREE.NearestFilter
+  return tex
+}
+
 export function createItemDropMesh(itemId: string, big = false): THREE.Mesh {
-  const colors: Record<string, number> = {
-    turnip: 0xe8d8f0, potato: 0xc8a86e, tomato: 0xff3030,
-    corn: 0xffe030, flower: 0xe080f0, rare: 0x90e0ff,
-    wood: 0x8b5a36, stone_item: 0x999999,
-    ore_copper: 0xb87333, ore_iron: 0xc0c0c0, ore_gold: 0xffd700,
-    gem_ruby: 0xe0115f, gem_sapphire: 0x0f52ba, fossil: 0xd2b48c, seed_star: 0x90e0ff,
-  }
-  const col = colors[itemId] || 0xffffff
-  const isGem = itemId.startsWith('gem_')
+  const emoji = ITEM_EMOJI_FOR_MESH[itemId]
+  const bgCol = ITEM_BG_COLORS[itemId] || '#555555'
   const scale = big ? 2.5 : 1
+  const baseSize = 0.18 * scale
+
+  if (emoji) {
+    const tex = makeEmojiTexture(emoji, bgCol, 128)
+    const geo = new THREE.PlaneGeometry(baseSize, baseSize)
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide })
+    return new THREE.Mesh(geo, mat)
+  }
+
+  const isGem = itemId.startsWith('gem_')
   const geo = isGem
     ? new THREE.OctahedronGeometry(0.12 * scale, 0)
     : new THREE.BoxGeometry(0.15 * scale, 0.15 * scale, 0.15 * scale)
-  return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: col }))
+  return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: parseInt(bgCol.replace('#', ''), 16) || 0xffffff }))
 }
 
 // ─── World Scenery ───

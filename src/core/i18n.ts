@@ -163,7 +163,7 @@ function applyLangToDOM() {
   const invP = document.querySelector('#inventory-panel p')
   if (invP) invP.textContent = t('invHint')
   const invClose = el('inv-close')
-  if (invClose) invClose.textContent = t('close')
+  if (invClose) invClose.textContent = '✕'
 
   // Shop
   const shopH2 = document.querySelector('#shop-panel h2')

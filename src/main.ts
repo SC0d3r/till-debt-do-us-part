@@ -443,11 +443,46 @@ class Game {
 
     if (interact) {
       if (this.inMine) { this.exitMine(); return }
+
+      // Check proximity to buildings (not just facing tile)
+      const px = this.playerModel.position.x
+      const pz = this.playerModel.position.z
+      const buildingRange = 2.8
+
+      // Check each building by position
+      const housePos = new THREE.Vector3(0, 0, 0)
+      const shopPos = new THREE.Vector3(this.farm.width - 1, 0, 0)
+      const minePos = new THREE.Vector3(0, 0, this.farm.height - 1)
+      const wellPos = new THREE.Vector3(Math.floor(this.farm.width / 2), 0, this.farm.height - 2)
+
+      if (px ** 2 + pz ** 2 < buildingRange ** 2) {
+        this.dialogue.show('sleep_confirm', (action) => {
+          if (action === 'sleep') this.doSleep()
+        })
+        return
+      }
+      if ((px - shopPos.x) ** 2 + (pz - shopPos.z) ** 2 < buildingRange ** 2) { this.openShop(); return }
+      if ((px - minePos.x) ** 2 + (pz - minePos.z) ** 2 < buildingRange ** 2) { this.enterMine(); return }
+      if ((px - wellPos.x) ** 2 + (pz - wellPos.z) ** 2 < buildingRange ** 2) { this.player.refillWater(); sound.water(); this.actionCooldown = 0.3; return }
+
+      // Bin interaction via E key
+      if (this.isNearBin()) {
+        const sel = this.player.getSelectedItem()
+        if (sel && sel.count > 0) {
+          const info = getItemInfo(sel.id)
+          if (info && info.sellPrice > 0 && info.type !== 'Tool') {
+            this.shipItems()
+            this.actionCooldown = 0.5
+            return
+          }
+        }
+      }
+
+      // Fallback: check facing tile for other interactions
       const { x, z } = this.getFacingTile()
       const ft = this.farm.getTile(x, z)
       if (!ft) return
       if (ft.type === TileType.HOUSE) {
-        // Sleep confirmation dialog
         this.dialogue.show('sleep_confirm', (action) => {
           if (action === 'sleep') this.doSleep()
         })
@@ -744,27 +779,27 @@ class Game {
         rightArm.add(this.heldToolMesh)
       }
     } else if (sel.id.startsWith('seed_')) {
-      // Seeds: big bag held above head with both hands
+      // Seeds: big emoji sprite held above head with both hands, touching
       const itemMesh = createItemDropMesh(sel.id)
-      itemMesh.position.set(0, 1.55, 0.15)
+      itemMesh.position.set(0, 1.35, 0.25)
+      itemMesh.scale.set(2.5, 2.5, 2.5)
+      this.playerModel.add(itemMesh)
+      this.heldToolMesh = itemMesh as unknown as THREE.Group
+      const la = this.playerModel.getObjectByName('leftArm') as THREE.Group | undefined
+      const ra = this.playerModel.getObjectByName('rightArm') as THREE.Group | undefined
+      if (la) la.rotation.x = -2.6
+      if (ra) ra.rotation.x = -2.6
+    } else {
+      // Other items: emoji sprite held above head with both hands, touching
+      const itemMesh = createItemDropMesh(sel.id)
+      itemMesh.position.set(0, 1.35, 0.25)
       itemMesh.scale.set(2.0, 2.0, 2.0)
       this.playerModel.add(itemMesh)
       this.heldToolMesh = itemMesh as unknown as THREE.Group
       const la = this.playerModel.getObjectByName('leftArm') as THREE.Group | undefined
       const ra = this.playerModel.getObjectByName('rightArm') as THREE.Group | undefined
-      if (la) la.rotation.x = -2.4
-      if (ra) ra.rotation.x = -2.4
-    } else {
-      // Other items held in front of chest with both hands
-      const itemMesh = createItemDropMesh(sel.id)
-      itemMesh.position.set(0, 0.85, 0.35)
-      itemMesh.scale.set(1.2, 1.2, 1.2)
-      this.playerModel.add(itemMesh)
-      this.heldToolMesh = itemMesh as unknown as THREE.Group
-      const la = this.playerModel.getObjectByName('leftArm') as THREE.Group | undefined
-      const ra = this.playerModel.getObjectByName('rightArm') as THREE.Group | undefined
-      if (la) la.rotation.x = -1.2
-      if (ra) ra.rotation.x = -1.2
+      if (la) la.rotation.x = -2.5
+      if (ra) ra.rotation.x = -2.5
     }
   }
 
@@ -1064,28 +1099,28 @@ class Game {
     const fl = this.mine.floors[this.mine.currentFloor]
     const sz = fl?.length || 10
 
-    // Darker mine atmosphere
-    this.mineScene.add(new THREE.AmbientLight(0x443322, 0.4))
-    const torch = new THREE.PointLight(0xffcc66, 1.8, 18)
+    // Brighter mine atmosphere for visibility
+    this.mineScene.add(new THREE.AmbientLight(0x665544, 0.7))
+    const torch = new THREE.PointLight(0xffcc66, 2.5, 22)
     torch.position.set(0.5, 3, 0.5)
     torch.name = 'torch'
     this.mineScene.add(torch)
-    const fillLight = new THREE.PointLight(0xaa9988, 0.6, 25)
+    const fillLight = new THREE.PointLight(0xccbbaa, 1.0, 30)
     fillLight.position.set(sz / 2, 5, sz / 2)
     this.mineScene.add(fillLight)
     // Helmet light - bright spot on player head
-    const helmetLight = new THREE.PointLight(0xffffee, 1.5, 10)
+    const helmetLight = new THREE.PointLight(0xffffee, 2.0, 14)
     helmetLight.position.set(0.5, 2.2, 0.5)
     helmetLight.name = 'helmetLight'
     this.mineScene.add(helmetLight)
     // Forward-facing spotlight from helmet
-    const headSpot = new THREE.SpotLight(0xffeedd, 2.0, 14, Math.PI / 5, 0.5, 1)
+    const headSpot = new THREE.SpotLight(0xffeedd, 2.5, 18, Math.PI / 4, 0.4, 1)
     headSpot.position.set(0.5, 2.0, 0.5)
     headSpot.target.position.set(0.5, 0, 3)
     headSpot.name = 'headSpot'
     this.mineScene.add(headSpot)
     this.mineScene.add(headSpot.target)
-    const playerGlow = new THREE.PointLight(0xffeedd, 0.6, 6)
+    const playerGlow = new THREE.PointLight(0xffeedd, 1.0, 8)
     playerGlow.position.set(0.5, 1.5, 0.5)
     playerGlow.name = 'playerGlow'
     this.mineScene.add(playerGlow)

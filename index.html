@@ -82,13 +82,16 @@
       padding: 14px 18px; z-index: 50;
       box-shadow: 0 4px 20px rgba(0,0,0,0.6);
     }
-    #dialog-speaker { color: #ffd700; font-size: 10px; margin-bottom: 6px; padding-bottom: 5px; border-bottom: 1px dashed #5a4020; }
-    #dialog-text { color: #f0e0c0; font-size: 9px; line-height: 1.8; min-height: 36px; margin-bottom: 8px; }
+    #dialog-speaker { color: #ffd700; font-size: 12px; margin-bottom: 6px; padding-bottom: 5px; border-bottom: 1px dashed #5a4020; }
+    #dialog-text { color: #f0e0c0; font-size: 11px; line-height: 2; min-height: 36px; margin-bottom: 8px; }
+    html[dir="rtl"] #dialog-speaker { font-size: 16px; }
+    html[dir="rtl"] #dialog-text { font-size: 15px; line-height: 2.2; }
     #dialog-choices { display: flex; flex-wrap: wrap; gap: 5px; }
     .dialog-choice {
       background: #3a2810; color: #f0e0c0; border: 2px solid #5a4020; border-radius: 4px;
-      padding: 7px 12px; font-family: 'Press Start 2P', monospace; font-size: 8px; cursor: pointer; transition: all 0.1s;
+      padding: 7px 12px; font-family: 'Press Start 2P', monospace; font-size: 9px; cursor: pointer; transition: all 0.1s;
     }
+    html[dir="rtl"] .dialog-choice { font-size: 13px; padding: 9px 16px; }
     .dialog-choice:hover { background: #5a4020; color: #ffd700; border-color: #ffd700; }
 
     /* ─── PAYMENT OVERLAY ─── */
