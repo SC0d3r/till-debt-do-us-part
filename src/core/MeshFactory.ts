@@ -534,29 +534,22 @@ export function createCropMesh(cropId: string, stage: number): THREE.Group {
   const col = cols[Math.min(stage, cols.length - 1)]
 
   if (stage === 0) {
+    // Single sprout mesh
     const sprout = createBox(0.06, 0.15, 0.06, col); sprout.position.y = 0.08; g.add(sprout)
   } else if (stage === 1) {
-    const stem = createBox(0.05, 0.25, 0.05, col); stem.position.y = 0.13; g.add(stem)
-    for (const sx of [-0.08, 0.08]) {
-      const leaf = createBox(0.12, 0.04, 0.04, col); leaf.position.set(sx, 0.2, 0)
-      leaf.rotation.z = sx > 0 ? -0.3 : 0.3; g.add(leaf)
-    }
+    // Merged stem+leaves into single wider box
+    const stem = createBox(0.2, 0.25, 0.05, col); stem.position.y = 0.13; g.add(stem)
   } else if (stage === 2) {
+    // Stem + single bud sphere (removed individual leaves)
     const stem = createBox(0.06, 0.35, 0.06, cols[1]); stem.position.y = 0.18; g.add(stem)
-    for (let i = 0; i < 3; i++) {
-      const leaf = createBox(0.15, 0.04, 0.04, cols[1]); leaf.position.set((i-1)*0.1, 0.25+i*0.05, 0)
-      leaf.rotation.z = (i-1)*0.3; g.add(leaf)
-    }
-    const bud = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), new THREE.MeshLambertMaterial({ color: col }))
+    const leafCross = createBox(0.25, 0.04, 0.25, cols[1]); leafCross.position.y = 0.28; g.add(leafCross)
+    const bud = new THREE.Mesh(new THREE.SphereGeometry(0.06, 4, 4), new THREE.MeshLambertMaterial({ color: col }))
     bud.position.y = 0.38; g.add(bud)
   } else {
+    // Full growth: stem + cross leaf + fruit (3 meshes instead of 6)
     const stem = createBox(0.07, 0.4, 0.07, cols[1]); stem.position.y = 0.2; g.add(stem)
-    for (let i = 0; i < 4; i++) {
-      const leaf = createBox(0.18, 0.04, 0.04, cols[1])
-      leaf.position.set((i%2===0?1:-1)*0.12, 0.2+i*0.06, (i%2===0?1:-1)*0.05)
-      leaf.rotation.z = (i%2===0?-1:1)*0.4; g.add(leaf)
-    }
-    const fruit = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshLambertMaterial({ color: col }))
+    const leafCross = createBox(0.3, 0.04, 0.3, cols[1]); leafCross.position.y = 0.3; g.add(leafCross)
+    const fruit = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), new THREE.MeshLambertMaterial({ color: col }))
     fruit.position.y = 0.45; g.add(fruit)
   }
   return g
@@ -614,7 +607,12 @@ const ITEM_BG_COLORS: Record<string, string> = {
   seed_corn: '#4a9e3a', seed_flower: '#3a7e3a', seed_rare: '#2a6e4a',
 }
 
+const emojiTexCache = new Map<string, THREE.Texture>()
+
 function makeEmojiTexture(emoji: string, bgColor: string, size: number): THREE.Texture {
+  const key = `${emoji}_${bgColor}_${size}`
+  const cached = emojiTexCache.get(key)
+  if (cached) return cached
   const canvas = document.createElement('canvas')
   canvas.width = size; canvas.height = size
   const ctx = canvas.getContext('2d')!
@@ -629,6 +627,7 @@ function makeEmojiTexture(emoji: string, bgColor: string, size: number): THREE.T
   const tex = new THREE.CanvasTexture(canvas)
   tex.magFilter = THREE.NearestFilter
   tex.minFilter = THREE.NearestFilter
+  emojiTexCache.set(key, tex)
   return tex
 }
 

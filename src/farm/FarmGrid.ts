@@ -174,7 +174,7 @@ export class FarmGrid {
     const tex = getTileTexture(texKey)
     const ground = createTexturedPlane(tex)
     ground.position.set(x, 0.01, z)
-    ground.receiveShadow = true
+    ground.receiveShadow = false
     this.group.add(ground)
     tile.groundMesh = ground
 
@@ -220,7 +220,6 @@ export class FarmGrid {
       const texKey = TILE_TEX_KEY[effectiveType] ?? 'dirt'
       const mat = tile.groundMesh.material as THREE.MeshLambertMaterial
       mat.map = getTileTexture(texKey)
-      mat.needsUpdate = true
     }
 
     // Rebuild object
@@ -358,9 +357,10 @@ export class FarmGrid {
         // New tree sapling on grass
         if (t.type === TileType.GRASS && rng.chance(0.015)) {
           t.type = TileType.SAPLING; t.treeAge = 0; this.updateTileVisual(x, z)
+        } else if (t.cropId || t.watered) {
+          // Only update visuals for tiles with crops or that were watered (now unwatered)
+          this.updateTileVisual(x, z)
         }
-
-        this.updateTileVisual(x, z)
       }
     }
     return spoiled

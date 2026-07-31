@@ -52,6 +52,20 @@ class Game {
   private dogState: 'idle' | 'walk' | 'bark' | 'play' = 'idle'
   private dogTargetPos = new THREE.Vector3()
   private worldSeed = 0
+  // Cached bone/part references to avoid getObjectByName per frame
+  private pLeftLeg!: THREE.Group
+  private pRightLeg!: THREE.Group
+  private pRightArm!: THREE.Group
+  private pLeftArm!: THREE.Group
+  private dogTail!: THREE.Group
+  private shopLeftArm!: THREE.Group
+  private shopRightArm!: THREE.Group
+  private mineTorch: THREE.PointLight | null = null
+  private minePlayerGlow: THREE.PointLight | null = null
+  private mineHelmetLight: THREE.PointLight | null = null
+  private mineGroundFill: THREE.PointLight | null = null
+  private mineHeadSpot: THREE.SpotLight | null = null
+  private binArrow: THREE.Object3D | null = null
   // FPS tracking
   private fpsFrames = 0
   private fpsTime = 0
@@ -78,7 +92,7 @@ class Game {
     const sun = new THREE.DirectionalLight(0xfff5e0, 0.9)
     sun.position.set(15, 20, 10)
     sun.castShadow = true
-    sun.shadow.mapSize.set(2048, 2048)
+    sun.shadow.mapSize.set(1024, 1024)
     sun.shadow.camera.left = -25; sun.shadow.camera.right = 25
     sun.shadow.camera.top = 25; sun.shadow.camera.bottom = -25
     this.scene.add(sun)
@@ -114,12 +128,17 @@ class Game {
     this.playerModel.position.set(1, 0, 1)
     this.playerModel.castShadow = true
     this.scene.add(this.playerModel)
+    this.pLeftLeg = this.playerModel.getObjectByName('leftLeg') as THREE.Group
+    this.pRightLeg = this.playerModel.getObjectByName('rightLeg') as THREE.Group
+    this.pRightArm = this.playerModel.getObjectByName('this.pRightArm') as THREE.Group
+    this.pLeftArm = this.playerModel.getObjectByName('this.pLeftArm') as THREE.Group
 
     // Dog
     this.dogModel = createDogModel()
     this.dogModel.position.set(1.5, 0, 1.5)
     this.dogModel.castShadow = true
     this.scene.add(this.dogModel)
+    this.dogTail = this.dogModel.getObjectByName('tail') as THREE.Group
 
     // Shop NPC with table
     this.shopNpcModel = createNPCModel()
@@ -128,6 +147,8 @@ class Game {
     this.shopNpcModel.rotation.y = Math.PI // face toward farm
     this.shopNpcModel.castShadow = true
     this.scene.add(this.shopNpcModel)
+    this.shopLeftArm = this.shopNpcModel.getObjectByName('this.pLeftArm') as THREE.Group
+    this.shopRightArm = this.shopNpcModel.getObjectByName('this.pRightArm') as THREE.Group
     // Table in front of shop
     const tableGeo = new THREE.BoxGeometry(1.2, 0.6, 0.6)
     const tableMat = new THREE.MeshLambertMaterial({ color: 0x8b5a36 })
@@ -275,19 +296,19 @@ class Game {
         this.playerModel.position.y = 0
         const px = this.playerModel.position.x
         const pz = this.playerModel.position.z
-        const torch = this.mineScene.getObjectByName('torch') as THREE.PointLight | undefined
-        if (torch) torch.position.set(px, 1.8, pz)
-        const pglow = this.mineScene.getObjectByName('playerGlow') as THREE.PointLight | undefined
-        if (pglow) pglow.position.set(px, 1.2, pz)
-        const helmetLight = this.mineScene.getObjectByName('helmetLight') as THREE.PointLight | undefined
-        if (helmetLight) helmetLight.position.set(px, 2.0, pz)
-        const groundFill = this.mineScene.getObjectByName('groundFill') as THREE.PointLight | undefined
-        if (groundFill) groundFill.position.set(px, 0.3, pz)
-        const headSpot = this.mineScene.getObjectByName('headSpot') as THREE.SpotLight | undefined
-        if (headSpot) {
+        if (!this.mineTorch) this.mineTorch = this.mineScene.getObjectByName('torch') as THREE.PointLight
+        if (!this.minePlayerGlow) this.minePlayerGlow = this.mineScene.getObjectByName('playerGlow') as THREE.PointLight
+        if (!this.mineHelmetLight) this.mineHelmetLight = this.mineScene.getObjectByName('helmetLight') as THREE.PointLight
+        if (!this.mineGroundFill) this.mineGroundFill = this.mineScene.getObjectByName('groundFill') as THREE.PointLight
+        if (!this.mineHeadSpot) this.mineHeadSpot = this.mineScene.getObjectByName('headSpot') as THREE.SpotLight
+        if (this.mineTorch) this.mineTorch.position.set(px, 1.8, pz)
+        if (this.minePlayerGlow) this.minePlayerGlow.position.set(px, 1.2, pz)
+        if (this.mineHelmetLight) this.mineHelmetLight.position.set(px, 2.0, pz)
+        if (this.mineGroundFill) this.mineGroundFill.position.set(px, 0.3, pz)
+        if (this.mineHeadSpot) {
           const rot = this.playerModel.rotation.y
-          headSpot.position.set(px, 1.5, pz)
-          headSpot.target.position.set(px + Math.sin(rot) * 4, 0, pz + Math.cos(rot) * 4)
+          this.mineHeadSpot.position.set(px, 1.5, pz)
+          this.mineHeadSpot.target.position.set(px + Math.sin(rot) * 4, 0, pz + Math.cos(rot) * 4)
         }
       }
     }
@@ -298,8 +319,8 @@ class Game {
     this.checkStoryTriggers()
     this.binArrowTimer += dt
     if (this.farm.binGroup) {
-      const arrow = this.farm.binGroup.getObjectByName('binArrow')
-      if (arrow) arrow.position.y = 2.5 + Math.sin(this.binArrowTimer * 3) * 0.15
+      if (!this.binArrow) this.binArrow = this.farm.binGroup.getObjectByName('binArrow') ?? null
+      if (this.binArrow) this.binArrow.position.y = 2.5 + Math.sin(this.binArrowTimer * 3) * 0.15
     }
     // Sweat icon above player head
     if (this.sweatTimer > 0) {
@@ -386,20 +407,17 @@ class Game {
     if (this.input.isDown('KeyD') || this.input.isDown('ArrowRight')) dx += 1
 
     // Leg animation
-    const leftLeg = this.playerModel.getObjectByName('leftLeg') as THREE.Group | undefined
-    const rightLeg = this.playerModel.getObjectByName('rightLeg') as THREE.Group | undefined
     if (dx === 0 && dz === 0) {
-      // Reset legs when idle
       this.walkTime = 0
-      if (leftLeg) leftLeg.rotation.x = 0
-      if (rightLeg) rightLeg.rotation.x = 0
+      if (this.pLeftLeg) this.pLeftLeg.rotation.x = 0
+      if (this.pRightLeg) this.pRightLeg.rotation.x = 0
       return
     }
 
     this.walkTime += dt * 10
     const legSwing = Math.sin(this.walkTime) * 0.5
-    if (leftLeg) leftLeg.rotation.x = legSwing
-    if (rightLeg) rightLeg.rotation.x = -legSwing
+    if (this.pLeftLeg) this.pLeftLeg.rotation.x = legSwing
+    if (this.pRightLeg) this.pRightLeg.rotation.x = -legSwing
 
     const len = Math.sqrt(dx * dx + dz * dz)
     dx /= len; dz /= len
@@ -714,9 +732,9 @@ class Game {
     if (this.toolAnimType === 'none') return
     this.toolAnimTimer += dt
 
-    const rightArm = this.playerModel.getObjectByName('rightArm') as THREE.Group | undefined
-    const leftArm = this.playerModel.getObjectByName('leftArm') as THREE.Group | undefined
-    if (!rightArm) return
+    
+    
+    if (!this.pRightArm) return
 
     const duration = this.toolAnimType === 'pour' ? 0.6 : 0.35
     const t = Math.min(this.toolAnimTimer / duration, 1)
@@ -725,9 +743,9 @@ class Game {
     if (this.toolAnimType === 'swing') {
       // Axe/pickaxe: big overhead swing arc
       const swingAngle = Math.sin(t * Math.PI)
-      rightArm.rotation.x = -swingAngle * 2.2
-      rightArm.rotation.z = swingAngle * 0.4
-      if (leftArm) { leftArm.rotation.x = -swingAngle * 0.8; leftArm.rotation.z = -swingAngle * 0.2 }
+      this.pRightArm.rotation.x = -swingAngle * 2.2
+      this.pRightArm.rotation.z = swingAngle * 0.4
+      if (this.pLeftArm) { this.pLeftArm.rotation.x = -swingAngle * 0.8; this.pLeftArm.rotation.z = -swingAngle * 0.2 }
       // Tool mesh wobbles during swing
       if (this.heldToolMesh) {
         this.heldToolMesh.rotation.x = -0.3 - swingAngle * 0.5
@@ -735,17 +753,17 @@ class Game {
     } else if (this.toolAnimType === 'pour') {
       // Watering can: tilt forward and pour
       const pourT = Math.sin(t * Math.PI)
-      rightArm.rotation.x = -0.8 - pourT * 1.0
-      rightArm.rotation.z = pourT * 0.3
+      this.pRightArm.rotation.x = -0.8 - pourT * 1.0
+      this.pRightArm.rotation.z = pourT * 0.3
       if (this.heldToolMesh) {
         this.heldToolMesh.rotation.x = -0.5 - pourT * 0.8
       }
     } else if (this.toolAnimType === 'dig') {
       // Hoe/shovel: downward digging motion
       const digT = Math.sin(t * Math.PI)
-      rightArm.rotation.x = -digT * 1.4
-      rightArm.rotation.z = 0
-      if (leftArm) { leftArm.rotation.x = -digT * 0.5 }
+      this.pRightArm.rotation.x = -digT * 1.4
+      this.pRightArm.rotation.z = 0
+      if (this.pLeftArm) { this.pLeftArm.rotation.x = -digT * 0.5 }
       if (this.heldToolMesh) {
         this.heldToolMesh.rotation.x = -0.3 - digT * 0.6
       }
@@ -753,8 +771,8 @@ class Game {
 
     if (t >= 1) {
       this.toolAnimType = 'none'
-      rightArm.rotation.set(0, 0, 0)
-      if (leftArm) leftArm.rotation.set(0, 0, 0)
+      this.pRightArm.rotation.set(0, 0, 0)
+      if (this.pLeftArm) this.pLeftArm.rotation.set(0, 0, 0)
       // Reset tool mesh to held position
       if (this.heldToolMesh && sel) {
         if (sel.id === 'water') {
@@ -775,10 +793,10 @@ class Game {
     this.playerModel.add(mesh)
 
     // Raise both arms
-    const leftArm = this.playerModel.getObjectByName('leftArm') as THREE.Group | undefined
-    const rightArm = this.playerModel.getObjectByName('rightArm') as THREE.Group | undefined
-    if (leftArm) leftArm.rotation.x = -2.5
-    if (rightArm) rightArm.rotation.x = -2.5
+    
+    
+    if (this.pLeftArm) this.pLeftArm.rotation.x = -2.5
+    if (this.pRightArm) this.pRightArm.rotation.x = -2.5
 
     let phase = 0 // 0=hold, 1=throw
     let t = 0
@@ -802,8 +820,8 @@ class Game {
           mesh.position.copy(worldPos)
           this.scene.add(mesh)
           // Reset arms
-          if (leftArm) leftArm.rotation.x = 0
-          if (rightArm) rightArm.rotation.x = 0
+          if (this.pLeftArm) this.pLeftArm.rotation.x = 0
+          if (this.pRightArm) this.pRightArm.rotation.x = 0
         }
         requestAnimationFrame(anim)
       } else {
@@ -827,18 +845,18 @@ class Game {
 
   private updateHeldVisual() {
     if (this.heldToolMesh) { this.playerModel.remove(this.heldToolMesh); this.heldToolMesh = null }
-    const leftArm = this.playerModel.getObjectByName('leftArm') as THREE.Group | undefined
-    const rightArm = this.playerModel.getObjectByName('rightArm') as THREE.Group | undefined
-    if (leftArm) leftArm.rotation.set(0, 0, 0)
-    if (rightArm) rightArm.rotation.set(0, 0, 0)
+    
+    
+    if (this.pLeftArm) this.pLeftArm.rotation.set(0, 0, 0)
+    if (this.pRightArm) this.pRightArm.rotation.set(0, 0, 0)
 
     const sel = this.player.getSelectedItem()
     if (!sel) return
 
     if (TOOLS[sel.id]) {
       this.heldToolMesh = createToolMesh(sel.id)
-      const rightArm = this.playerModel.getObjectByName('rightArm') as THREE.Group | undefined
-      if (rightArm) {
+      
+      if (this.pRightArm) {
         // Watering can held above head when selected
         if (sel.id === 'water') {
           this.heldToolMesh.position.set(0, 0.35, 0.1)
@@ -847,7 +865,7 @@ class Game {
           this.heldToolMesh.position.set(0, -0.15, 0.15)
           this.heldToolMesh.rotation.x = -0.3
         }
-        rightArm.add(this.heldToolMesh)
+        this.pRightArm.add(this.heldToolMesh)
       }
     } else if (sel.id.startsWith('seed_')) {
       // Seeds: big emoji sprite held above head with both hands, touching
@@ -856,8 +874,8 @@ class Game {
       itemMesh.scale.set(2.5, 2.5, 2.5)
       this.playerModel.add(itemMesh)
       this.heldToolMesh = itemMesh as unknown as THREE.Group
-      const la = this.playerModel.getObjectByName('leftArm') as THREE.Group | undefined
-      const ra = this.playerModel.getObjectByName('rightArm') as THREE.Group | undefined
+      const la = this.playerModel.getObjectByName('this.pLeftArm') as THREE.Group | undefined
+      const ra = this.playerModel.getObjectByName('this.pRightArm') as THREE.Group | undefined
       if (la) la.rotation.x = -2.6
       if (ra) ra.rotation.x = -2.6
     } else {
@@ -867,8 +885,8 @@ class Game {
       itemMesh.scale.set(2.0, 2.0, 2.0)
       this.playerModel.add(itemMesh)
       this.heldToolMesh = itemMesh as unknown as THREE.Group
-      const la = this.playerModel.getObjectByName('leftArm') as THREE.Group | undefined
-      const ra = this.playerModel.getObjectByName('rightArm') as THREE.Group | undefined
+      const la = this.playerModel.getObjectByName('this.pLeftArm') as THREE.Group | undefined
+      const ra = this.playerModel.getObjectByName('this.pRightArm') as THREE.Group | undefined
       if (la) la.rotation.x = -2.5
       if (ra) ra.rotation.x = -2.5
     }
@@ -903,12 +921,12 @@ class Game {
     this.dogTimer += dt
     this.dogBarkTimer += dt
 
-    const tail = this.dogModel.getObjectByName('tail') as THREE.Group | undefined
+    
 
     switch (this.dogState) {
       case 'idle':
         // Wag tail slowly
-        if (tail) tail.rotation.y = Math.sin(this.dogTimer * 3) * 0.3
+        if (this.dogTail) this.dogTail.rotation.y = Math.sin(this.dogTimer * 3) * 0.3
         // Random bark
         if (this.dogBarkTimer > 8 + Math.random() * 15) {
           this.dogState = 'bark'
@@ -930,7 +948,7 @@ class Game {
         break
 
       case 'walk':
-        if (tail) tail.rotation.y = Math.sin(this.dogTimer * 8) * 0.5
+        if (this.dogTail) this.dogTail.rotation.y = Math.sin(this.dogTimer * 8) * 0.5
         const dir = new THREE.Vector3().subVectors(this.dogTargetPos, this.dogModel.position)
         dir.y = 0
         const dist = dir.length()
@@ -946,7 +964,7 @@ class Game {
         break
 
       case 'bark':
-        if (tail) tail.rotation.y = Math.sin(this.dogTimer * 12) * 0.6
+        if (this.dogTail) this.dogTail.rotation.y = Math.sin(this.dogTimer * 12) * 0.6
         // Head bob
         this.dogModel.children[1].position.y = 0.35 + Math.sin(this.dogTimer * 15) * 0.03
         if (this.dogTimer > 0.5) {
@@ -957,7 +975,7 @@ class Game {
         break
 
       case 'play':
-        if (tail) tail.rotation.y = Math.sin(this.dogTimer * 15) * 0.8
+        if (this.dogTail) this.dogTail.rotation.y = Math.sin(this.dogTimer * 15) * 0.8
         // Spin in circle
         this.dogModel.rotation.y += 3 * dt
         if (this.dogTimer > 1.5) {
@@ -987,14 +1005,15 @@ class Game {
       this.shopNpcModel.rotation.y += diff * 3 * dt
     }
 
+    // Skip idle animation when far away (not visible through fog)
+    if (dist > 20) return
+
     // Idle animations: gentle sway and arm movement
-    const leftArm = this.shopNpcModel.getObjectByName('leftArm') as THREE.Group | undefined
-    const rightArm = this.shopNpcModel.getObjectByName('rightArm') as THREE.Group | undefined
     // Gentle body sway
     this.shopNpcModel.children[0].rotation.z = Math.sin(t * 1.5) * 0.03
     // Arms: one hand on hip, other gestures occasionally
-    if (leftArm) leftArm.rotation.x = -0.3 + Math.sin(t * 0.8) * 0.1
-    if (rightArm) rightArm.rotation.x = -0.5 + Math.sin(t * 1.2) * 0.15
+    if (this.shopLeftArm) this.shopLeftArm.rotation.x = -0.3 + Math.sin(t * 0.8) * 0.1
+    if (this.shopRightArm) this.shopRightArm.rotation.x = -0.5 + Math.sin(t * 1.2) * 0.15
     // Head nod when player is close
     if (dist < 3) {
       const head = this.shopNpcModel.children[1]
@@ -1036,11 +1055,11 @@ class Game {
     // Only one sound (addToBin already plays collect)
 
     // Hand throw animation
-    const rightArm = this.playerModel.getObjectByName('rightArm') as THREE.Group | undefined
-    if (rightArm) {
-      const origRot = rightArm.rotation.x
-      rightArm.rotation.x = -2.0
-      setTimeout(() => { rightArm.rotation.x = origRot }, 300)
+    
+    if (this.pRightArm) {
+      const origRot = this.pRightArm.rotation.x
+      this.pRightArm.rotation.x = -2.0
+      setTimeout(() => { this.pRightArm.rotation.x = origRot }, 300)
     }
   }
 

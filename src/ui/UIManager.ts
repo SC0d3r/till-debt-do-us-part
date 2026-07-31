@@ -90,16 +90,20 @@ export class UIManager {
 
   private lastRenderedSlot = -1
   private onSelectSlot: ((slot: number) => void) | null = null
+  private slotCache: string[] = new Array(8).fill('')
 
   setOnSelectSlot(cb: (slot: number) => void) { this.onSelectSlot = cb }
 
+  invalidateHotbarCache() { this.slotCache.fill('') }
+
   autoFillHotbar(player: PlayerState) {
-    // If any hotbar slot (0-7) is empty, pull next item from overflow (8-15)
     for (let h = 0; h < 8; h++) {
       if (player.inventory[h] === null) {
         for (let o = 8; o < 16; o++) {
           if (player.inventory[o] !== null) {
             player.swapSlots(h, o)
+            this.slotCache[h] = ''
+            this.slotCache[o] = ''
             break
           }
         }
@@ -107,12 +111,25 @@ export class UIManager {
     }
   }
 
+  private getSlotCacheKey(player: PlayerState, i: number): string {
+    const item = player.inventory[i]
+    if (!item || item.count <= 0) return `empty_${i === player.selectedSlot ? 1 : 0}`
+    const isTool = !!TOOLS[item.id]
+    if (isTool) {
+      const dur = player.getToolDurability(item.id)
+      const tier = player.toolTiers[item.id] || 1
+      const wLvl = item.id === 'water' ? player.waterLevel : -1
+      return `${item.id}_${item.count}_${dur}_${tier}_${wLvl}_${i === player.selectedSlot ? 1 : 0}`
+    }
+    return `${item.id}_${item.count}_${i === player.selectedSlot ? 1 : 0}`
+  }
+
   private renderInventory(player: PlayerState) {
     this.autoFillHotbar(player)
     const bar = document.getElementById('inventory-bar')!
-    // Only rebuild if slot count changed or first render
     if (bar.childElementCount !== 8) {
       bar.innerHTML = ''
+      this.slotCache.fill('')
       for (let i = 0; i < 8; i++) {
         const slot = document.createElement('div')
         slot.className = 'inv-slot'
@@ -122,7 +139,7 @@ export class UIManager {
           e.stopPropagation()
           player.selectedSlot = i
           sound.menuSelect()
-          this.lastRenderedSlot = -1
+          this.slotCache.fill('')
           this.updateHUD(player)
           this.onSelectSlot?.(i)
         })
@@ -151,7 +168,8 @@ export class UIManager {
             if (player.selectedSlot === fromIdx) player.selectedSlot = i
             else if (player.selectedSlot === i) player.selectedSlot = fromIdx
             sound.menuSelect()
-            this.lastRenderedSlot = -1
+            this.slotCache[fromIdx] = ''
+            this.slotCache[i] = ''
             this.updateHUD(player)
             this.onSelectSlot?.(player.selectedSlot)
           }
@@ -160,8 +178,11 @@ export class UIManager {
       }
     }
 
-    // Update slot contents
     for (let i = 0; i < 8; i++) {
+      const key = this.getSlotCacheKey(player, i)
+      if (key === this.slotCache[i]) continue
+      this.slotCache[i] = key
+
       const slot = bar.children[i] as HTMLElement
       const isActive = i === player.selectedSlot
       slot.className = `inv-slot${isActive ? ' active' : ''}`
