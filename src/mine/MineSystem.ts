@@ -134,9 +134,11 @@ export class MineSystem {
     return Math.min(flat + this.digsThisFloor * pity, 0.3)
   }
 
-  // Very small chance to accidentally stumble back to the surface, grows with depth.
+  // Digging never sends you back up. Only the ladder has a small chance to
+  // fail: instead of descending, the old rungs give way and dump you at the
+  // surface. The chance grows with depth but stays low.
   getExitChance(): number {
-    return 0.01 + this.currentFloor * 0.012
+    return Math.min(0.04 + this.currentFloor * 0.008, 0.12)
   }
 
   dig(x: number, z: number, pickaxeTier: number): DigResult {
@@ -159,11 +161,6 @@ export class MineSystem {
 
     if (tile.itemId) {
       this.spawnBouncingItem(x, z, tile.itemId)
-    }
-
-    // Roll exit first (mutually exclusive with the ladder)
-    if (Math.random() < this.getExitChance()) {
-      return { success: true, foundHole: false, exitMine: true, itemId: null, blocked: false, outOfEnergy: false }
     }
 
     // Roll the single ladder — only once per level

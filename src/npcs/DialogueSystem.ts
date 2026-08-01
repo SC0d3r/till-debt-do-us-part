@@ -92,6 +92,11 @@ const DIALOGUES: Record<string, DialogueEntry> = {
     textKey: 'dlg_mine_descend',
     choices: [{ labelKey: 'dlg_descend', action: 'descend' }, { labelKey: 'dlg_stay', action: 'close' }],
   },
+  ladder_mishap: {
+    speakerKey: 'dlg_mine',
+    textKey: 'dlg_ladder_mishap',
+    choices: [{ labelKey: 'dlg_ouch', action: 'close' }],
+  },
   crop_ripe: {
     speakerKey: 'dlg_grandpa',
     textKey: 'dlg_crop_ripe',

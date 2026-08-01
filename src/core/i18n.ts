@@ -66,8 +66,10 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     // Mine
     dlg_mine: '⛏️ Mine Hole',
     dlg_mine_descend: 'You found a glowing hole with a ladder leading deeper. Climb down to the next level?',
+    dlg_ladder_mishap: "You grab the ladder... CRACK! The old rungs give way! You tumble and slide all the way back up to the surface. Looks like you're not going deeper today!",
     dlg_descend: 'Descend',
     dlg_stay: 'Stay here',
+    dlg_ouch: 'Ouch!',
     // Farming tutorial
     dlg_grandpa: "📖 Grandpa's Diary",
     dlg_crop_ripe: "It's time!! The crops you planted have finally grown! Walk right up to a ripe plant and press E (or SPACE) to pick it — any item in hand works, just not the watering can. Pick them all before they dry out!",
@@ -147,8 +149,10 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     // Mine
     dlg_mine: '⛏️ گودال معدن',
     dlg_mine_descend: 'یک گودال درخشان با نردبانی که به عمق می‌رود پیدا کردی. به طبقه بعد پایین می‌روی؟',
+    dlg_ladder_mishap: 'نردبان را می‌گیری... ترق! چوب‌های کهنه می‌شکنند! به سمت بالا سُر می‌خوری و دوباره به سطح می‌رسی. معلومه که امروز قرار نیست عمیق‌تر بروی!',
     dlg_descend: 'پایین برو',
     dlg_stay: 'اینجا بمان',
+    dlg_ouch: 'آخ!',
     // Farming tutorial
     dlg_grandpa: '📖 دفتر خاطرات پدربزرگ',
     dlg_crop_ripe: 'وقتش رسیده!! محصولاتی که کاشتی بالاخره بزرگ شدند! به گیاه رسیده نزدیک شو و E (یا Space) را بزن تا بچینیش — هر آیتمی که دستت است اشکال ندارد، فقط آبپاش نه. همه‌شان را بچین قبل از اینکه خشک شوند!',

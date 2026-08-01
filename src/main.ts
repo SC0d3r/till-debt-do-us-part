@@ -581,9 +581,14 @@ class Game {
           this.dialogue.show('mine_descend', (action) => {
             if (action === 'descend') {
               sound.menuClose()
-              this.mine.descend()
-              this.playerModel.position.set(hole.x, 0, hole.z + 0.5)
-              this.updateMineHUD()
+              // Small chance the old ladder gives way: tumble back to the surface
+              if (Math.random() < this.mine.getExitChance()) {
+                this.dialogue.show('ladder_mishap', () => this.exitMine())
+              } else {
+                this.mine.descend()
+                this.playerModel.position.set(hole.x, 0, hole.z + 0.5)
+                this.updateMineHUD()
+              }
             }
           })
         } else {
