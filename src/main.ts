@@ -799,13 +799,41 @@ class Game {
     const cropId = this.farm.harvest(x, z)
     if (!cropId) return
     this.showHarvestAnim(cropId)
-    this.player.addItem(cropId)
+    this.placeHarvestedItem(cropId)
     this.actionCooldown = 0.3
     // Celebrate the very first harvest with a gamey tutorial
     if (!this.player.hasFarmed) {
       this.player.hasFarmed = true
       this.dialogue.show('first_harvest')
     }
+  }
+
+  // Harvested crops always land in the hotbar and get auto-selected:
+  // stack if one exists, else the first empty slot; if the hotbar is full,
+  // the crop takes the last slot and the rest shift one slot lower
+  // (the front item moves to the bag).
+  private placeHarvestedItem(id: string) {
+    const inv = this.player.inventory
+    for (let i = 0; i < 8; i++) {
+      const s = inv[i]
+      if (s && s.id === id) { s.count++; this.selectSlot(i); return }
+    }
+    for (let i = 0; i < 8; i++) {
+      if (inv[i] === null) { inv[i] = { id, count: 1 }; this.selectSlot(i); return }
+    }
+    const front = inv[0]
+    for (let i = 1; i < 8; i++) inv[i - 1] = inv[i]
+    inv[7] = { id, count: 1 }
+    if (front) {
+      const bagIdx = inv.findIndex((s, i) => i >= 8 && s === null)
+      if (bagIdx >= 0) inv[bagIdx] = front
+    }
+    this.selectSlot(7)
+  }
+
+  private selectSlot(i: number) {
+    this.player.selectedSlot = i
+    this.updateHeldVisual()
   }
 
   // ─── TOOL ANIMATIONS ───
