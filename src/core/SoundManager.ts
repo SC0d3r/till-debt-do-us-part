@@ -121,6 +121,138 @@ export class SoundManager {
     setTimeout(() => this.playTone(80, 0.4, 'sawtooth', 0.15), 200)
   }
 
+  // ─── Slot machine SFX (all synthesized, with slight random pitch jitter) ───
+  private blip(freq: number, dur: number, type: OscillatorType = 'sine', vol = 0.4, jitter = 0.07) {
+    this.playTone(freq * (1 + (Math.random() - 0.5) * 2 * jitter), dur, type, vol)
+  }
+
+  private seq(notes: number[], gap = 0.06, type: OscillatorType = 'sine', vol = 0.3) {
+    notes.forEach((f, i) => setTimeout(() => this.blip(f, 0.09, type, vol), i * gap * 1000))
+  }
+
+  slotClick() {
+    this.blip(1400, 0.05, 'square', 0.12)
+    setTimeout(() => this.blip(1950, 0.06, 'square', 0.08), 35)
+  }
+
+  slotSpinWhoosh() {
+    this.playNoise(0.5, 0.12)
+    setTimeout(() => this.blip(280, 0.3, 'sine', 0.14), 60)
+  }
+
+  slotClink() {
+    this.blip(850 + Math.random() * 500, 0.06, 'sine', 0.14)
+  }
+
+  slotMatch(size: number) {
+    const n = Math.min(3 + Math.floor(size / 3), 6)
+    const base = 480 + Math.min(size, 8) * 14
+    const notes: number[] = []
+    for (let i = 0; i < n; i++) notes.push(base + i * 150)
+    this.seq(notes, 0.07, 'sine', 0.24)
+  }
+
+  slotPop(size: number) {
+    this.playNoise(0.1 + Math.min(size, 10) * 0.018, 0.12 + Math.min(size, 8) * 0.02)
+    this.blip(190 + Math.random() * 70, 0.1, 'triangle', 0.2)
+  }
+
+  slotCascadeUp(step: number) {
+    const base = 300 + Math.min(step, 8) * 85
+    this.seq([base, base * 1.25, base * 1.55], 0.05, 'triangle', 0.18)
+  }
+
+  slotMultDing(level: number) {
+    const f = 840 * Math.pow(1.16, level)
+    this.blip(f, 0.12, 'sine', 0.24)
+    setTimeout(() => this.blip(f * 1.5, 0.16, 'sine', 0.15), 95)
+  }
+
+  slotCoin(n: number) {
+    for (let i = 0; i < Math.min(n, 14); i++) {
+      setTimeout(() => this.blip(1150 + Math.random() * 1700, 0.045, 'square', 0.055), i * 42)
+    }
+  }
+
+  slotWin(intensity: number) {
+    const n = 5 + Math.min(intensity, 8)
+    const notes: number[] = []
+    for (let i = 0; i < n; i++) notes.push(660 + i * 95)
+    this.seq(notes, 0.05, 'sine', 0.2)
+    this.slotCoin(8 + intensity)
+  }
+
+  slotBigWin() {
+    this.blip(196, 0.9, 'sawtooth', 0.1)
+    this.blip(247, 0.9, 'sawtooth', 0.08)
+    this.blip(294, 0.8, 'sawtooth', 0.08)
+    this.blip(392, 0.6, 'sine', 0.13)
+    this.blip(523, 0.55, 'sine', 0.1)
+    this.slotCoin(22)
+    setTimeout(() => this.seq([660, 770, 880, 990, 1100], 0.06, 'sine', 0.13), 320)
+  }
+
+  slotNoWin() {
+    this.blip(500, 0.12, 'sine', 0.14)
+    setTimeout(() => this.blip(400, 0.12, 'sine', 0.12), 140)
+    setTimeout(() => this.blip(300, 0.28, 'sine', 0.11), 280)
+    this.playNoise(0.14, 0.07)
+  }
+
+  slotDeny() {
+    this.playTone(110, 0.18, 'sawtooth', 0.18)
+    setTimeout(() => this.playTone(90, 0.22, 'sawtooth', 0.13), 95)
+  }
+
+  // ─── Slot ambient (soft luxury drone, very subtle) ───
+  private ambOscs: OscillatorNode[] = []
+  private ambGain: GainNode | null = null
+  private ambOn = false
+
+  slotAmbientOn() {
+    if (this.ambOn) return
+    this.ensureCtx()
+    this.ambOn = true
+    const c = this.ctx!
+    const g = c.createGain()
+    g.gain.value = 0
+    const filter = c.createBiquadFilter()
+    filter.type = 'lowpass'
+    filter.frequency.value = 420
+    filter.connect(this.masterGain!)
+    g.connect(filter)
+    this.ambGain = g
+    const freqs = [110, 110.8, 164.8, 220.4]
+    const types: OscillatorType[] = ['sine', 'triangle', 'sine', 'sine']
+    const vols = [0.35, 0.16, 0.12, 0.08]
+    this.ambOscs = []
+    freqs.forEach((f, i) => {
+      const o = c.createOscillator()
+      o.type = types[i]
+      o.frequency.value = f
+      const og = c.createGain()
+      og.gain.value = vols[i]
+      o.connect(og)
+      og.connect(g)
+      o.start()
+      this.ambOscs.push(o)
+    })
+    g.gain.linearRampToValueAtTime(0.028, c.currentTime + 2)
+  }
+
+  slotAmbientOff() {
+    if (!this.ambOn) return
+    this.ambOn = false
+    const c = this.ctx!
+    if (this.ambGain) this.ambGain.gain.linearRampToValueAtTime(0, c.currentTime + 1.2)
+    const oscs = this.ambOscs
+    this.ambOscs = []
+    this.ambGain = null
+    setTimeout(() => {
+      for (const o of oscs) { try { o.stop() } catch {} }
+    }, 1400)
+  }
+
   // ─── Background music (MP3) ───
   private ensureMusicEl(): HTMLAudioElement {
     if (!this.musicEl) {

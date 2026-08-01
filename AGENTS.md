@@ -44,10 +44,44 @@ Rules:
 - **`FarmTile.objGroup` is typed `THREE.Object3D`** (not Group) because some tiles use Mesh directly
 - **Sound init requires user gesture**: `sound.init()` called on start button click only
 
+## Headless Browser Testing (puppeteer-core)
+
+Use this to verify gameplay flows after implementing/changing features (slot machine, UI panels, keybinds, money flow). There is no unit test suite.
+
+**Setup:**
+- `puppeteer-core` is a devDependency; Chrome binary is `/usr/bin/google-chrome`
+- Start dev server first: `npm run dev -- --port 5199` (log to /tmp/opencode/vite-dev.log)
+- Write the test script at the PROJECT ROOT (e.g. `slot-test.tmp.mjs`) — it must be inside the project dir for the ESM import of puppeteer-core to resolve — then `node slot-test.tmp.mjs` and delete the file after
+
+**Minimal skeleton:**
+```js
+import puppeteer from 'puppeteer-core'
+const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--disable-gpu', '--autoplay-policy=no-user-gesture-required'] })
+const page = await browser.newPage()
+page.on('pageerror', (e) => console.log('PAGEERROR:', e.message)) // catch JS errors
+await page.setViewport({ width: 1280, height: 800 })
+await page.goto('http://localhost:5199/', { waitUntil: 'networkidle2' })
+await page.click('#start-btn')  // game starts here; sound.init needs this gesture
+// interact: page.keyboard.press('KeyR'), page.click('#slot-spin'), page.keyboard.press('Escape')
+// sample state: page.evaluate(() => document.getElementById('slot-money').textContent)
+// verify classes: document.body.classList.contains('slot-open'), element.classList.contains('show')
+await browser.close()
+```
+
+**Low-FPS problem (critical):** headless Chrome renders WebGL with software (SwiftShader), so the game runs at only ~2 FPS. Since `main.ts` clamps `dt` to 0.05, game-time advances roughly 10–20× SLOWER than wall-clock. Anything longer than a few seconds of game-time (full cascade chains, win count-ups, win-panel fade-outs) takes minutes in a test. Don't mistake this for a bug — verify expected state-transition timings against game-time, not wall-time.
+
+**Solutions that worked:**
+- **Deterministic randomness:** `await page.evaluateOnNewDocument(() => { Math.random = () => 0.5 })` before goto — all slot symbols identical → full-grid cluster → guaranteed cascade chain every spin
+- **Temporarily shorten long game-time phases** to make tests finish: e.g. lower `MAX_CASCADES` (20 → 3) and/or shorten the big-win exit (`stateT > 2.4` → `0.3`) — always REVERT after the test
+- **Temporarily add a debug hook** exposing internal state: `(window as any).__slotDebug = () => ({ state, stateT, cascadeIndex, totalWin, ... })` at the top of `SlotMachine.update()`, then poll it via `page.evaluate` every ~250ms and print only CHANGED lines (dedup) to keep output readable; remove the hook afterwards
+- **Wait, don't assume:** fade timings run on real timeouts (e.g. slot close fires ~430ms after Escape — check at ≥800ms, not 300ms); round-end (NOWIN/win) needs a poll loop with a `break` once the expected class appears
+
+**Key selectors:** `#start-btn` (starts game), `#slot-screen`, `#slot-spin`, `#slot-close`, `#slot-money`, `#slot-mult`, `#slot-win-panel` / `#slot-nowin` (use `.classList.contains('show')`), `body.slot-open` (slot open state), `#hud` display (farm HUD restored after close). Expected console noise: 404 for `og-image.png` (harmless).
+
 ## Gotchas
 - `GAME_CONFIG` uses `startingDebt` / `startingGold` (not `startDebt`)
 - Inventory is fixed 8 slots; `PlayerState` constructor pre-fills tools + seeds
 - Mine system still uses sprite-based rendering (legacy) while farm is full 3D meshes
 - `createSprite()` in AssetLoader kept only for mine compatibility
 - Vite base is `./` for relative asset paths in production builds
-- No test suite exists; verify with `npx tsc --noEmit && npx vite build`
+- No unit test suite exists; verify code with `npx tsc --noEmit && npx vite build` and verify gameplay with the puppeteer-core flow above

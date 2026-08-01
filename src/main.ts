@@ -9,6 +9,7 @@ import { CROPS, TOOLS, GAME_CONFIG, MINE_ITEMS, MATERIAL_ITEMS, getItemInfo, TOO
 import { COLORS, getTileTexture, createTexturedPlane, createPlayerModel, createNPCModel, createDogModel, createToolMesh, createItemDropMesh, createStone, createCoinParticle, SeededRNG } from './core/MeshFactory'
 import { sound } from './core/SoundManager'
 import { initLang, setLang, t, getLang } from './core/i18n'
+import { SlotMachine } from './slot/SlotMachine'
 
 class Game {
   private paused = false
@@ -74,6 +75,9 @@ class Game {
   // Unstuck cooldown (seconds remaining)
   private unstuckCooldown = 0
   private lastUnstuckBtnSec = -1
+  // Slot machine (Cascade Desire casino)
+  private slot: SlotMachine | null = null
+  private slotOpen = false
 
   constructor() {
     this.renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -135,6 +139,14 @@ class Game {
     this.ui = new UIManager()
     this.ui.setOnSelectSlot(() => this.updateHeldVisual())
 
+    // Slot machine scene (opened with R; the farm scene stops rendering while open)
+    this.slot = new SlotMachine(this.player, () => this.ui.updateHUD(this.player), () => {
+      this.slotOpen = false
+      document.body.classList.remove('slot-open')
+      sound.resumeMusic()
+      this.saveGame()
+    })
+
     // Player model
     this.playerModel = createPlayerModel()
     this.playerModel.position.set(1, 0, 1)
@@ -186,10 +198,32 @@ class Game {
     })
 
     window.addEventListener('keydown', (e) => {
+      if (e.key === 'r' || e.key === 'R') {
+        if (!this.started || this.paused || this.slotOpen || e.repeat) return
+        if (this.ui.inventoryOpen) this.ui.closeInventory()
+        if (this.ui.shopOpen) this.ui.closeShop()
+        if (this.dialogue.active) this.dialogue.close()
+        this.openSlot()
+        return
+      }
       if (e.key === 'Escape') {
+        if (this.slotOpen) { this.slot?.close(); return }
         if (this.ui.inventoryOpen) { this.ui.closeInventory(); return }
         if (this.ui.shopOpen) { this.ui.closeShop(); return }
         if (this.started && !this.dialogue.active && !this.morningBuyerActive) this.togglePause()
+        return
+      }
+      if (this.slotOpen) {
+        if (e.key === ' ' || e.key === 'Spacebar') {
+          e.preventDefault()
+          this.slot!.pressSpin()
+        } else if (e.key === 'q' || e.key === 'Q') {
+          e.preventDefault()
+          this.slot!.changeBet(-5)
+        } else if (e.key === 'e' || e.key === 'E') {
+          e.preventDefault()
+          this.slot!.changeBet(5)
+        }
         return
       }
       if (!this.started || this.paused || this.dialogue.active) return
@@ -265,6 +299,14 @@ class Game {
     }
   }
 
+  // ─── SLOT MACHINE (Cascade Desire) ───
+  private openSlot() {
+    this.slotOpen = true
+    document.body.classList.add('slot-open')
+    sound.pauseMusic()
+    this.slot!.open()
+  }
+
   // Teleport the player out of a stuck spot to a random walkable tile in the yard
   private useUnstuck() {
     if (!this.started) return
@@ -326,6 +368,11 @@ class Game {
     requestAnimationFrame(this.loop)
     const dt = Math.min(this.clock.getDelta(), 0.05)
     if (!this.started) { this.renderer.render(this.scene, this.camera); return }
+    // Slot machine open: farm scene is NOT rendered at all (keeps FPS high)
+    if (this.slotOpen) {
+      this.slot!.update(dt)
+      return
+    }
     if (this.paused) { this.renderer.render(this.scene, this.camera); return }
 
     this.tiredCooldown = Math.max(0, this.tiredCooldown - dt)
