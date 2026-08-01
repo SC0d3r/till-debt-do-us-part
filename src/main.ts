@@ -51,6 +51,7 @@ class Game {
   private dogBarkTimer = 0
   private dogState: 'idle' | 'walk' | 'bark' | 'play' = 'idle'
   private dogTargetPos = new THREE.Vector3()
+  private scratchVec = new THREE.Vector3()
   private worldSeed = 0
   // Cached bone/part references to avoid getObjectByName per frame
   private pLeftLeg!: THREE.Group
@@ -965,7 +966,7 @@ class Game {
 
       case 'walk':
         if (this.dogTail) this.dogTail.rotation.y = Math.sin(this.dogTimer * 8) * 0.5
-        const dir = new THREE.Vector3().subVectors(this.dogTargetPos, this.dogModel.position)
+        const dir = this.scratchVec.subVectors(this.dogTargetPos, this.dogModel.position)
         dir.y = 0
         const dist = dir.length()
         if (dist > 0.2) {
@@ -1202,7 +1203,9 @@ class Game {
       const anim = () => {
         t += 0.02
         vel.y -= 9.8 * 0.02
-        coin.position.add(vel.clone().multiplyScalar(0.02))
+        coin.position.x += vel.x * 0.02
+        coin.position.y += vel.y * 0.02
+        coin.position.z += vel.z * 0.02
         coin.rotation.x += 0.15
         coin.rotation.z += 0.1
         if (coin.position.y < 0 || t > 2) {

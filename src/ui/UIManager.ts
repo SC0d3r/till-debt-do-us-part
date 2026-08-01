@@ -60,13 +60,22 @@ export class UIManager {
   }
 
   updateHUD(player: PlayerState) {
-    document.getElementById('day-display')!.textContent = String(player.day)
-    document.getElementById('gold-display')!.textContent = String(player.gold)
-    document.getElementById('debt-display')!.textContent = `${player.debt}/${GAME_CONFIG.startingDebt}g`
+    const day = String(player.day)
+    const gold = String(player.gold)
+    const debt = `${player.debt}/${GAME_CONFIG.startingDebt}g`
+    const dayEl = document.getElementById('day-display')!
+    if (dayEl.textContent !== day) dayEl.textContent = day
+    const goldEl = document.getElementById('gold-display')!
+    if (goldEl.textContent !== gold) goldEl.textContent = gold
+    const debtEl = document.getElementById('debt-display')!
+    if (debtEl.textContent !== debt) debtEl.textContent = debt
+
     const pct = Math.max(0, (player.stamina / player.maxStamina) * 100)
+    const width = `${pct}%`
     const fill = document.getElementById('stamina-fill')!
-    fill.style.width = `${pct}%`
-    fill.style.background = pct < 20 ? '#e74c3c' : pct < 50 ? '#f39c12' : 'linear-gradient(90deg, #4caf50, #6abf5a)'
+    if (fill.style.width !== width) fill.style.width = width
+    const bg = pct < 20 ? '#e74c3c' : pct < 50 ? '#f39c12' : 'linear-gradient(90deg, #4caf50, #6abf5a)'
+    if (fill.style.background !== bg) fill.style.background = bg
 
     const durEl = document.getElementById('durability-indicator')!
     const sel = player.getSelectedItem()
@@ -80,13 +89,16 @@ export class UIManager {
         const wColor = wPct > 50 ? '#4488cc' : wPct > 20 ? '#f39c12' : '#e74c3c'
         html += ` <span style="color:${wColor}">💧${player.waterLevel}/${player.maxWater}</span>`
       }
-      durEl.innerHTML = html
-    } else {
+      if (this.lastDurHtml !== html) { this.lastDurHtml = html; durEl.innerHTML = html }
+    } else if (this.lastDurHtml !== '') {
+      this.lastDurHtml = ''
       durEl.textContent = ''
     }
 
     this.renderInventory(player)
   }
+
+  private lastDurHtml = ''
 
   private lastRenderedSlot = -1
   private onSelectSlot: ((slot: number) => void) | null = null

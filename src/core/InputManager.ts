@@ -13,10 +13,15 @@ export class InputManager {
   }
 
   update() {
-    for (const key in this.keys) {
-      this.justPressed[key] = this.keys[key] && !this.prevKeys[key]
+    const keys = this.keys
+    const prev = this.prevKeys
+    const jp = this.justPressed
+    for (const key in keys) {
+      jp[key] = keys[key] && !prev[key]
     }
-    this.prevKeys = { ...this.keys }
+    // Rebuild the prevKeys snapshot in place (no per-frame allocation)
+    for (const key in prev) delete prev[key]
+    for (const key in keys) prev[key] = keys[key]
   }
 
   isDown(code: string): boolean {

@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { GAME_CONFIG, CROPS } from '../data/gameData'
-import { SeededRNG, COLORS, getTileTexture, createTexturedPlane, createTree, createSapling, createSmallTree, createStone, createHouse, createShop, createMineEntrance, createWell, createShippingBin, createCropMesh, createFencePost, createFenceRail, createMountain, createFlowerPatch, createRiverSegment } from '../core/MeshFactory'
+import { SeededRNG, COLORS, getTileTexture, createTree, createSapling, createSmallTree, createStone, createHouse, createShop, createMineEntrance, createWell, createShippingBin, createCropMesh, createFencePost, createFenceRail, createMountain, createRiverSegment } from '../core/MeshFactory'
+import { buildInstanced, type InstPlacement } from '../core/Instancing'
 import { sound } from '../core/SoundManager'
 
 export enum TileType {
@@ -27,7 +28,6 @@ export interface FarmTile {
   growthDay: number
   watered: boolean
   treeAge: number // 0=sapling, 1=small, 2+=full
-  groundMesh: THREE.Mesh | null
   objGroup: THREE.Object3D | null
   cropGroup: THREE.Group | null
 }
@@ -40,11 +40,15 @@ export class FarmGrid {
   binItems: Array<{id:string; count:number}> = []
   binGroup: THREE.Group | null = null
   private rng: SeededRNG
+  private groundMeshes: Record<string, THREE.InstancedMesh> = {}
+  private groundKey: string[] = []
+  private hiddenGround = new THREE.Matrix4().makeTranslation(0, -100, 0)
 
   constructor(seed?: number) {
     this.group = new THREE.Group()
     this.rng = new SeededRNG(seed ?? Date.now())
     this.generateMap()
+    this.buildGroundMeshes()
     this.buildVisuals()
     this.buildBoundary()
   }
@@ -62,7 +66,7 @@ export class FarmGrid {
     for (let x = 0; x < W; x++) {
       this.tiles[x] = []
       for (let z = 0; z < H; z++) {
-        this.tiles[x][z] = { type: TileType.GRASS, cropId:null, growthDay:0, watered:false, treeAge:0, groundMesh:null, objGroup:null, cropGroup:null }
+        this.tiles[x][z] = { type: TileType.GRASS, cropId:null, growthDay:0, watered:false, treeAge:0, objGroup:null, cropGroup:null }
       }
     }
 
@@ -166,17 +170,46 @@ export class FarmGrid {
     }
   }
 
+  private buildGroundMeshes() {
+    const capacity = this.width * this.height
+    const plane = new THREE.PlaneGeometry(1, 1)
+    plane.rotateX(-Math.PI / 2)
+    const keys = ['grass', 'dirt', 'tilled', 'watered', 'path', 'water']
+    for (const k of keys) {
+      const im = new THREE.InstancedMesh(plane, new THREE.MeshLambertMaterial({ map: getTileTexture(k) }), capacity)
+      im.frustumCulled = false
+      this.group.add(im)
+      this.groundMeshes[k] = im
+      for (let i = 0; i < capacity; i++) im.setMatrixAt(i, this.hiddenGround)
+      im.instanceMatrix.needsUpdate = true
+    }
+    this.groundKey = new Array(capacity).fill('')
+  }
+
+  private setGround(x: number, z: number, texKey: string) {
+    const idx = z * this.width + x
+    const prev = this.groundKey[idx]
+    if (prev === texKey) return
+    this.groundKey[idx] = texKey
+    const mesh = this.groundMeshes[texKey]
+    if (!mesh) return
+    const m = new THREE.Matrix4().makeTranslation(x, 0.01, z)
+    mesh.setMatrixAt(idx, m)
+    mesh.instanceMatrix.needsUpdate = true
+    if (prev) {
+      const pmesh = this.groundMeshes[prev]
+      if (pmesh) {
+        pmesh.setMatrixAt(idx, this.hiddenGround)
+        pmesh.instanceMatrix.needsUpdate = true
+      }
+    }
+  }
+
   private buildTileVisual(x: number, z: number) {
     const tile = this.tiles[x][z]
 
-    // Ground plane with texture
-    const texKey = TILE_TEX_KEY[tile.type] ?? 'dirt'
-    const tex = getTileTexture(texKey)
-    const ground = createTexturedPlane(tex)
-    ground.position.set(x, 0.01, z)
-    ground.receiveShadow = false
-    this.group.add(ground)
-    tile.groundMesh = ground
+    // Ground plane with texture (instanced)
+    this.setGround(x, z, TILE_TEX_KEY[tile.type] ?? 'dirt')
 
     // Remove old object
     if (tile.objGroup) { this.group.remove(tile.objGroup); tile.objGroup = null }
@@ -214,15 +247,7 @@ export class FarmGrid {
     const tile = this.tiles[x][z]
     if (!tile) return
 
-    // Update ground texture
-    if (tile.groundMesh) {
-      const effectiveType = tile.watered ? TileType.WATERED : tile.type
-      const texKey = TILE_TEX_KEY[effectiveType] ?? 'dirt'
-      const mat = tile.groundMesh.material as THREE.MeshLambertMaterial
-      mat.map = getTileTexture(texKey)
-    }
-
-    // Rebuild object
+    // Rebuild object (ground texture handled by setGround inside buildTileVisual)
     if (tile.objGroup) { this.group.remove(tile.objGroup); tile.objGroup = null }
     this.buildTileVisual(x, z)
 
@@ -376,19 +401,28 @@ export class FarmGrid {
     const margin = 2
     const bgRng = new SeededRNG(this.rng.next() * 999999 | 0)
 
-    // Fence around perimeter
+    // Fence around perimeter (instanced)
+    const postPlacements: InstPlacement[] = []
+    const railPlacements: InstPlacement[] = []
     for (let x = -margin; x < W + margin; x++) {
       for (const z of [-margin, H + margin - 1]) {
-        const post = createFencePost(); post.position.set(x, 0, z); this.group.add(post)
-        if (x < W + margin - 1) { const rail = createFenceRail(); rail.position.set(x + 0.5, 0.4, z); this.group.add(rail) }
+        postPlacements.push({ x, z })
+        if (x < W + margin - 1) railPlacements.push({ x: x + 0.5, z, y: 0.4 })
       }
     }
     for (let z = -margin; z < H + margin; z++) {
       for (const x of [-margin, W + margin - 1]) {
-        const post = createFencePost(); post.position.set(x, 0, z); this.group.add(post)
-        if (z < H + margin - 1) { const rail = createFenceRail(); rail.position.set(x, 0.4, z + 0.5); rail.rotation.y = Math.PI / 2; this.group.add(rail) }
+        postPlacements.push({ x, z })
+        if (z < H + margin - 1) railPlacements.push({ x, z: z + 0.5, y: 0.4, rotY: Math.PI / 2 })
       }
     }
+    const refPost = createFencePost()
+    const refPost0 = refPost.children[0] as THREE.Mesh
+    const refPost1 = refPost.children[1] as THREE.Mesh
+    this.group.add(buildInstanced(refPost0.geometry, refPost0.material as THREE.Material, postPlacements.length, postPlacements, new THREE.Vector3(0, 0.3, 0), { castShadow: true }))
+    this.group.add(buildInstanced(refPost1.geometry, refPost1.material as THREE.Material, postPlacements.length, postPlacements, new THREE.Vector3(0, 0.62, 0)))
+    const refRail = createFenceRail() as THREE.Mesh
+    this.group.add(buildInstanced(refRail.geometry, refRail.material as THREE.Material, railPlacements.length, railPlacements, new THREE.Vector3(0, 0, 0)))
 
     // Mountains in the far background
     const mtPositions = [
@@ -403,7 +437,8 @@ export class FarmGrid {
       this.group.add(mt)
     }
 
-    // Dense forest beyond fence (more trees, varied sizes)
+    // Dense forest beyond fence (instanced, more trees, varied sizes)
+    const treePlacements: InstPlacement[] = []
     for (let i = 0; i < 100; i++) {
       const side = bgRng.int(0, 3)
       let bx: number, bz: number
@@ -413,20 +448,40 @@ export class FarmGrid {
         case 2: bx = -margin - bgRng.range(1, 8); bz = bgRng.range(-margin-6, H+margin+6); break
         default: bx = W + margin + bgRng.range(0, 7); bz = bgRng.range(-margin-6, H+margin+6); break
       }
-      const tree = createTree(bgRng.range(0.6, 1.5))
-      tree.position.set(bx, 0, bz)
-      this.group.add(tree)
+      const s = bgRng.range(0.6, 1.5)
+      treePlacements.push({ x: bx, z: bz, s: new THREE.Vector3(s, s, s) })
+    }
+    const refTree = createTree(1)
+    for (const child of refTree.children) {
+      const part = child as THREE.Mesh
+      // Forest sits beyond the fence: keep it out of the shadow pass (shadows land
+      // outside the playable farm) to save ~400 shadow-map instances per frame.
+      this.group.add(buildInstanced(part.geometry, part.material as THREE.Material, treePlacements.length, treePlacements, part.position.clone(), { preScale: true }))
     }
 
-    // Flower patches scattered around the farm edges and paths
+    // Flower patches scattered around the farm edges and paths (instanced)
+    const flowerColors = [0xff6688, 0xffaa44, 0xff44aa, 0xffff66, 0xaa66ff, 0xff8888]
+    const stemPlacements: InstPlacement[] = []
+    const petalPlacements: InstPlacement[] = []
     for (let i = 0; i < 25; i++) {
       const fx = bgRng.range(-1, W + 1)
       const fz = bgRng.range(-1, H + 1)
-      // Only place on grass tiles or just outside fence
-      const flowers = createFlowerPatch()
-      flowers.position.set(fx, 0.05, fz)
-      this.group.add(flowers)
+      for (let j = 0; j < 5; j++) {
+        const ox = (Math.random() - 0.5) * 0.4
+        const oz = (Math.random() - 0.5) * 0.4
+        const h = 0.15 + Math.random() * 0.1
+        const r = 0.04 + Math.random() * 0.03
+        const col = flowerColors[Math.floor(Math.random() * flowerColors.length)]
+        stemPlacements.push({ x: fx + ox, z: fz + oz, y: 0.05, s: new THREE.Vector3(1, h / 0.15, 1) })
+        petalPlacements.push({ x: fx + ox, z: fz + oz, y: 0.05, s: new THREE.Vector3(r / 0.04, r / 0.04, r / 0.04), color: col })
+      }
     }
+    const stemGeo = new THREE.BoxGeometry(0.02, 0.15, 0.02)
+    const stemMat = new THREE.MeshLambertMaterial({ color: 0x3a8e3a })
+    const petalGeo = new THREE.SphereGeometry(0.04, 6, 6)
+    const petalMat = new THREE.MeshLambertMaterial({ color: 0xffffff })
+    this.group.add(buildInstanced(stemGeo, stemMat, stemPlacements.length, stemPlacements, new THREE.Vector3(0, 0.08, 0)))
+    this.group.add(buildInstanced(petalGeo, petalMat, petalPlacements.length, petalPlacements, new THREE.Vector3(0, 0.18, 0)))
 
     // River running along one edge
     const river = createRiverSegment(H + 8)
