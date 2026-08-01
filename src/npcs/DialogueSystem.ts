@@ -92,6 +92,16 @@ const DIALOGUES: Record<string, DialogueEntry> = {
     textKey: 'dlg_mine_descend',
     choices: [{ labelKey: 'dlg_descend', action: 'descend' }, { labelKey: 'dlg_stay', action: 'close' }],
   },
+  crop_ripe: {
+    speakerKey: 'dlg_grandpa',
+    textKey: 'dlg_crop_ripe',
+    choices: [{ labelKey: 'dlg_ready_to_pick', action: 'close' }],
+  },
+  first_harvest: {
+    speakerKey: 'dlg_recipe',
+    textKey: 'dlg_first_harvest',
+    choices: [{ labelKey: 'dlg_to_bin', action: 'close' }],
+  },
 }
 
 export class DialogueSystem {

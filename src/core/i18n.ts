@@ -10,6 +10,9 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     volume: '🔊 Volume',
     language: '🌐 Language',
     resume: 'RESUME',
+    unstuck: '🕳️ UNSTUCK',
+    unstuck_cd: 'UNSTUCK ({s}s)',
+    unstuckHint: 'Stuck? Teleports you to a random spot in the yard (1 min cooldown)',
     close: 'Close',
     inventory: '📦 Inventory',
     invHint: 'Click to select · Drag to reorder · ✕ to discard',
@@ -65,6 +68,13 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     dlg_mine_descend: 'You found a glowing hole with a ladder leading deeper. Climb down to the next level?',
     dlg_descend: 'Descend',
     dlg_stay: 'Stay here',
+    // Farming tutorial
+    dlg_grandpa: "📖 Grandpa's Diary",
+    dlg_crop_ripe: "It's time!! The crops you planted have finally grown! Walk right up to a ripe plant and press E (or SPACE) to pick it — any item in hand works, just not the watering can. Pick them all before they dry out!",
+    dlg_ready_to_pick: "I'm ready to pick!",
+    dlg_recipe: "🌟 Grandma's Recipe Book",
+    dlg_first_harvest: "THAT'S IT! You just picked your very first crop! 🎉 You're a real farmer now! Here's your mission: walk to the big wooden shipping bin (follow the golden arrow) and press E to sell your harvest. The coins get added every morning. Grandpa would be so proud!",
+    dlg_to_bin: 'Off to the bin!',
     mine_hud_title: '⛏ MINE',
     mine_depth_label: 'DEPTH',
     mine_digs_label: 'DIGS',
@@ -81,6 +91,9 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     volume: '🔊 صدا',
     language: '🌐 زبان',
     resume: 'ادامه',
+    unstuck: '🕳️ رفع گیر',
+    unstuck_cd: 'رفع گیر ({s}ث)',
+    unstuckHint: 'گیر کردی؟ به یک نقطه تصادفی در حیاط منتقل میکند (۱ دقیقه زمان انتظار)',
     close: 'بستن',
     inventory: '📦 کوله‌پشتی',
     invHint: 'کلیک برای انتخاب · کشیدن برای جابجایی · ✕ برای حذف',
@@ -136,6 +149,13 @@ const STRINGS: Record<Lang, Record<string, string>> = {
     dlg_mine_descend: 'یک گودال درخشان با نردبانی که به عمق می‌رود پیدا کردی. به طبقه بعد پایین می‌روی؟',
     dlg_descend: 'پایین برو',
     dlg_stay: 'اینجا بمان',
+    // Farming tutorial
+    dlg_grandpa: '📖 دفتر خاطرات پدربزرگ',
+    dlg_crop_ripe: 'وقتش رسیده!! محصولاتی که کاشتی بالاخره بزرگ شدند! به گیاه رسیده نزدیک شو و E (یا Space) را بزن تا بچینیش — هر آیتمی که دستت است اشکال ندارد، فقط آبپاش نه. همه‌شان را بچین قبل از اینکه خشک شوند!',
+    dlg_ready_to_pick: 'آماده‌ام بچینم!',
+    dlg_recipe: '🌟 کتاب دستور پخت مادربزرگ',
+    dlg_first_harvest: 'همین شد! اولین محصولت را چیدی! 🎉 حالا یک کشاورز واقعی شدی! مأموریتت: به جعبه چوبی بزرگ حمل محموله برو (فلش طلایی را دنبال کن) و E را بزن تا محصولت را بفروشی. سکه‌ها هر صبح اضافه می‌شوند. پدربزرگ به تو افتخار می‌کرد!',
+    dlg_to_bin: 'به سمت جعبه!',
     mine_hud_title: '⛏ معدن',
     mine_depth_label: 'عمق',
     mine_digs_label: 'حفاری',
@@ -188,6 +208,8 @@ function applyLangToDOM() {
   setText('lbl-volume', 'volume')
   setText('lbl-lang', 'language')
   setText('resume-btn', 'resume')
+  setText('unstuck-btn', 'unstuck')
+  setText('unstuck-hint', 'unstuckHint')
 
   // Inventory panel
   const invH2 = document.querySelector('#inventory-panel h2')

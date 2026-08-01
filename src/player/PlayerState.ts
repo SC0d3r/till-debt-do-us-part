@@ -19,6 +19,7 @@ export class PlayerState {
   selectedSlot = 0
   introSeen = false
   grimesFirstSeen = false
+  hasFarmed = false
   debtPaid = false
   grimesVisitCount = 0
   totalGoldEarned = 0
@@ -140,7 +141,7 @@ export class PlayerState {
       gold: this.gold, debt: this.debt, day: this.day, stamina: this.stamina,
       inventory: this.inventory, toolTiers: this.toolTiers,
       toolDurability: this.toolDurability, waterLevel: this.waterLevel,
-      introSeen: this.introSeen, grimesFirstSeen: this.grimesFirstSeen, debtPaid: this.debtPaid,
+      introSeen: this.introSeen, grimesFirstSeen: this.grimesFirstSeen, hasFarmed: this.hasFarmed, debtPaid: this.debtPaid,
       grimesVisitCount: this.grimesVisitCount, totalGoldEarned: this.totalGoldEarned,
       totalItemsSold: this.totalItemsSold, totalItemsMined: this.totalItemsMined,
       daysWithoutPettingDog: this.daysWithoutPettingDog, debtDeadlineBonus: this.debtDeadlineBonus,

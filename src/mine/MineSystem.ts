@@ -86,8 +86,8 @@ export class MineSystem {
     const floor = this.generateFloor(floorNum)
     const geo = new THREE.PlaneGeometry(1, 1)
     geo.rotateX(-Math.PI / 2)
-    const rockMat = new THREE.MeshLambertMaterial({ color: 0x666666, side: THREE.DoubleSide })
-    const dirtMat = new THREE.MeshLambertMaterial({ color: 0x5a3c28, side: THREE.DoubleSide })
+    const rockMat = new THREE.MeshLambertMaterial({ color: 0x666666, side: THREE.FrontSide })
+    const dirtMat = new THREE.MeshLambertMaterial({ color: 0x5a3c28, side: THREE.FrontSide })
 
     for (let x = 0; x < floor.length; x++) {
       for (let z = 0; z < floor[x].length; z++) {

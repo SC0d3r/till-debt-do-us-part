@@ -43,6 +43,10 @@ export class FarmGrid {
   private groundMeshes: Record<string, THREE.InstancedMesh> = {}
   private groundKey: string[] = []
   private hiddenGround = new THREE.Matrix4().makeTranslation(0, -100, 0)
+  // Ripe crop jiggle state: tileKey -> remaining seconds of jiggle / delay
+  private jiggleTime = new Map<number, number>()
+  private jiggleDelay = new Map<number, number>()
+  private jiggleClock = 0
 
   constructor(seed?: number) {
     this.group = new THREE.Group()
@@ -318,6 +322,56 @@ export class FarmGrid {
   isRipe(x: number, z: number): boolean {
     const t = this.tiles[x]?.[z]; if (!t?.cropId) return false
     const c = CROPS[t.cropId]; return !!c && t.growthDay >= c.growthDays
+  }
+
+  hasRipeCrop(): boolean {
+    for (let x = 0; x < this.width; x++) {
+      for (let z = 0; z < this.height; z++) {
+        const t = this.tiles[x][z]
+        if (!t.cropId) continue
+        const c = CROPS[t.cropId]
+        if (c && t.growthDay >= c.growthDays) return true
+      }
+    }
+    return false
+  }
+
+  // Fully-grown crops jiggle from time to time, each on its own random rhythm
+  updateRipeAnim(dt: number) {
+    this.jiggleClock += dt
+    const clock = this.jiggleClock
+    for (let x = 0; x < this.width; x++) {
+      for (let z = 0; z < this.height; z++) {
+        const t = this.tiles[x][z]
+        const key = x * 1000 + z
+        if (!t.cropId || !t.cropGroup) {
+          if (this.jiggleTime.has(key)) this.jiggleTime.delete(key)
+          if (this.jiggleDelay.has(key)) this.jiggleDelay.delete(key)
+          continue
+        }
+        const crop = CROPS[t.cropId]
+        if (!crop || t.growthDay < crop.growthDays) continue
+        let jt = this.jiggleTime.get(key) ?? 0
+        let jd = this.jiggleDelay.get(key)
+        if (jd === undefined) jd = 1 + Math.random() * 4
+        if (jt > 0) {
+          jt -= dt
+          const env = Math.sin(Math.max(0, (1.2 - jt) / 1.2) * Math.PI)
+          t.cropGroup.rotation.z = Math.sin(clock * 13) * 0.07 * env
+          t.cropGroup.rotation.x = Math.cos(clock * 9) * 0.04 * env
+          if (jt <= 0) {
+            t.cropGroup.rotation.z = 0
+            t.cropGroup.rotation.x = 0
+            jd = 2.5 + Math.random() * 5
+          }
+        } else {
+          jd -= dt
+          if (jd <= 0) jt = 1.2
+        }
+        this.jiggleTime.set(key, jt)
+        this.jiggleDelay.set(key, jd)
+      }
+    }
   }
 
   addToBin(id: string, count: number) {

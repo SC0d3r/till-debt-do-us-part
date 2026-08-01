@@ -71,6 +71,9 @@ class Game {
   private fpsFrames = 0
   private fpsTime = 0
   private fpsDisplay = 0
+  // Unstuck cooldown (seconds remaining)
+  private unstuckCooldown = 0
+  private lastUnstuckBtnSec = -1
 
   constructor() {
     this.renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -91,12 +94,19 @@ class Game {
     const ambient = new THREE.AmbientLight(0xffeedd, 0.7)
     this.scene.add(ambient)
     const sun = new THREE.DirectionalLight(0xfff5e0, 0.9)
-    sun.position.set(15, 20, 10)
+    // Keep the same light direction ((15,20,10) offset from the farm center)
+    // but target the farm so the shadow map only covers the playable area.
+    // The whole background (mountains, forest, river, far ground) no longer
+    // renders into the per-frame shadow pass, and farm shadows get ~2x sharper.
+    sun.position.set(23, 26, 16)
+    sun.target.position.set(8, 0, 6)
     sun.castShadow = true
     sun.shadow.mapSize.set(1024, 1024)
-    sun.shadow.camera.left = -25; sun.shadow.camera.right = 25
-    sun.shadow.camera.top = 25; sun.shadow.camera.bottom = -25
+    sun.shadow.camera.left = -14; sun.shadow.camera.right = 14
+    sun.shadow.camera.top = 14; sun.shadow.camera.bottom = -14
+    sun.shadow.camera.updateProjectionMatrix()
     this.scene.add(sun)
+    this.scene.add(sun.target)
     const fill = new THREE.DirectionalLight(0xaaccff, 0.3)
     fill.position.set(-10, 8, -5)
     this.scene.add(fill)
@@ -115,6 +125,7 @@ class Game {
 
     // Pause menu wiring
     document.getElementById('resume-btn')!.addEventListener('click', () => this.togglePause())
+    document.getElementById('unstuck-btn')!.addEventListener('click', () => this.useUnstuck())
     const volSlider = document.getElementById('vol-slider') as HTMLInputElement
     volSlider.addEventListener('input', () => { sound.setVolume(parseInt(volSlider.value) / 100) })
 
@@ -254,6 +265,43 @@ class Game {
     }
   }
 
+  // Teleport the player out of a stuck spot to a random walkable tile in the yard
+  private useUnstuck() {
+    if (!this.started) return
+    if (this.unstuckCooldown > 0) { sound.error(); return }
+    this.unstuckCooldown = 60
+    if (this.inMine) this.exitMine()
+    let px = 0.5, pz = 0.5
+    for (let i = 0; i < 40; i++) {
+      const tx = 0.3 + Math.random() * (this.farm.width - 0.6)
+      const tz = 0.3 + Math.random() * (this.farm.height - 0.6)
+      if (!this.farm.isSolid(Math.round(tx), Math.round(tz))) { px = tx; pz = tz; break }
+    }
+    this.playerModel.position.set(px, 0, pz)
+    this.playerModel.rotation.y = Math.PI
+    sound.menuSelect()
+    if (this.paused) this.togglePause()
+  }
+
+  private updateUnstuckBtn() {
+    const btn = document.getElementById('unstuck-btn')
+    if (!btn) return
+    if (this.unstuckCooldown > 0) {
+      const sec = Math.ceil(this.unstuckCooldown)
+      if (sec === this.lastUnstuckBtnSec) return
+      this.lastUnstuckBtnSec = sec
+      btn.textContent = t('unstuck_cd').replace('{s}', String(sec))
+      btn.setAttribute('disabled', '')
+      btn.style.opacity = '0.5'
+    } else {
+      if (this.lastUnstuckBtnSec === -1) return
+      this.lastUnstuckBtnSec = -1
+      btn.textContent = t('unstuck')
+      btn.removeAttribute('disabled')
+      btn.style.opacity = '1'
+    }
+  }
+
   private sweatTimer = 0
 
   private triggerTiredAnimation() {
@@ -281,8 +329,12 @@ class Game {
     if (this.paused) { this.renderer.render(this.scene, this.camera); return }
 
     this.tiredCooldown = Math.max(0, this.tiredCooldown - dt)
+    this.unstuckCooldown = Math.max(0, this.unstuckCooldown - dt)
+    if (this.paused) this.updateUnstuckBtn()
     this.input.update()
     this.actionCooldown = Math.max(0, this.actionCooldown - dt)
+
+    if (!this.inMine) this.farm.updateRipeAnim(dt)
 
     if (!this.dialogue.active && !this.ui.shopOpen) {
       this.handleMovement(dt)
@@ -595,6 +647,8 @@ class Game {
       if (ft.type === TileType.SHOP) { this.openShop(); return }
       if (ft.type === TileType.MINE) { this.enterMine(); return }
       if (ft.type === TileType.WELL) { this.player.refillWater(); sound.water(); this.actionCooldown = 0.3; return }
+      // Pick ripe crops with E (facing tile, then the tile we're standing on)
+      if (this.tryHarvestNearby()) return
       return
     }
 
@@ -620,6 +674,9 @@ class Game {
     if ([TileType.HOUSE, TileType.SHOP, TileType.MINE, TileType.WELL, TileType.WATER, TileType.BIN, TileType.FENCE].includes(ft.type)) return
 
     const sel = this.player.getSelectedItem()
+
+    // Pick ripe crops with SPACE using any item except the watering can
+    if (sel?.id !== 'water' && this.tryHarvestNearby()) return
     const tier = this.player.toolTiers
 
     // Check tool durability
@@ -726,15 +783,28 @@ class Game {
       } else sound.error()
       return
     }
+  }
 
-    // Harvest
-    if (this.farm.isRipe(x, z)) {
-      const cropId = this.farm.harvest(x, z)
-      if (cropId) {
-        this.showHarvestAnim(cropId)
-        this.player.addItem(cropId)
-        this.actionCooldown = 0.3
-      }
+  // Harvest a ripe crop on the facing tile, or the tile the player is standing on
+  private tryHarvestNearby(): boolean {
+    const { x, z } = this.getFacingTile()
+    if (this.farm.isRipe(x, z)) { this.doHarvest(x, z); return true }
+    const px = Math.round(this.playerModel.position.x)
+    const pz = Math.round(this.playerModel.position.z)
+    if ((px !== x || pz !== z) && this.farm.isRipe(px, pz)) { this.doHarvest(px, pz); return true }
+    return false
+  }
+
+  private doHarvest(x: number, z: number) {
+    const cropId = this.farm.harvest(x, z)
+    if (!cropId) return
+    this.showHarvestAnim(cropId)
+    this.player.addItem(cropId)
+    this.actionCooldown = 0.3
+    // Celebrate the very first harvest with a gamey tutorial
+    if (!this.player.hasFarmed) {
+      this.player.hasFarmed = true
+      this.dialogue.show('first_harvest')
     }
   }
 
@@ -803,58 +873,30 @@ class Game {
   }
 
   private showHarvestAnim(itemId: string) {
-    // Phase 1: Hold big item above head with both hands
+    // Hold the freshly picked item above the head with both hands, then pocket it
     const mesh = createItemDropMesh(itemId, true)
     mesh.position.set(0, 1.5, 0)
     this.playerModel.add(mesh)
 
     // Raise both arms
-    
-    
     if (this.pLeftArm) this.pLeftArm.rotation.x = -2.5
     if (this.pRightArm) this.pRightArm.rotation.x = -2.5
 
-    let phase = 0 // 0=hold, 1=throw
     let t = 0
-    const binPos = this.binPosition.clone()
-
     const anim = () => {
       t += 0.025
-      if (phase === 0) {
-        // Hold above head, slight bob
-        mesh.position.y = 1.5 + Math.sin(t * 6) * 0.05
-        mesh.rotation.y += 0.08
-        if (t > 0.8) {
-          // Phase 2: Throw toward bin
-          phase = 1
-          t = 0
-          this.playerModel.remove(mesh)
-          // Get world position for thrown item
-          const worldPos = new THREE.Vector3()
-          this.playerModel.getWorldPosition(worldPos)
-          worldPos.y = 1.5
-          mesh.position.copy(worldPos)
-          this.scene.add(mesh)
-          // Reset arms
-          if (this.pLeftArm) this.pLeftArm.rotation.x = 0
-          if (this.pRightArm) this.pRightArm.rotation.x = 0
-        }
-        requestAnimationFrame(anim)
-      } else {
-        // Arc toward bin
-        const progress = Math.min(t / 0.5, 1)
-        const startPos = new THREE.Vector3(this.playerModel.position.x, 1.5, this.playerModel.position.z)
-        mesh.position.lerpVectors(startPos, binPos, progress)
-        mesh.position.y += Math.sin(progress * Math.PI) * 1.5 // Arc height
-        mesh.rotation.x += 0.2
-        mesh.rotation.y += 0.15
-        if (progress >= 1) {
-          this.scene.remove(mesh)
-          sound.collect()
-        } else {
-          requestAnimationFrame(anim)
-        }
+      // Hold above head, slight bob
+      mesh.position.y = 1.5 + Math.sin(t * 6) * 0.05
+      mesh.rotation.y += 0.08
+      if (t > 0.8) {
+        // Pocket it: item vanishes into the bag, arms lower
+        this.playerModel.remove(mesh)
+        if (this.pLeftArm) this.pLeftArm.rotation.x = 0
+        if (this.pRightArm) this.pRightArm.rotation.x = 0
+        sound.collect()
+        return
       }
+      requestAnimationFrame(anim)
     }
     anim()
   }
@@ -1317,7 +1359,9 @@ class Game {
     }
     this.scene.add(this.playerModel)
 
-    this.playerModel.position.set(0.5, 0, GAME_CONFIG.farmHeight - 0.5)
+    // Spawn in front of the mine door, facing the farm (toward home)
+    this.playerModel.position.set(0.7, 0, GAME_CONFIG.farmHeight - 1.8)
+    this.playerModel.rotation.y = Math.PI
     for (const [id, count] of Object.entries(result.items)) this.player.addItem(id, count)
     sound.menuClose()
     this.updateMineHUD()
@@ -1440,6 +1484,11 @@ class Game {
     setTimeout(() => this.triggerMorningBuyer(), 500)
 
     if (spoiled.length > 0) { this.dialogue.show('spoil_notice'); return }
+    // First time a crop is ripe and ready to pick: teach the player how
+    if (!this.player.hasFarmed && this.farm.hasRipeCrop()) {
+      this.dialogue.show('crop_ripe')
+      return
+    }
     if (this.player.debt <= 0 && !this.player.debtPaid) {
       this.player.debtPaid = true
       this.dialogue.show('win', a => { if (a === 'reset') this.player.reset() })

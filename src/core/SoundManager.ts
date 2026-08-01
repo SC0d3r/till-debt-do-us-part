@@ -34,6 +34,9 @@ export class SoundManager {
     gain.connect(this.masterGain!)
     osc.start()
     osc.stop(this.ctx!.currentTime + duration)
+    // Free the graph as soon as the note ends so repeated sounds (footsteps,
+    // tool swings) don't accumulate AudioNodes and degrade the frame rate.
+    osc.onended = () => { osc.disconnect(); gain.disconnect() }
   }
 
   playNoise(duration: number, volume = 0.3) {
@@ -52,6 +55,7 @@ export class SoundManager {
     source.connect(gain)
     gain.connect(this.masterGain!)
     source.start()
+    source.onended = () => { source.disconnect(); gain.disconnect() }
   }
 
   // Sound effects
