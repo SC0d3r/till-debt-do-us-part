@@ -30,11 +30,10 @@ const SYMBOLS: SlotSymbolDef[] = [
   { id: 'target',    emoji: '🎯', pay: 0,    weight: 2,  tier: 0, scale: 1.0 },   // scatter (2+ pays, 3+ bonus)
 ]
 
-const MULT_STEPS = [1, 1.5, 2.5, 4, 6, 9, 13, 18]
 const MIN_MATCH_TIER: Record<number, number> = { 0: 3, 1: 4, 2: 4, 3: 4 }
 const MAX_CASCADES = 20
 const COLS = 6
-const ROWS = 5
+const ROWS = 7          // default board rows (mobile adds one more)
 const MIN_BET = 1
 const MAX_BET = 500
 const GRAVITY = 140       // fall units (cells) / s²
@@ -89,6 +88,7 @@ export class SlotMachine {
   private bet = 10
 
   // pixel metrics (recomputed on resize)
+  private rows = ROWS
   private cs = 90      // cell size px
   private gap = 7      // gap px
   private pad = 12     // panel padding px
@@ -131,14 +131,37 @@ export class SlotMachine {
   private measure() {
     const vw = window.innerWidth
     const vh = window.innerHeight
-    this.cs = Math.max(52, Math.min(108, Math.floor(Math.min(vw * 0.115, (vh - 164) / 5))))
+    const stacked = vw < 700 || vw < vh || vh < 620
     this.gap = 8
     this.pad = 14
+    if (stacked) {
+      // mobile: fill the space between header and bottom nav with square cells;
+      // row count adapts so both width and height are used with small margins
+      const availW = vw - 12
+      const availH = vh - 72 - 210 - 6
+      const csW = Math.max(24, Math.floor((availW - this.pad * 2 - (COLS - 1) * this.gap) / COLS))
+      let rows = Math.max(4, Math.min(12, Math.floor((availH - 20) / (csW + this.gap))))
+      this.rows = rows
+      this.cs = Math.max(24, Math.min(csW, Math.floor((availH - 20 - (rows - 1) * this.gap) / rows)))
+    } else {
+      this.rows = ROWS
+      this.cs = Math.max(52, Math.min(108, Math.floor(Math.min(vw * 0.115, (vh - 170) / this.rows))))
+    }
     this.step = this.cs + this.gap
     const w = this.pad * 2 + COLS * this.cs + (COLS - 1) * this.gap
-    const h = this.pad * 2 + ROWS * this.cs + (ROWS - 1) * this.gap
+    const h = this.pad * 2 + this.rows * this.cs + (this.rows - 1) * this.gap
     this.grid.style.width = `${w}px`
     this.grid.style.height = `${h}px`
+    if (stacked) {
+      // win box sized relative to the grid so it never touches the table border
+      const bw = Math.min(310, Math.round(w * 0.66))
+      const bh = Math.max(160, Math.min(250, Math.round(h * 0.44)))
+      this.el.winPanel.style.width = `${bw}px`
+      this.el.winPanel.style.height = `${bh}px`
+      this.el.winPanel.style.padding = `${Math.round(bh * 0.14)}px ${Math.round(bw * 0.09)}px`
+      this.el.winAmount.style.fontSize = `${Math.max(28, Math.round(bh * 0.16))}px`
+      this.el.winLabel.style.fontSize = `${Math.max(13, Math.round(bh * 0.07))}px`
+    }
   }
 
   // ─── DOM wiring ───
@@ -317,7 +340,7 @@ export class SlotMachine {
     this.updateMult(1)
 
     for (let col = 0; col < COLS; col++) {
-      for (let row = 0; row < ROWS; row++) {
+      for (let row = 0; row < this.rows; row++) {
         const cell = this.createCell(col, row, this.pickSymbol(), row + 1.2 + Math.random() * 0.6, (col + row) * 0.02 + Math.random() * 0.06)
         cell.vy = -4 - Math.random() * 1
       }
@@ -499,7 +522,7 @@ export class SlotMachine {
       c.el.style.transform = 'translateY(0px)'
     }
     const matched = this.findMatches()
-    const mult = MULT_STEPS[Math.min(this.cascadeIndex, MULT_STEPS.length - 1)]
+    const mult = this.waveMult
     const scatterCount = this.cells.filter(c => c.def.id === 'target').length
 
     if (matched.length === 0) {
@@ -585,7 +608,8 @@ export class SlotMachine {
     this.state = 'cascade'
     this.stateT = 0
     this.cascadeIndex++
-    this.updateMult(MULT_STEPS[Math.min(this.cascadeIndex, MULT_STEPS.length - 1)])
+    this.waveMult = this.rollMult(this.cascadeIndex)
+    this.updateMult(this.waveMult)
 
     if (this.cascadeIndex >= MAX_CASCADES) {
       // force resolve
@@ -597,7 +621,7 @@ export class SlotMachine {
     // survivors fall down to fill gaps
     for (let col = 0; col < COLS; col++) {
       const colCells = this.cells.filter(c => c.col === col).sort((a, b) => b.row - a.row)
-      let targetRow = ROWS - 1
+      let targetRow = this.rows - 1
       for (const c of colCells) {
         const newRow = targetRow--
         if (newRow !== c.row) {
@@ -613,7 +637,7 @@ export class SlotMachine {
       }
       // new symbols drop from the top
       while (targetRow >= 0) {
-        this.createCell(col, targetRow, this.pickSymbol(), targetRow + 1.2 + Math.random() * 0.6, (ROWS - targetRow) * 0.03 + col * 0.01 + Math.random() * 0.04)
+        this.createCell(col, targetRow, this.pickSymbol(), targetRow + 1.2 + Math.random() * 0.6, (this.rows - targetRow) * 0.03 + col * 0.01 + Math.random() * 0.04)
         targetRow--
       }
     }
@@ -688,6 +712,13 @@ export class SlotMachine {
   // ─── Multiplier display ───
   private _multShown = 1
   private _multTimer = 0
+  private waveMult = 1
+
+  // random fractional multiplier per cascade: grows with depth, capped at x18
+  private rollMult(k: number) {
+    const v = 1 + k * 0.85 + Math.random() * 0.9
+    return Math.min(18, Math.round(v * 10) / 10)
+  }
 
   private updateMult(v: number) {
     const el = this.el.mult
@@ -706,27 +737,18 @@ export class SlotMachine {
     el.classList.add('slot-pop')
     sound.slotMultDing(v)
 
-    // slot-machine reel: cycle through intermediate multipliers up to v
+    // slot-machine reel: cycle through intermediate fractional values up to v
     if (v === this._multShown) {
       el.textContent = `x${v}`
       return
     }
-    let idx = MULT_STEPS.indexOf(v)
-    if (idx < 0) idx = MULT_STEPS.findIndex(s => s >= v)
-    if (idx < 0) {
-      el.textContent = `x${v}`
-      this._multShown = v
-      return
-    }
-    let start = MULT_STEPS.indexOf(this._multShown) + 1
-    if (start < 1) start = 1
+    const steps = Math.max(1, Math.min(5, Math.ceil((v - this._multShown) * 3)))
     const roll: number[] = []
-    for (let i = start; i <= idx; i++) roll.push(MULT_STEPS[i])
-    this._multShown = v
-    if (roll.length === 0) {
-      el.textContent = `x${v}`
-      return
+    for (let i = 1; i <= steps; i++) {
+      const mid = this._multShown + (v - this._multShown) * (i / steps)
+      roll.push(i === steps ? v : Math.round(mid * 10) / 10)
     }
+    this._multShown = v
     let k = 0
     const tick = () => {
       if (k >= roll.length) {

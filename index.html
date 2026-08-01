@@ -388,9 +388,9 @@
     #slot-grid.dim .slot-cell { filter: grayscale(0.85) brightness(0.7); transition: filter 0.3s; }
     #slot-grid.win-zoom { animation: slotWinZoom 0.9s cubic-bezier(0.2, 1, 0.4, 1) forwards; }
     @keyframes slotWinZoom {
-      0% { transform: translate(-50%, -50%) scale(1); }
-      45% { transform: translate(-50%, -50%) scale(1.08); }
-      100% { transform: translate(-50%, -50%) scale(1.05); }
+      0% { transform: translateX(-50%) scale(1); }
+      45% { transform: translateX(-50%) scale(1.08); }
+      100% { transform: translateX(-50%) scale(1.05); }
     }
 
     /* Cells */
@@ -610,10 +610,10 @@
     /* Win panel */
     #slot-win-panel {
       position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 6;
-      min-width: 380px; text-align: center; pointer-events: none;
+      min-width: 352px; text-align: center; pointer-events: none;
       opacity: 0; visibility: hidden; overflow: hidden;
       background: linear-gradient(180deg, rgba(54,40,22,0.97), rgba(24,14,15,0.98));
-      border: 1px solid rgba(212,175,55,0.55); border-radius: 16px; padding: 34px 52px 40px;
+      border: 1px solid rgba(212,175,55,0.55); border-radius: 16px; padding: 30px 40px 34px;
       box-shadow: 0 24px 70px rgba(0,0,0,0.65), 0 0 44px rgba(212,175,55,0.12),
                   inset 0 1px 0 rgba(255,255,255,0.07), inset 0 -1px 0 rgba(0,0,0,0.5);
     }
@@ -641,7 +641,7 @@
       background: linear-gradient(90deg, transparent, rgba(212,175,55,0.6), transparent);
     }
     #slot-win-amount {
-      font-size: 66px; font-weight: bold; color: #f5e6c8; letter-spacing: 2px;
+      font-size: 56px; font-weight: bold; color: #f5e6c8; letter-spacing: 2px;
       text-shadow: 0 1px 0 rgba(0,0,0,0.6), 0 0 22px rgba(255,215,0,0.22);
       display: flex; justify-content: center; align-items: center;
       white-space: nowrap;
@@ -695,6 +695,80 @@
     @keyframes slotFlashRed {
       0%, 100% { border-color: rgba(212,175,55,0.55); box-shadow: 0 0 34px rgba(0,0,0,0.65), inset 0 0 26px rgba(212,175,55,0.06); }
       35% { border-color: #e05555; box-shadow: 0 0 40px rgba(224,85,85,0.5), inset 0 0 26px rgba(224,85,85,0.15); }
+    }
+
+    /* ─── MOBILE: stacked slot layout ─── */
+    @media (max-width: 700px), (max-height: 620px) and (orientation: landscape), (hover: none) {
+      #slot-screen { overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 208px; }
+      #slot-topbar { padding: 10px 14px; }
+      #slot-title { font-size: 20px; letter-spacing: 6px; }
+      #slot-money { font-size: 22px; min-width: 90px; }
+      #slot-money-label .coin-emoji { font-size: 20px; }
+      #slot-hint { display: none; }
+      #slot-grid {
+        position: relative; left: auto; top: auto; transform: none;
+        margin: 72px auto 0;
+      }
+      /* bottom nav: bet controls + spin */
+      #slot-left-col {
+        position: fixed; left: 0; right: 0; bottom: 0; top: auto; transform: none;
+        width: 100%; flex-direction: column; gap: 8px; z-index: 8;
+        padding: 8px 10px calc(10px + env(safe-area-inset-bottom, 0px));
+        background: linear-gradient(180deg, rgba(8,4,14,0.92), rgba(8,4,14,0.97));
+        border-top: 1px solid rgba(212,175,55,0.45);
+      }
+      #slot-bet-panel {
+        background: none; border: none; box-shadow: none; border-radius: 0;
+        padding: 0; width: 100%;
+      }
+      #slot-bet-label { display: none; }
+      #slot-bet-wrap { justify-content: center; gap: 16px; margin-bottom: 10px; }
+      .slot-bet-btn { width: 50px; height: 50px; }
+      #slot-bet { font-size: 30px; min-width: 64px; }
+      .slot-quick-row { width: min(360px, 100%); }
+      #slot-spin {
+        width: min(360px, calc(100vw - 16px)); height: 58px; font-size: 22px; letter-spacing: 4px;
+        animation: slotSpinIdleMobile 3.2s ease-in-out infinite;
+      }
+      @keyframes slotSpinIdleMobile {
+        0%, 100% { transform: scale(1); filter: brightness(1); }
+        50% { transform: scale(1.012); filter: brightness(1.06); }
+      }
+      /* win box scales down */
+      #slot-win-panel {
+        top: 38%; min-width: 0; width: auto; height: auto;
+        display: flex; flex-direction: column; justify-content: center; align-items: center;
+      }
+      #slot-win-label {
+        position: absolute; top: 13%; left: 0; right: 0;
+        font-size: 12px; letter-spacing: 3px; margin-bottom: 0;
+      }
+      #slot-win-amount { flex: 1; }
+      #slot-rules { display: none; }
+      #slot-mult { top: 108px; }
+      #slot-toast { bottom: 26vh; }
+      #slot-screen button, #slot-screen .slot-quick { touch-action: manipulation; }
+      #controls-hint { display: none; }
+      /* zoom scales from the grid's own center (no vertical jump) */
+      #slot-grid.win-zoom { animation: slotWinZoomMobile 0.9s cubic-bezier(0.2, 1, 0.4, 1) forwards; }
+      @keyframes slotWinZoomMobile {
+        0% { transform: scale(1); }
+        45% { transform: scale(1.05); }
+        100% { transform: scale(1.03); }
+      }
+    }
+    #slot-open-btn {
+      display: none; width: 40px; height: 40px; border-radius: 10px; cursor: pointer;
+      background: radial-gradient(circle at 50% 30%, #fff0b0, #e8c14a 45%, #b8922a 75%);
+      border: 2px solid #fff6d8; font-size: 20px; align-items: center; justify-content: center;
+      box-shadow: 0 0 14px rgba(212,175,55,0.45); margin-left: 6px;
+    }
+    @media (hover: none), (pointer: coarse) { #slot-open-btn { display: inline-flex; } }
+    @media (hover: none), (pointer: coarse) {
+      #hud { flex-wrap: wrap; row-gap: 2px; }
+      #fps-display, #durability-indicator { display: none; }
+      #stamina-bar { width: 50px; }
+      .hud-group { gap: 8px; }
     }
 
     /* Confetti + streak */
@@ -755,6 +829,7 @@
       <div id="stamina-wrap"><span class="hud-icon">⚡</span><div id="stamina-bar"><div id="stamina-fill"></div></div></div>
       <div id="durability-indicator"></div>
       <div class="hud-stat"><span class="hud-label">DEADLINE</span><span class="hud-value">21</span></div>
+      <button id="slot-open-btn" title="Slot Machine">🎰</button>
       <div class="hud-stat"><span id="fps-display" style="color:#888;font-size:7px">-- FPS</span></div>
     </div>
   </div>

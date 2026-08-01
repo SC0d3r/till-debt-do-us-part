@@ -130,6 +130,13 @@ class Game {
     // Pause menu wiring
     document.getElementById('resume-btn')!.addEventListener('click', () => this.togglePause())
     document.getElementById('unstuck-btn')!.addEventListener('click', () => this.useUnstuck())
+    document.getElementById('slot-open-btn')!.addEventListener('click', () => {
+      if (!this.started || this.paused || this.slotOpen) return
+      if (this.ui.inventoryOpen) this.ui.closeInventory()
+      if (this.ui.shopOpen) this.ui.closeShop()
+      if (this.dialogue.active) this.dialogue.close()
+      this.openSlot()
+    })
     const volSlider = document.getElementById('vol-slider') as HTMLInputElement
     volSlider.addEventListener('input', () => { sound.setVolume(parseInt(volSlider.value) / 100) })
 
