@@ -1,16 +1,19 @@
-// Procedural audio synthesizer - generates all game sounds using Web Audio API
-// No external files needed
+// Sound system:
+// - All game sound effects are synthesized with the Web Audio API (no files).
+// - The gameplay-loop song is a real MP3 file (public/gameplayloopsong.mp3)
+//   streamed through an HTMLAudioElement — no per-9.6s WebAudio node churn.
 
 export class SoundManager {
   private ctx: AudioContext | null = null
   private masterGain: GainNode | null = null
-  private musicOscillators: OscillatorNode[] = []
+  private musicEl: HTMLAudioElement | null = null
   private musicPlaying = false
+  private volume = 0.3
 
   init() {
     this.ctx = new AudioContext()
     this.masterGain = this.ctx.createGain()
-    this.masterGain.gain.value = 0.3
+    this.masterGain.gain.value = this.volume
     this.masterGain.connect(this.ctx.destination)
   }
 
@@ -114,66 +117,52 @@ export class SoundManager {
     setTimeout(() => this.playTone(80, 0.4, 'sawtooth', 0.15), 200)
   }
 
-  // Background music - gentle pentatonic loop
+  // ─── Background music (MP3) ───
+  private ensureMusicEl(): HTMLAudioElement {
+    if (!this.musicEl) {
+      this.musicEl = new Audio('gameplayloopsong.mp3')
+      this.musicEl.loop = true
+      this.musicEl.volume = this.volume
+      this.musicEl.addEventListener('error', () => { this.musicEl = null })
+    }
+    return this.musicEl
+  }
+
   startMusic() {
     if (this.musicPlaying) return
     this.ensureCtx()
     this.musicPlaying = true
-    this.scheduleMusicLoop()
+    const el = this.ensureMusicEl()
+    el.play().catch(() => { this.musicPlaying = false })
   }
 
   setVolume(v: number) {
-    if (this.masterGain) this.masterGain.gain.value = Math.max(0, Math.min(1, v))
+    this.volume = Math.max(0, Math.min(1, v))
+    if (this.masterGain) this.masterGain.gain.value = this.volume
+    if (this.musicEl) this.musicEl.volume = this.volume
   }
 
   pauseMusic() {
     this.musicPlaying = false
+    this.musicEl?.pause()
     if (this.ctx?.state === 'running') this.ctx.suspend()
   }
 
   resumeMusic() {
     if (this.ctx?.state === 'suspended') this.ctx.resume()
-    if (!this.musicPlaying) { this.musicPlaying = true; this.scheduleMusicLoop() }
+    if (!this.musicPlaying) {
+      this.musicPlaying = true
+      const el = this.ensureMusicEl()
+      el.play().catch(() => { this.musicPlaying = false })
+    }
   }
 
   stopMusic() {
     this.musicPlaying = false
-    for (const osc of this.musicOscillators) {
-      try { osc.stop() } catch {}
+    if (this.musicEl) {
+      this.musicEl.pause()
+      this.musicEl.currentTime = 0
     }
-    this.musicOscillators = []
-  }
-
-  private scheduleMusicLoop() {
-    if (!this.musicPlaying || !this.ctx) return
-    // Pentatonic scale: C D E G A
-    const notes = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25]
-    const now = this.ctx.currentTime
-    const beatLen = 0.6
-
-    for (let i = 0; i < 16; i++) {
-      const noteIdx = Math.floor(Math.random() * notes.length)
-      const freq = notes[noteIdx] / 2 // Lower octave for ambient feel
-      const osc = this.ctx.createOscillator()
-      const gain = this.ctx.createGain()
-      osc.type = 'sine'
-      osc.frequency.value = freq
-      const startTime = now + i * beatLen
-      gain.gain.setValueAtTime(0, startTime)
-      gain.gain.linearRampToValueAtTime(0.06, startTime + 0.1)
-      gain.gain.exponentialRampToValueAtTime(0.001, startTime + beatLen * 0.9)
-      osc.connect(gain)
-      gain.connect(this.masterGain!)
-      osc.start(startTime)
-      osc.stop(startTime + beatLen)
-      this.musicOscillators.push(osc)
-    }
-
-    // Schedule next loop
-    setTimeout(() => {
-      this.musicOscillators = []
-      if (this.musicPlaying) this.scheduleMusicLoop()
-    }, 16 * beatLen * 1000)
   }
 }
 
