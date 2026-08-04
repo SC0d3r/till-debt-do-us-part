@@ -24,8 +24,8 @@ permission:
   # wildcard patterns against tool names, so this should cover every tool it
   # exposes. If a session shows a different exact tool name (server ids
   # sometimes get sanitized, e.g. hyphens to underscores), adjust to match.
-  "box-mcp_*": allow
   "gemini-analyze-*": allow
+  "box-mcp_*": allow
   task: deny
 ---
 
@@ -70,7 +70,7 @@ if the harness exists but wasn't used.
 # If screenshots are provided
 
 You'll be handed screenshot paths (captured via `scene-capture`, named after
-their fixture). For each one, call `gemini-analyze-image_gemini_analyze_image` or `box-mcp` with the path and a prompt tailored to what you're checking — e.g. "describe the lighting,
+their fixture). For each one, call `gemini-analyze-image_gemini_analyze_image` (note that if you want to use gemini-analyze use gemini-analyze-image_gemini_analyze_image and not box-mcp_gemini_analyze_image) or `box-mcp` with the path and a prompt tailored to what you're checking — e.g. "describe the lighting,
 color palette, and anything that looks visually broken (floating objects,
 missing textures, z-fighting, wrong scale) in this scene." Don't reuse one
 generic prompt for every review; ask about the specific thing you suspect from
@@ -91,5 +91,5 @@ directly yourself.
 **Verdict: SHIP / SHIP WITH FOLLOWUPS / DO NOT SHIP**
 
 Reasoning: <2-4 sentences>
-Review basis: <code-only / code + screenshot(s) via gemini-analyze-image_gemini_analyze_image or box-mcp>
+Review basis: <code-only / code + screenshot(s) via gemini-analyze-image_gemini_analyze_image (note that if you want to use gemini-analyze use gemini-analyze-image_gemini_analyze_image and not box-mcp_gemini_analyze_image) or box-mcp>
 ```
