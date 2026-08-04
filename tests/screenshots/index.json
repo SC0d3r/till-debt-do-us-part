@@ -1,0 +1,42 @@
+{
+  "main-menu": {
+    "path": "tests/screenshots/main-menu.png",
+    "capturedAt": "2026-08-04T09:41:42.458Z",
+    "commit": "6b6ae9e29ffc9a86225d8edd5f9f59577ac75002"
+  },
+  "farm-day": {
+    "path": "tests/screenshots/farm-day.png",
+    "capturedAt": "2026-08-04T07:48:01.753Z",
+    "commit": "14fd611d852bfadd372fd829dcf7f684cb3aeaf9"
+  },
+  "farm-crops-grown": {
+    "path": "tests/screenshots/farm-crops-grown.png",
+    "capturedAt": "2026-08-04T07:48:01.753Z",
+    "commit": "14fd611d852bfadd372fd829dcf7f684cb3aeaf9"
+  },
+  "shop-open": {
+    "path": "tests/screenshots/shop-open.png",
+    "capturedAt": "2026-08-04T07:48:01.753Z",
+    "commit": "14fd611d852bfadd372fd829dcf7f684cb3aeaf9"
+  },
+  "inventory-open": {
+    "path": "tests/screenshots/inventory-open.png",
+    "capturedAt": "2026-08-04T07:48:01.753Z",
+    "commit": "14fd611d852bfadd372fd829dcf7f684cb3aeaf9"
+  },
+  "dialogue-open": {
+    "path": "tests/screenshots/dialogue-open.png",
+    "capturedAt": "2026-08-04T07:48:01.754Z",
+    "commit": "14fd611d852bfadd372fd829dcf7f684cb3aeaf9"
+  },
+  "mine-floor-1": {
+    "path": "tests/screenshots/mine-floor-1.png",
+    "capturedAt": "2026-08-04T09:41:42.460Z",
+    "commit": "6b6ae9e29ffc9a86225d8edd5f9f59577ac75002"
+  },
+  "slot-machine": {
+    "path": "tests/screenshots/slot-machine.png",
+    "capturedAt": "2026-08-04T07:49:27.080Z",
+    "commit": "14fd611d852bfadd372fd829dcf7f684cb3aeaf9"
+  }
+}

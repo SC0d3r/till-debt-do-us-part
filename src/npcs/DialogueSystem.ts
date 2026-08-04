@@ -117,6 +117,10 @@ export class DialogueSystem {
   private choicesEl: HTMLElement
   private onChoice: ((action: string) => void) | null = null
   private labelOverrides: Record<string, string> | null = null
+  // Typewriter interval id — cleared on every show/showRaw/close so a stale
+  // interval from a previous dialogue can't keep appending chars into the next
+  // one (observed corrupted text in the dialogue-open fixture).
+  private typeInterval = 0
 
   constructor() {
     this.dialogBox = document.getElementById('dialog-box')!
@@ -129,6 +133,7 @@ export class DialogueSystem {
     const entry = DIALOGUES[id]
     if (!entry) return
 
+    clearInterval(this.typeInterval)
     this.active = true
     this.onChoice = onChoice || null
     this.labelOverrides = labelOverrides || null
@@ -145,12 +150,12 @@ export class DialogueSystem {
 
     // Typewriter effect
     let charIdx = 0
-    const typeInterval = setInterval(() => {
+    this.typeInterval = setInterval(() => {
       if (charIdx < bodyText.length) {
         this.textEl.textContent += bodyText[charIdx]
         charIdx++
       } else {
-        clearInterval(typeInterval)
+        clearInterval(this.typeInterval)
         this.showChoices(entry.choices)
       }
     }, 25)
@@ -158,7 +163,7 @@ export class DialogueSystem {
     // Allow skip by clicking
     const skipHandler = () => {
       if (charIdx < bodyText.length) {
-        clearInterval(typeInterval)
+        clearInterval(this.typeInterval)
         this.textEl.textContent = bodyText
         this.showChoices(entry.choices)
       }
@@ -190,6 +195,7 @@ export class DialogueSystem {
   }
 
   showRaw(speaker: string, text: string, onChoice?: (action: string) => void) {
+    clearInterval(this.typeInterval)
     this.active = true
     this.onChoice = onChoice || null
     sound.menuOpen()
@@ -202,6 +208,7 @@ export class DialogueSystem {
   }
 
   close() {
+    clearInterval(this.typeInterval)
     this.active = false
     this.dialogBox.style.display = 'none'
     this.onChoice = null

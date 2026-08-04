@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { GAME_CONFIG, CROPS } from '../data/gameData'
 import { SeededRNG, COLORS, getTileTexture, createTree, createSapling, createSmallTree, createStone, createHouse, createShop, createMineEntrance, createWell, createShippingBin, createCropMesh, createFencePost, createFenceRail, createMountain, createRiverSegment } from '../core/MeshFactory'
 import { buildInstanced, type InstPlacement } from '../core/Instancing'
+import { disposeObject } from '../core/disposeObject'
 import { sound } from '../core/SoundManager'
 
 export enum TileType {
@@ -55,6 +56,16 @@ export class FarmGrid {
     this.buildGroundMeshes()
     this.buildVisuals()
     this.buildBoundary()
+  }
+
+  // Releases GPU resources (geometries/materials) for every mesh in this farm.
+  // Call before dropping the farm group (e.g. startGame() replacing an old
+  // farm) so repeated rebuilds from the debug harness don't leak buffers.
+  // Textures are shared/cached (MeshFactory.getTileTexture) and NOT disposed.
+  dispose() {
+    disposeObject(this.group)
+    this.group.clear()
+    this.groundMeshes = {}
   }
 
   isSolid(x: number, z: number): boolean {

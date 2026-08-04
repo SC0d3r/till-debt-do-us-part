@@ -10,6 +10,8 @@ import { COLORS, getTileTexture, createTexturedPlane, createPlayerModel, createN
 import { sound } from './core/SoundManager'
 import { initLang, setLang, t, getLang } from './core/i18n'
 import { SlotMachine } from './slot/SlotMachine'
+import { disposeObject } from './core/disposeObject'
+import { initDevHarness } from './debug/devHarness'
 
 class Game {
   private paused = false
@@ -78,6 +80,10 @@ class Game {
   // Slot machine (Cascade Desire casino)
   private slot: SlotMachine | null = null
   private slotOpen = false
+  // True while debugDispatch('closeSlot') is closing the slot: suppresses the
+  // onClosed saveGame() so a stale slot save can't land in localStorage during
+  // the next debug fixture's window. Normal R-key close keeps saving.
+  private _debugClosingSlot = false
 
   constructor() {
     this.renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -151,7 +157,12 @@ class Game {
       this.slotOpen = false
       document.body.classList.remove('slot-open')
       sound.resumeMusic()
-      this.saveGame()
+      if (this._debugClosingSlot) {
+        // Debug-driven close (devHarness reset): skip the save.
+        this._debugClosingSlot = false
+      } else {
+        this.saveGame()
+      }
     })
 
     // Player model
@@ -265,25 +276,77 @@ class Game {
     startBtn.addEventListener('click', () => {
       const seedInput = document.getElementById('world-seed') as HTMLInputElement
       const seedVal = seedInput?.value.trim()
-      this.worldSeed = seedVal ? parseInt(seedVal, 10) || this.hashString(seedVal) : Date.now()
-
-      sound.init(); sound.startMusic()
-      document.getElementById('start-overlay')!.style.display = 'none'
-      this.started = true
-
-      // Create farm with seed
-      this.farm = new FarmGrid(this.worldSeed)
-      this.scene.add(this.farm.group)
-
-      if (!this.player.load()) { /* defaults */ }
-      else {
-        const sf = localStorage.getItem('till_debt_farm')
-        if (sf) try { this.farm.loadState(JSON.parse(sf)) } catch {}
-      }
-      this.updateHeldVisual()
+      const parsedSeed = seedVal ? parseInt(seedVal, 10) || this.hashString(seedVal) : undefined
+      this.startGame(parsedSeed)
     })
 
     this.loop()
+  }
+
+  // Starts a new farm. Idempotent: if a farm already exists (a second call
+  // from the debug harness), the old farm group is dropped first so repeated
+  // starts never stack farms.
+  public startGame(seed?: number) {
+    this.worldSeed = seed ?? Date.now()
+
+    sound.init(); sound.startMusic()
+    document.getElementById('start-overlay')!.style.display = 'none'
+    this.started = true
+
+    // Drop any existing farm before creating the new one (idempotency).
+    // Dispose GPU resources (geometries/materials) so repeated starts from the
+    // debug harness don't leak instanced-mesh buffers.
+    if (this.farm) {
+      this.scene.remove(this.farm.group)
+      this.farm.dispose()
+      this.binArrow = null
+    }
+
+    // Create farm with seed
+    this.farm = new FarmGrid(this.worldSeed)
+    this.scene.add(this.farm.group)
+
+    if (!this.player.load()) { /* defaults */ }
+    else {
+      const sf = localStorage.getItem('till_debt_farm')
+      if (sf) try { this.farm.loadState(JSON.parse(sf)) } catch {}
+    }
+    this.updateHeldVisual()
+  }
+
+  // Dev-harness only (src/debug/devHarness.ts): lets the debug API drive
+  // actions that can't be expressed as plain field writes. Never called by
+  // game code; harmless dead code in production builds.
+  debugDispatch(action: string, arg?: unknown): void {
+    switch (action) {
+      case 'start':
+        this.startGame(typeof arg === 'number' ? arg : undefined)
+        break
+      case 'openShop': this.openShop(); break
+      case 'closeShop': this.ui.closeShop(); break
+      case 'openInventory': this.ui.openInventory(this.player); break
+      case 'closeInventory': this.ui.closeInventory(); break
+      case 'enterMine': this.enterMine(); break
+      case 'exitMine': this.exitMine(); break
+      case 'openSlot': this.openSlot(); break
+      case 'closeSlot':
+        // Force the end state synchronously — slot.close() animates a ~430ms
+        // fade and only then flips flags via its onClosed callback.
+        this._debugClosingSlot = true
+        this.slotOpen = false
+        document.body.classList.remove('slot-open')
+        sound.resumeMusic()
+        this.slot?.close()
+        break
+      case 'slotSpin':
+        // Populate the reel grid (open() clears it; cells only exist after a
+        // spin). Result is random (Math.random) — acceptable for a baseline.
+        if (this.slotOpen) this.slot?.pressSpin()
+        break
+      case 'triggerMorningBuyer': this.triggerMorningBuyer(); break
+      default:
+        throw new Error(`debugDispatch: unknown action "${action}"`)
+    }
   }
 
   private hashString(s: string): number {
@@ -1268,6 +1331,7 @@ class Game {
         npc.rotation.y = Math.atan2(dir.x, dir.z)
       } else {
         this.scene.remove(npc)
+        disposeObject(npc)
         this.npcModel = null
         this.morningBuyerActive = false
         this.morningBuyerPhase = 'idle'
@@ -1442,6 +1506,10 @@ class Game {
     if (this.mineScene) {
       this.mineScene.remove(this.playerModel)
       this.mineScene.remove(this.mine.group)
+      // Dispose mine-only resources (floor, stones, torches, flames) so
+      // repeated enter/exit cycles from the debug harness don't leak GPU
+      // buffers. playerModel and mine.group were removed above — they persist.
+      disposeObject(this.mineScene)
       this.mineScene = null
     }
     this.scene.add(this.playerModel)
@@ -1670,4 +1738,7 @@ class Game {
   }
 }
 
-new Game()
+const game = new Game()
+if (import.meta.env.DEV) {
+  initDevHarness(game)
+}

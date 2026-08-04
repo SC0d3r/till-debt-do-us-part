@@ -1,7 +1,7 @@
 {
-  "status": "idle",
-  "feature": null,
-  "category": null,
-  "current_step": null,
-  "last_updated": null
+  "status": "in-progress",
+  "feature": "debug-harness-part-a",
+  "category": "Tech & Performance",
+  "current_step": 6,
+  "last_updated": "2026-08-04T05:10:00Z"
 }
