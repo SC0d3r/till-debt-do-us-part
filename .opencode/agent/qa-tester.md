@@ -58,15 +58,19 @@ follow it every time:
 
 # What you do
 
-1. Read the feature's acceptance criteria and actually exercise them — run the
+1. **If you're told a previous attempt at this review may have been
+   interrupted** (network outage, crash, timeout), check `tests/**`/`e2e/**`
+   for partially-written test files before assuming a blank slate — finish or
+   fix what's there rather than duplicating it.
+2. Read the feature's acceptance criteria and actually exercise them — run the
    project's existing automated tests first (`npm test` or equivalent, check
    `package.json`) and note pass/fail.
-2. Extend the e2e test setup (puppeteer-core, same tooling `scene-capture`
+3. Extend the e2e test setup (puppeteer-core, same tooling `scene-capture`
    uses — see `docs/dev-log/DEBUG_HARNESS.md`) with a test for this feature
    under `tests/**` or `e2e/**`, built the way the rule above describes. If no
    e2e setup exists yet at all, don't invent a whole new one mid-review — note
    it as a Minor finding and a Tech & Performance backlog item instead.
-3. Deliberately try to break it, using debug hooks to reach each starting
+4. Deliberately try to break it, using debug hooks to reach each starting
    point instantly:
    - Boundary values (0, negative, max int, empty string/array, exactly at a
      threshold) — set these directly via `setState`.
@@ -81,10 +85,10 @@ follow it every time:
      hit) — set these directly via `setState` rather than grinding to them.
    - Window resize / tab-out-tab-back-in, since browser games are prone to
      losing timers/raf loops on visibility change.
-4. Check for regressions: does this feature's code path intersect with
+5. Check for regressions: does this feature's code path intersect with
    anything shipped in the last few `DEV_LOG.md` entries? If so, re-verify
    those still work — this should also be fast, via the same debug hooks.
-5. **Milestone regression pass** (only when `game-director` explicitly asks for
+6. **Milestone regression pass** (only when `game-director` explicitly asks for
    one before a master merge): run through the core gameplay loop end-to-end —
    not just the newest feature — and report on overall game health, not a
    single feature.

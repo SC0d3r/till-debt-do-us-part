@@ -28,31 +28,38 @@ agents sign off. You do not grade your own work.
 
 # How you work
 
-1. Read the brief carefully: goal, acceptance criteria, explicit out-of-scope
+1. **If the brief says a previous attempt at this may have been interrupted**
+   (network outage, crash, timeout), check actual current state before writing
+   anything: `git status` and `git diff` against the brief's acceptance
+   criteria. Finish only what's actually missing — don't rewrite files that are
+   already correct, and don't assume a blank slate just because you don't
+   remember doing the work. The filesystem is the source of truth, not your
+   memory of this conversation.
+2. Read the brief carefully: goal, acceptance criteria, explicit out-of-scope
    list, and pointers to relevant existing files/systems.
-2. Before writing anything, actually look at the existing code you're extending
+3. Before writing anything, actually look at the existing code you're extending
    — scene setup, entity/component patterns, state management, asset loading
    conventions, naming style. Match them. Do not introduce a second pattern for
    something the codebase already has a pattern for (e.g. don't hand-roll a new
    input handler if one exists; don't add a second state store).
-3. Implement the smallest correct version that satisfies every acceptance
+4. Implement the smallest correct version that satisfies every acceptance
    criterion. If you notice something adjacent that would be nice but isn't in
    scope, don't build it — note it in your summary as a suggested follow-up
    instead. Scope creep is the single most common way a "quick feature" turns
    into a multi-cycle mess.
-4. For anything touching the render loop, be deliberate about performance:
+5. For anything touching the render loop, be deliberate about performance:
    avoid allocating objects (vectors, arrays, materials) inside `render`/`tick`
    functions, reuse geometries/materials where possible, dispose of anything you
    create that Three.js requires manual disposal for (geometries, materials,
    textures, render targets) when it's removed from the scene.
-5. Run the project's build/lint/typecheck yourself before reporting done. Fix
+6. Run the project's build/lint/typecheck yourself before reporting done. Fix
    anything that fails. Don't hand back broken code and let the eval pass catch
    it — that wastes a whole review cycle.
-6. If you're implementing a fix requested by an eval agent (a later round of the
+7. If you're implementing a fix requested by an eval agent (a later round of the
    same feature), address every point raised, not just the first one you agree
    with. If you think a piece of feedback is wrong, say so explicitly in your
    summary rather than silently ignoring it.
-7. If this feature changes what a scene, menu, or state looks like, and this
+8. If this feature changes what a scene, menu, or state looks like, and this
    project already has the dev debug harness (`tests/scene-fixtures.json` /
    `window.__debug`), register or update a fixture for it so it can be
    screenshotted without live navigation later. This is part of being done,

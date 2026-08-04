@@ -69,6 +69,35 @@ edits to `.opencode/**` or `docs/dev-log/**`, no `qa-tester`/critic edits outsid
 their lanes. Review those `deny` lists before you trust this unattended, and add
 more if your project has other things worth hard-blocking.
 
+## Resilience — outages, timeouts, and crashes mid-cycle
+
+Two new files make interruptions (network outages, provider timeouts,
+`game-director` itself getting killed) recoverable instead of losing work:
+
+- **`docs/dev-log/CYCLE_STATE.json`** — a small checkpoint `game-director`
+  writes right before anything that could be interrupted (selecting a
+  feature, invoking a subagent) and resets to idle the moment a feature
+  ships or gets abandoned. On every invocation it's the very first thing read
+  — if it says `"in-progress"`, that invocation is a resume, not a fresh
+  cycle, and it re-attaches to the same feature at the same step instead of
+  picking something new or getting confused by leftover uncommitted changes.
+- **`docs/dev-log/INCIDENTS.md`** — append-only log `game-director` writes to
+  when a subagent fails 3 retries in a row, so failures are visible to you
+  without digging through `logs/dev-loop/*.log`.
+
+If a single subagent call (e.g. `feature-writer`) fails or times out,
+`game-director` retries it directly (up to 3 attempts) with an explicit
+instruction to check real repo state first rather than redo everything —
+since the filesystem, not chat memory, is what's actually persistent. Only
+after 3 failed attempts does it mark the feature `blocked` and move to a
+different backlog item.
+
+`scripts/dev-loop.sh` also now backs off exponentially (30s → 60s → 120s →
+capped at 5 min) after consecutive whole-process failures — e.g. if the
+machine's internet is actually down for a while — and resets to the normal
+30s cooldown the moment a cycle succeeds again, so it doesn't hammer a dead
+connection.
+
 ## Screenshots: debug-jump, don't simulate navigation
 
 `visual-critic` and `ui-critic` review code by default. To let them genuinely
@@ -166,5 +195,7 @@ docs/dev-log/FEATURE_BACKLOG.md       idea queue, seeded with 10 starter ideas
 docs/dev-log/MILESTONES.md            milestone criteria + history
 docs/dev-log/DEV_LOG.md               shipped-feature ground truth
 docs/dev-log/DEBUG_HARNESS.md         living debug/test-harness spec — run Part A once
+docs/dev-log/CYCLE_STATE.json         checkpoint for resuming after a crash/outage
+docs/dev-log/INCIDENTS.md             log of subagent failures/retries
 scripts/dev-loop.sh                   the actual "keep going forever" loop
 ```
