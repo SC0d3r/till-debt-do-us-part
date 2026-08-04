@@ -1,42 +1,42 @@
 {
   "main-menu": {
     "path": "tests/screenshots/main-menu.png",
-    "capturedAt": "2026-08-04T09:41:42.458Z",
-    "commit": "6b6ae9e29ffc9a86225d8edd5f9f59577ac75002"
+    "capturedAt": "2026-08-04T09:48:40.520Z",
+    "commit": "55883ed5a4b5645907628963099d28abc1565d84"
   },
   "farm-day": {
     "path": "tests/screenshots/farm-day.png",
-    "capturedAt": "2026-08-04T07:48:01.753Z",
-    "commit": "14fd611d852bfadd372fd829dcf7f684cb3aeaf9"
+    "capturedAt": "2026-08-04T09:48:40.521Z",
+    "commit": "55883ed5a4b5645907628963099d28abc1565d84"
   },
   "farm-crops-grown": {
     "path": "tests/screenshots/farm-crops-grown.png",
-    "capturedAt": "2026-08-04T07:48:01.753Z",
-    "commit": "14fd611d852bfadd372fd829dcf7f684cb3aeaf9"
+    "capturedAt": "2026-08-04T09:48:40.522Z",
+    "commit": "55883ed5a4b5645907628963099d28abc1565d84"
   },
   "shop-open": {
     "path": "tests/screenshots/shop-open.png",
-    "capturedAt": "2026-08-04T07:48:01.753Z",
-    "commit": "14fd611d852bfadd372fd829dcf7f684cb3aeaf9"
+    "capturedAt": "2026-08-04T09:48:40.522Z",
+    "commit": "55883ed5a4b5645907628963099d28abc1565d84"
   },
   "inventory-open": {
     "path": "tests/screenshots/inventory-open.png",
-    "capturedAt": "2026-08-04T07:48:01.753Z",
-    "commit": "14fd611d852bfadd372fd829dcf7f684cb3aeaf9"
+    "capturedAt": "2026-08-04T09:48:40.522Z",
+    "commit": "55883ed5a4b5645907628963099d28abc1565d84"
   },
   "dialogue-open": {
     "path": "tests/screenshots/dialogue-open.png",
-    "capturedAt": "2026-08-04T07:48:01.754Z",
-    "commit": "14fd611d852bfadd372fd829dcf7f684cb3aeaf9"
+    "capturedAt": "2026-08-04T09:48:40.523Z",
+    "commit": "55883ed5a4b5645907628963099d28abc1565d84"
   },
   "mine-floor-1": {
     "path": "tests/screenshots/mine-floor-1.png",
-    "capturedAt": "2026-08-04T09:41:42.460Z",
-    "commit": "6b6ae9e29ffc9a86225d8edd5f9f59577ac75002"
+    "capturedAt": "2026-08-04T09:48:40.523Z",
+    "commit": "55883ed5a4b5645907628963099d28abc1565d84"
   },
   "slot-machine": {
     "path": "tests/screenshots/slot-machine.png",
-    "capturedAt": "2026-08-04T07:49:27.080Z",
-    "commit": "14fd611d852bfadd372fd829dcf7f684cb3aeaf9"
+    "capturedAt": "2026-08-04T09:48:40.523Z",
+    "commit": "55883ed5a4b5645907628963099d28abc1565d84"
   }
 }
