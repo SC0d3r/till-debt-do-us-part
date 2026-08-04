@@ -14,12 +14,18 @@ permission:
     "ls*": allow
     "find *": allow
     "grep *": allow
-  # box-mcp is your image+prompt -> text MCP server. Permission keys match
+  # gemini-analyze-image_gemini_analyze_image is your image+prompt -> text MCP server. Permission keys match
+  # wildcard patterns against tool names, so this should cover every tool it
+  # exposes. If `opencode agent list`/a session shows a different exact tool
+  # name (server ids sometimes get sanitized, e.g. hyphens to underscores),
+  # adjust this pattern to match.
+  # and also box-mcp is yet another of your image+prompt -> text MCP server. Permission keys match
   # wildcard patterns against tool names, so this should cover every tool it
   # exposes. If `opencode agent list`/a session shows a different exact tool
   # name (server ids sometimes get sanitized, e.g. hyphens to underscores),
   # adjust this pattern to match.
   "box-mcp_*": allow
+  "gemini-analyze-*": allow
   task: deny
 ---
 
@@ -58,7 +64,7 @@ limitation for a given review, say so explicitly and note what you'd need
 # If screenshots are provided
 
 You were handed one or more screenshot paths (captured via `scene-capture`,
-each named after a fixture). For each one, call `box-mcp` with the screenshot
+each named after a fixture). For each one, call `gemini-analyze-image_gemini_analyze_image` or `box-mcp` with the screenshot
 path and a specific prompt built from what you're actually checking this time — e.g. "describe every visible text element, its
 approximate size, and whether it looks readable against its background" or
 "describe what's on screen and whether the currently-interactive element (if
@@ -81,7 +87,7 @@ this way, just say what you couldn't check.
 **Verdict: SHIP / SHIP WITH FOLLOWUPS / DO NOT SHIP**
 
 Reasoning: <2-4 sentences>
-Review basis: <code-only / code + screenshot(s) via box-mcp>
+Review basis: <code-only / code + screenshot(s) via gemini-analyze-image_gemini_analyze_image or box-mcp>
 ```
 
 A missing or broken core interaction (can't close a menu, no way to know an

@@ -125,10 +125,10 @@ a given state, this kit adds a debug/test harness:
   or introduces new state must extend the debug API to cover it, in the same
   change — not as later cleanup.
 - `ui-critic`/`visual-critic` already have permission wired up for your
-  `box-mcp` server (image + prompt -> text) and call it per-screenshot with a
+  `gemini-analyze-image_gemini_analyze_image` and `box-mcp` server (image + prompt -> text) and call it per-screenshot with a
   tailored prompt rather than one generic "describe this image." If
   `opencode agent list`/a session shows its tools under a different exact
-  prefix than `box-mcp_*`, adjust the pattern in both files' frontmatter.
+  prefix than `gemini-analyze-*` `box-mcp_*`, adjust the pattern in both files' frontmatter.
 
 ### Running the bootstrap (Part A) — answering your question directly
 

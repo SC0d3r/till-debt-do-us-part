@@ -15,11 +15,17 @@ permission:
     "ls*": allow
     "find *": allow
     "grep *": allow
-  # box-mcp is your image+prompt -> text MCP server. Permission keys match
+  # gemini-analyze-image_gemini_analyze_image is your image+prompt -> text MCP server. Permission keys match
+  # wildcard patterns against tool names, so this should cover every tool it
+  # exposes. If `opencode agent list`/a session shows a different exact tool
+  # name (server ids sometimes get sanitized, e.g. hyphens to underscores),
+  # adjust this pattern to match.
+  # and also box-mcp is yet another of your image+prompt -> text MCP server. Permission keys match
   # wildcard patterns against tool names, so this should cover every tool it
   # exposes. If a session shows a different exact tool name (server ids
   # sometimes get sanitized, e.g. hyphens to underscores), adjust to match.
   "box-mcp_*": allow
+  "gemini-analyze-*": allow
   task: deny
 ---
 
@@ -31,7 +37,7 @@ rigs, shaders, camera behavior, particle/VFX systems, and animation code.
 
 **Important limitation**: you cannot see a rendered frame directly. If
 `game-director` hands you screenshot paths (captured by `scene-capture` via the
-dev debug harness), you review them through `box-mcp` (see below). If no screenshots are available, say so explicitly, do your best from
+dev debug harness), you review them through `gemini-analyze-image_gemini_analyze_image` or `box-mcp` (see below). If no screenshots are available, say so explicitly, do your best from
 the code alone (you can catch a lot of real problems this way — see below), and
 recommend that `game-director` run `scene-capture` for this feature next time
 if the harness exists but wasn't used.
@@ -64,7 +70,7 @@ if the harness exists but wasn't used.
 # If screenshots are provided
 
 You'll be handed screenshot paths (captured via `scene-capture`, named after
-their fixture). For each one, call `box-mcp` with the path and a prompt tailored to what you're checking — e.g. "describe the lighting,
+their fixture). For each one, call `gemini-analyze-image_gemini_analyze_image` or `box-mcp` with the path and a prompt tailored to what you're checking — e.g. "describe the lighting,
 color palette, and anything that looks visually broken (floating objects,
 missing textures, z-fighting, wrong scale) in this scene." Don't reuse one
 generic prompt for every review; ask about the specific thing you suspect from
@@ -85,5 +91,5 @@ directly yourself.
 **Verdict: SHIP / SHIP WITH FOLLOWUPS / DO NOT SHIP**
 
 Reasoning: <2-4 sentences>
-Review basis: <code-only / code + screenshot(s) via box-mcp>
+Review basis: <code-only / code + screenshot(s) via gemini-analyze-image_gemini_analyze_image or box-mcp>
 ```
