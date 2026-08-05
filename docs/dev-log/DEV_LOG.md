@@ -17,7 +17,7 @@ Follow-ups queued: <backlog items added as a result, or "none">
 ---
 
 ## Fast QA mode (dev harness) — Tech & Performance — 2026-08-05
-Commit: (see git log)
+Commit: 07185e8
 Summary: QA suites ran 1-2fps under SwiftShader (10-20+ min each). New dev-only
 `?fast=1` mode (gated by import.meta.env.DEV, folded out of prod): 4ms setTimeout
 loop driver, render throttled to 1-in-60 ticks via a single renderFrame(force)
