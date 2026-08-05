@@ -123,16 +123,28 @@ CONCLUSION=$(gh run view "$RUN_ID" --json conclusion --jq '.conclusion' 2>/dev/n
 echo "Run $RUN_ID concluded: ${CONCLUSION:-unknown}"
 
 # --- 3. Pull results back to the exact local paths the local scripts use ---
+# `gh run download` refuses to overwrite existing files, so extract into a
+# fresh temp dir and copy over — never leaves stale files from earlier runs.
 if [ -n "$FIXTURES" ] || [ "$ALL_FIXTURES" = true ]; then
   mkdir -p tests/screenshots
-  gh run download "$RUN_ID" -n "screenshots" --dir tests/screenshots 2>/dev/null || \
+  TMP=$(mktemp -d)
+  if gh run download "$RUN_ID" -n "screenshots" --dir "$TMP" 2>/dev/null; then
+    cp -f "$TMP"/* tests/screenshots/ 2>/dev/null || true
+  else
     echo "No screenshots artifact found (capture job may not have run)." >&2
+  fi
+  rm -rf "$TMP"
 fi
 
 if [ "$RUN_E2E" = true ]; then
   mkdir -p tests/e2e-results
-  gh run download "$RUN_ID" -n "e2e-results" --dir tests/e2e-results 2>/dev/null || \
+  TMP=$(mktemp -d)
+  if gh run download "$RUN_ID" -n "e2e-results" --dir "$TMP" 2>/dev/null; then
+    cp -f "$TMP"/* tests/e2e-results/ 2>/dev/null || true
+  else
     echo "No e2e-results artifact found (e2e job may not have run)." >&2
+  fi
+  rm -rf "$TMP"
 fi
 
 if [ "$CONCLUSION" = "success" ]; then
