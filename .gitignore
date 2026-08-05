@@ -4,3 +4,5 @@ dist/
 .DS_Store
 
 tests/.tmp-baseline/
+
+tests/e2e-results/
