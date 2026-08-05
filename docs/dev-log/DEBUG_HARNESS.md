@@ -289,18 +289,20 @@ random commits — only when explicitly asked for exactly the fixtures/tests
 needed). Inputs: `ref`, `tag` (a caller-generated unique string, used in
 `run-name` so the caller can find the resulting run — `gh workflow run`
 doesn't return a run ID directly), `fixtures` (comma-separated), `all_fixtures`,
-`run_e2e`.
+`run_e2e`, `concurrency` (default 3 — the runners have 4 vCPUs), `browser`
+(default `preinstalled`; see the benchmark table below).
 
 Jobs: `build` (checkout at `ref`, `npm ci`, `npm run test:prod-gate` — compile gate
 plus the production-bundle safety check) → `capture-screenshots` (only if
-`fixtures`/`all_fixtures` was given: install Chrome via
-`browser-actions/setup-chrome`, start the Vite **dev server** on 4173, run
+`fixtures`/`all_fixtures` was given: optionally install Chrome per the
+`browser` input, start the Vite **dev server** on 4173, run
 `capture-screenshots.mjs` against `--base-url=http://localhost:4173` with
-`--concurrency=<input>`, upload `tests/screenshots/` as an artifact) and
-`e2e-tests` (only if `run_e2e` was given: same setup, run `npm run test:e2e`
-with `BASE_URL=http://localhost:4173`, tee output into
-`tests/e2e-results/full-loop.txt`, upload as an artifact). Both downstream jobs
-run in parallel off the same `build` output.
+`--concurrency=<input>` and `--software`, upload `tests/screenshots/` as an
+artifact **even on failure** — `if: always()` on the upload step, so partial
+captures still come back) and `e2e-tests` (only if `run_e2e` was given: same
+setup, run `npm run test:e2e` with `BASE_URL=http://localhost:4173`, tee
+output into `tests/e2e-results/full-loop.txt`, upload as an artifact). Both
+downstream jobs run in parallel off the same `build` output.
 
 **Why the dev server and not `vite preview`?** The harness is gated by
 `import.meta.env.DEV`, which Vite statically replaces with `false` in *every*
@@ -308,6 +310,35 @@ run in parallel off the same `build` output.
 `window.__debug`. The dev server is what local capture/testing uses, and it
 works identically in the runner. The `build` job still validates the real
 production build via `test:prod-gate`.
+
+### Software rendering & the GPU probe
+
+`ubuntu-latest` runners have **no GPU at all** — WebGL only exists via SwiftShader
+software rendering. An earlier design probed the GPU flags on one fixture first
+and fell back to software per-fixture; in practice that probe wasted ~8-20s of
+every run for a known outcome. The workflow now always passes `--software` and
+`capture-screenshots.mjs` skips the probe entirely (kept only for local
+machines that do have a usable GPU). Capture is ~30s for all 9 fixtures either
+way, and the software-rendered PNGs are visually indistinguishable in quality.
+
+### Browser provisioning benchmark (2026-08-05, run IDs 31007742349/31008271519/31008271710)
+
+All three runs: 9 fixtures + full e2e loop, concurrency 3, fixed pipeline
+(`--software`, boot-wait). `conclusion` was `failure` in every case solely due
+to the known L9b slot-spin test failure (56/57 — a real game bug, tracked in
+the backlog), never due to infrastructure.
+
+| browser input      | build | capture job (inside) | e2e job | provisioning cost |
+|--------------------|-------|----------------------|---------|-------------------|
+| setup-chrome       | 17s   | 58s (31.3s)          | 4m13s   | setup-chrome action ~10-15s |
+| **preinstalled**   | 19s   | **48s (28.9s)**      | **3m32s** | none — uses the runner's `/usr/bin/google-chrome` |
+| puppeteer-bundled  | 15s   | 60s (29.4s)          | 3m53s   | `npm i --no-save puppeteer` ~15s |
+
+Provisioning mode barely matters — the run is dominated by the e2e gameplay
+loop (~3.5-4.2m, identical logic in all three) — but `preinstalled` is
+marginally fastest and costs zero downloads or extra actions, so it is the
+default. Use `--browser=setup-chrome` or `--browser=puppeteer-bundled` only if
+the runner's preinstalled Chrome ever diverges from what local testing uses.
 
 ### The wrapper — `scripts/run-ci-puppeteer.sh`
 
@@ -324,13 +355,15 @@ conclusion` (doesn't rely solely on `--exit-status`, which isn't guaranteed
 across every `gh` version), downloads the `screenshots`/`e2e-results`
 artifacts into the exact same local paths (`tests/screenshots/*.png`,
 `tests/screenshots/index.json`) the local script would have produced, and
-exits non-zero on failure. Everything downstream — `ui-critic`/`visual-critic`
-reading screenshot paths, `qa-tester`'s own assertions — is unaware whether a
-given run happened locally or in CI.
+exits non-zero on failure. (`gh run download` refuses to overwrite existing
+files, so downloads go to a temp dir first and are copied over — stale files
+from earlier runs never block a download.) Everything downstream —
+`ui-critic`/`visual-critic` reading screenshot paths, `qa-tester`'s own
+assertions — is unaware whether a given run happened locally or in CI.
 
 ### One-time setup
 
 - `gh auth login` once on this machine (already done, per the project owner).
 - Nothing else — no new npm packages. `browser-actions/setup-chrome` is a
   GitHub Action, not an npm dependency, and it only runs inside the CI
-  runner.
+  runner (and only when `browser=setup-chrome` is explicitly requested).

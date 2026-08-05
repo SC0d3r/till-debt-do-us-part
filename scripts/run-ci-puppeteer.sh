@@ -30,7 +30,7 @@ FIXTURES=""
 ALL_FIXTURES=false
 RUN_E2E=false
 CONCURRENCY=3
-BROWSER="setup-chrome" # setup-chrome (default) | preinstalled | puppeteer-bundled
+BROWSER="preinstalled" # preinstalled (default) | setup-chrome | puppeteer-bundled
 
 for arg in "$@"; do
   case "$arg" in

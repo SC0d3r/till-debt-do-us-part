@@ -41,9 +41,9 @@ on:
         required: false
         default: "3"
       browser:
-        description: "Browser provisioning: setup-chrome (pinned Chrome for Testing) | preinstalled (runner's /usr/bin/google-chrome, zero download) | puppeteer-bundled (npm i puppeteer)"
+        description: "Browser provisioning: preinstalled (runner's /usr/bin/google-chrome, zero download — default) | setup-chrome (pinned Chrome for Testing) | puppeteer-bundled (npm i puppeteer)"
         required: false
-        default: "setup-chrome"
+        default: "preinstalled"
 
 run-name: "puppeteer ${{ inputs.tag }} (${{ inputs.ref }})"
 

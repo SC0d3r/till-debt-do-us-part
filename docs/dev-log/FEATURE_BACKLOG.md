@@ -38,6 +38,15 @@ the next cycle's Ideate step will top it back up.
 
 ## Follow-ups from fast-QA review (2026-08-05)
 
+- [idea] (Core Loop, M) Slot machine SPIN click populates 0 reel cells — real
+  game bug surfaced by CI e2e (L9b, runs 30996286294/31006867682/31008271519/
+  31008271710, all 56/57). Clicking the real SPIN button via puppeteer leaves
+  all 3 reel cells empty (cells.ok=true, value=0), while the __debug direct
+  call works. Suspects: the click lands on a non-interactive overlay, the
+  touch/mobile media query route (hover:none removal is only done in the
+  capture script, not e2e), or a fast-mode race with the spin animation.
+  Game-side fix required; the e2e suite stays red until this is resolved.
+  qa-tester + design-critic.
 - [idea] (Tech & Performance, S) Fast-latch replay on panel open — clear the
   InputManager fast-mode `latched` keys when a panel opens (shop/slot/dialogue/
   pause) so a key pressed while a panel is open can't replay as an action after
