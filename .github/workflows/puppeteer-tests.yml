@@ -37,9 +37,13 @@ on:
         type: boolean
         default: false
       concurrency:
-        description: "Parallel capture pages (ubuntu-latest has 4 vCPU; 2-3 is safe)"
+        description: "Parallel capture pages (ubuntu-latest has 4 vCPU; 3 is safe)"
         required: false
-        default: "2"
+        default: "3"
+      browser:
+        description: "Browser provisioning: setup-chrome (pinned Chrome for Testing) | preinstalled (runner's /usr/bin/google-chrome, zero download) | puppeteer-bundled (npm i puppeteer)"
+        required: false
+        default: "setup-chrome"
 
 run-name: "puppeteer ${{ inputs.tag }} (${{ inputs.ref }})"
 
@@ -80,7 +84,11 @@ jobs:
           cache: npm
       - run: npm ci
       - id: setup-chrome
+        if: ${{ inputs.browser == 'setup-chrome' }}
         uses: browser-actions/setup-chrome@v1
+      - name: Install bundled puppeteer (benchmark mode)
+        if: ${{ inputs.browser == 'puppeteer-bundled' }}
+        run: npm i --no-save puppeteer
       - name: Serve dev server
         run: |
           npm run dev -- --port 4173 --strictPort &
@@ -88,9 +96,13 @@ jobs:
             curl -sf http://localhost:4173 -o /dev/null && break
             sleep 1
           done
+          # Pre-warm the Vite on-demand transform so the first page load
+          # doesn't eat a 15-30s cold compile inside the fixture timeout.
+          curl -sf http://localhost:4173/src/main.ts -o /dev/null || true
       - name: Capture fixtures
         env:
           CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+          PUPPETEER_BUNDLED: ${{ inputs.browser == 'puppeteer-bundled' && '1' || '' }}
         run: |
           if [ "${{ inputs.all_fixtures }}" = "true" ]; then
             node scripts/capture-screenshots.mjs --all --concurrency=${{ inputs.concurrency }} --base-url=http://localhost:4173
@@ -117,7 +129,11 @@ jobs:
           cache: npm
       - run: npm ci
       - id: setup-chrome
+        if: ${{ inputs.browser == 'setup-chrome' }}
         uses: browser-actions/setup-chrome@v1
+      - name: Install bundled puppeteer (benchmark mode)
+        if: ${{ inputs.browser == 'puppeteer-bundled' }}
+        run: npm i --no-save puppeteer
       - name: Serve dev server
         run: |
           npm run dev -- --port 4173 --strictPort &
@@ -125,9 +141,12 @@ jobs:
             curl -sf http://localhost:4173 -o /dev/null && break
             sleep 1
           done
+          # Pre-warm the Vite on-demand transform (see capture job).
+          curl -sf http://localhost:4173/src/main.ts -o /dev/null || true
       - name: Run e2e tests
         env:
           CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+          PUPPETEER_BUNDLED: ${{ inputs.browser == 'puppeteer-bundled' && '1' || '' }}
           BASE_URL: http://localhost:4173
         run: |
           set -o pipefail
