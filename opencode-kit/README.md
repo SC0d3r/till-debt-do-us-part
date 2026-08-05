@@ -4,14 +4,15 @@
 
 1. Check out your `dev` branch.
 2. Copy this into the repo root:
-   - `.opencode/agent/` (the 7 agent files)
+   - `.opencode/agent/` (the 10 agent files)
    - `opencode.json` (or merge its contents into an existing one)
    - `docs/dev-log/` (seed backlog/milestones/log/harness spec)
    - `scripts/dev-loop.sh`
 3. `chmod +x scripts/dev-loop.sh`
 4. Verify OpenCode picks the agents up: `opencode agent list`. You should see
-   `game-director`, `feature-writer`, `design-critic`, `ui-critic`,
-   `visual-critic`, `performance-critic`, `qa-tester`, `scene-capture`.
+   `game-director`, `feature-writer`, `asset-creator`, `asset-critic`,
+   `design-critic`, `ui-critic`, `visual-critic`, `performance-critic`,
+   `qa-tester`, `scene-capture`.
 
 **Note on the directory name**: OpenCode's own docs disagree with themselves —
 the Agents page says per-project markdown agents live in `.opencode/agents/`
@@ -124,11 +125,41 @@ a given state, this kit adds a debug/test harness:
 - `feature-writer` has a standing rule: any feature that changes a scene/menu
   or introduces new state must extend the debug API to cover it, in the same
   change — not as later cleanup.
-- `ui-critic`/`visual-critic` already have permission wired up for your
-  `gemini-analyze-image_gemini_analyze_image` (note that if you want to use gemini-analyze use gemini-analyze-image_gemini_analyze_image and not box-mcp_gemini_analyze_image) and `box-mcp_box_image_description` server (image + prompt -> text) and call it per-screenshot with a
+- `ui-critic`/`visual-critic` have permission wired up for your two
+  image-analysis MCP servers (`gemini-analyze-image_gemini_analyze_image` and
+  `box-mcp_box_image_description`) and call them per-screenshot with a
   tailored prompt rather than one generic "describe this image." If
-  `opencode agent list`/a session shows its tools under a different exact
-  prefix than `gemini-analyze-*` `box-mcp_*`, adjust the pattern in both files' frontmatter.
+  `opencode agent list`/a session shows either tool under a different exact
+  name, adjust the pattern in that file's frontmatter.
+
+## Assets: a dedicated creator + critic, not ad hoc geometry
+
+- **`.opencode/agent/asset-creator.md`** — builds one game asset per
+  invocation (model/material/procedural texture) as reusable Three.js code
+  matching this project's existing visual style, since no
+  asset-*generation* tool is wired in (only the two analysis MCPs above) —
+  everything is procedural geometry/materials/canvas-drawn textures, not
+  imported files. It does a quick self-check with one of the image tools
+  before handing off (catches obvious mistakes cheaply) but that never
+  substitutes for real review.
+- **`.opencode/agent/asset-critic.md`** — the authoritative, harsh reviewer.
+  Separate from `asset-creator` on purpose, for the same reason none of the
+  other builders grade their own work: it reviews via `previewAsset`
+  screenshots (see below) through both image MCPs, cross-checking
+  Blocker-level visual calls against both models, plus the code itself for
+  poly budget, instancing, and disposal.
+- **`window.__debug.previewAsset(name)`** — a new primitive in
+  `DEBUG_HARNESS.md`, separate from `gotoFixture`. Loads exactly one asset
+  into a neutral studio background/lighting rig so `asset-critic` gets a
+  clean, unambiguous shot with no gameplay context — uses the exact same
+  `scene-capture` subagent and capture script, just a different fixture
+  category (`"asset-preview"`).
+- `game-director` now has a **step 3.5** in its cycle: any feature needing new
+  visual content stops there to commission `asset-creator` and get it through
+  `asset-critic` *before* `feature-writer` ever touches it, and it's also a
+  standalone backlog category (**Assets & Art**) for pure art passes with no
+  code changes. There's a new standing rule against `feature-writer` ever
+  improvising asset geometry as a shortcut.
 
 ### Running the bootstrap (Part A) — answering your question directly
 
@@ -190,6 +221,8 @@ strongest model — run `opencode models` to see what's available to you.
 .opencode/agent/performance-critic.md render-loop/asset/memory harshness
 .opencode/agent/qa-tester.md          breaks things on purpose, owns e2e tests
 .opencode/agent/scene-capture.md      captures only the fixtures it's told to
+.opencode/agent/asset-creator.md      builds one procedural Three.js asset per call
+.opencode/agent/asset-critic.md       harsh, separate review of each asset
 opencode.json                         default agent + hard git safety rules
 docs/dev-log/FEATURE_BACKLOG.md       idea queue, seeded with 10 starter ideas
 docs/dev-log/MILESTONES.md            milestone criteria + history

@@ -1,11 +1,12 @@
 # Debug/Test Harness — living spec
 
 This is the single source of truth for the game's debug/test API: what exists
-right now, how to extend it, and how `feature-writer` / `scene-capture` /
-`qa-tester` are each expected to use it. **This is not a one-time task** — it's
-built once (Part A) and then grows alongside the game forever (Parts B-D). If
-this doc and the actual code disagree, the code wins and this doc needs fixing
-— treat it like `DEV_LOG.md`, not like a changelog of a finished project.
+right now, how to extend it, and how `feature-writer` / `asset-creator` /
+`scene-capture` / `qa-tester` are each expected to use it. **This is not a
+one-time task** — it's built once (Part A) and then grows alongside the game
+forever (Parts B-D). If this doc and the actual code disagree, the code wins
+and this doc needs fixing — treat it like `DEV_LOG.md`, not like a changelog
+of a finished project.
 
 Uses `puppeteer-core` against your already-installed system Chrome, not
 Playwright — no bundled-browser download, minimal disk footprint.
@@ -63,6 +64,15 @@ Expose `window.__debug` with:
   without engineering the full real precondition chain that would naturally
   cause it.
 - **`listFixtures()`** — returns the fixture registry as-is.
+- **`previewAsset(name, opts?)`** — loads exactly one asset (built by
+  `asset-creator`) into a neutral, isolated preview: plain studio background,
+  a standard 3-point lighting rig, and a camera framed to fill most of the
+  viewport with the asset. This is deliberately separate from `gotoFixture`
+  (which jumps to real in-game scenes/states) — asset review needs a clean,
+  unambiguous shot with no gameplay context, lighting variance, or occlusion
+  from other objects. Sets `ready` the same way as any other transition. Added
+  by `asset-creator` the first time it's needed; every asset it builds after
+  that registers a fixture that resolves through this same path.
 
 Reset any state that could leak between calls — this API will be called
 repeatedly in the same page without a reload, both by the capture script and
@@ -73,8 +83,11 @@ by test scripts.
 Array of `{ "name": "...", "description": "...", "category": "..." }`. One
 entry per meaningfully distinct visual state: every menu screen, key
 time-of-day/weather combos, and the signature visual moment of every feature
-going forward. `devHarness.js` should import this JSON as its single source of
-truth for `gotoFixture`, so there's only one place to edit, not two that drift.
+going forward — plus one entry per asset under category `"asset-preview"`,
+resolved through `previewAsset` rather than `gotoFixture` (`devHarness.js`
+should check each fixture's category to know which path to call).
+`devHarness.js` should import this JSON as its single source of truth, so
+there's only one place to edit, not two that drift.
 
 Seed it with at least: main menu, farm scene (day), farm scene (night, if the
 game has one yet), one open in-game menu, one dialogue/interaction state —
@@ -181,6 +194,11 @@ a normal part of being "done" — this is already a standing rule in
   introduced the state — not a later cleanup task.
 - If a feature adds a new time-based mechanic, extend `fastForward`'s internal
   clock-advance logic to cover it.
+
+`asset-creator` has the equivalent standing rule for its own output: every
+asset it builds registers a `"asset-preview"` fixture through `previewAsset`
+(A.1) in the same change that introduces the asset — never as follow-up
+cleanup.
 
 ## Part C — Periodic health check (game-director, self-maintaining)
 
