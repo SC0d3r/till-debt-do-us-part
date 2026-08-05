@@ -29,7 +29,7 @@ BRANCH="ci-eval-$TAG"   # unique per invocation — never shared between runs
 FIXTURES=""
 ALL_FIXTURES=false
 RUN_E2E=false
-CONCURRENCY=2
+CONCURRENCY=3
 
 for arg in "$@"; do
   case "$arg" in

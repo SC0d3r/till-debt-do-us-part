@@ -35,7 +35,6 @@
  * real desktop layout (see the comment in loadPage).
  */
 
-import puppeteer from 'puppeteer-core'
 import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'node:fs'
 import { execSync, spawn } from 'node:child_process'
 import { dirname, join } from 'node:path'
@@ -46,13 +45,29 @@ const SHOTS_DIR = join(ROOT, 'tests', 'screenshots')
 const INDEX_PATH = join(SHOTS_DIR, 'index.json')
 const REGISTRY_PATH = join(ROOT, 'tests', 'scene-fixtures.json')
 
+// Browser driver: default puppeteer-core (drives the system Chrome, found via
+// CHROME_PATH or common paths). Set PUPPETEER_BUNDLED=1 to use the `puppeteer`
+// package's own bundled Chromium instead (one of the CI provisioning options
+// benchmarked in DEBUG_HARNESS.md Part E — the workflow's `browser` input).
+const useBundled = process.env.PUPPETEER_BUNDLED === '1'
+let puppeteer
+if (useBundled) {
+  try {
+    puppeteer = (await import('puppeteer')).default
+  } catch {
+    throw new Error('PUPPETEER_BUNDLED=1 but the `puppeteer` package is not installed (npm i -D puppeteer)')
+  }
+} else {
+  puppeteer = (await import('puppeteer-core')).default
+}
+
 const CHROME_PATH =
   process.env.CHROME_PATH ||
   ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable',
     '/usr/bin/chromium', '/usr/bin/chromium-browser']
     .find(p => existsSync(p))
 
-if (!CHROME_PATH) {
+if (!useBundled && !CHROME_PATH) {
   throw new Error('No Chrome/Chromium binary found. Set CHROME_PATH explicitly.')
 }
 
@@ -171,7 +186,10 @@ function withTimeout(promise, ms, name) {
 
 async function loadPage(page, url) {
   await page.goto(url, { waitUntil: 'domcontentloaded' })
-  await page.waitForFunction(() => !!window.__debug, { timeout: 15000 })
+  // 60s, not 15s: the FIRST page load on a cold Vite dev server includes the
+  // full on-demand module transform, which takes 15-30s+ on slow machines and
+  // cold CI runners. Warm loads resolve in well under a second.
+  await page.waitForFunction(() => !!window.__debug, { timeout: 60000 })
   // Headless Chrome reports `(hover: none)` and `(pointer: none)` (it has no
   // input devices), which trips the slot machine's mobile CSS media query
   // (`@media (max-width: 700px), (max-height: 620px) and (orientation:
@@ -208,7 +226,7 @@ async function runAll({ fixtures, concurrency, url, args, label }) {
   let browser
   try {
     browser = await puppeteer.launch({
-      executablePath: CHROME_PATH,
+      ...(useBundled ? {} : { executablePath: CHROME_PATH }),
       headless: true, // puppeteer-core 25; the doc's 'new' string is a legacy alias
       defaultViewport: { width: 960, height: 720, deviceScaleFactor: 1 },
       args,
@@ -293,13 +311,28 @@ async function main() {
   await ensureServer()
 
   console.log(`[capture] ${fixtures.length} fixture(s), concurrency=${concurrency}`)
-  const gpuResults = await runAll({ fixtures, concurrency, url, args: GPU_ARGS, label: 'gpu' })
+  const probeName = fixtures[0]
+  // Probe the GPU flags on ONE fixture first. GitHub Actions runners have no
+  // GPU, and this dev machine's GPU flags stall/blank WebGL too — on such
+  // machines a full GPU pass wastes minutes producing all-blank frames. If
+  // the probe is blank/failed, skip straight to a single software pass.
+  const probe = await runAll({ fixtures: [probeName], concurrency: 1, url, args: GPU_ARGS, label: 'gpu' })
 
-  const failed = fixtures.filter(name => !isGood(gpuResults.get(name)))
+  let gpuResults = new Map()
   let softResults = new Map()
-  if (failed.length > 0) {
-    console.log(`[fallback] ${failed.length} fixture(s) failed/blank with GPU flags — retrying WITHOUT GPU flags (software rendering)`)
-    softResults = await runAll({ fixtures: failed, concurrency, url, args: SOFT_ARGS, label: 'software' })
+  if (isGood(probe.get(probeName))) {
+    // GPU flags render correctly here — use them for everything, fall back
+    // per-fixture as before.
+    gpuResults = await runAll({ fixtures, concurrency, url, args: GPU_ARGS, label: 'gpu' })
+    const failed = fixtures.filter(name => !isGood(gpuResults.get(name)))
+    if (failed.length > 0) {
+      console.log(`[fallback] ${failed.length} fixture(s) failed/blank with GPU flags — retrying WITHOUT GPU flags (software rendering)`)
+      softResults = await runAll({ fixtures: failed, concurrency, url, args: SOFT_ARGS, label: 'software' })
+    }
+  } else {
+    // No usable GPU (GitHub runners, this dev box): one software pass for all.
+    console.log(`[probe] ${probeName} failed/blank with GPU flags — no usable GPU here, capturing everything with software rendering`)
+    softResults = await runAll({ fixtures, concurrency, url, args: SOFT_ARGS, label: 'software' })
   }
 
   // Combine: software result wins if the GPU attempt failed or was blank.

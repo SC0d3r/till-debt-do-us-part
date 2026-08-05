@@ -8,11 +8,24 @@
 //    typewriter swallows Space/E until dismissed → clearDialogues after every day advance.
 //  - Buyer payment: overlay shows ~30s after trigger (NPC walk), gold credits at the
 //    END of the count-up, right as the overlay hides → poll the two conditions separately.
-import puppeteer from 'puppeteer-core'
 
 // CI-friendly: CHROME_PATH/BASE_URL come from the GitHub Actions workflow
 // (scripts/run-ci-puppeteer.sh); local runs fall back to the old defaults.
-const CHROME = process.env.CHROME_PATH || '/usr/bin/google-chrome'
+// PUPPETEER_BUNDLED=1 switches to the `puppeteer` package's bundled Chromium
+// (one of the browser provisioning options benchmarked in DEBUG_HARNESS.md
+// Part E — the workflow's `browser` input).
+const useBundled = process.env.PUPPETEER_BUNDLED === '1'
+let puppeteer
+if (useBundled) {
+  try {
+    puppeteer = (await import('puppeteer')).default
+  } catch {
+    throw new Error('PUPPETEER_BUNDLED=1 but the `puppeteer` package is not installed (npm i -D puppeteer)')
+  }
+} else {
+  puppeteer = (await import('puppeteer-core')).default
+}
+const CHROME = useBundled ? undefined : (process.env.CHROME_PATH || '/usr/bin/google-chrome')
 const URL_DEBUG = (process.env.BASE_URL || 'http://localhost:5173') + '/?debug=1&fast=1'
 const ARGS = ['--mute-audio', '--enable-unsafe-swiftshader', '--no-sandbox', '--disable-dev-shm-usage']
 
@@ -28,7 +41,7 @@ function test(name, pass, detail = '') {
 // 1440. Modular distance on the 1440-minute clock for relative round-trips.
 const modDist = (a, b) => Math.min((a - b + 1440) % 1440, (b - a + 1440) % 1440)
 
-const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ARGS,
+const browser = await puppeteer.launch({ ...(useBundled ? {} : { executablePath: CHROME }), headless: true, args: ARGS,
   defaultViewport: { width: 960, height: 540, deviceScaleFactor: 1 } })
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
