@@ -79,6 +79,11 @@ function parseArgs() {
     } else if (a.startsWith('--concurrency=')) {
       concurrency = parseInt(a.slice('--concurrency='.length), 10)
       if (!Number.isFinite(concurrency) || concurrency < 1) throw new Error(`Invalid --concurrency: ${a}`)
+    } else if (a.startsWith('--base-url=')) {
+      // Documented in DEBUG_HARNESS.md A.3: --base-url=<url> (or BASE_URL env).
+      // Local runs default to the dev server on 5173; CI passes the preview
+      // server URL explicitly.
+      process.env.BASE_URL = a.slice('--base-url='.length)
     } else {
       throw new Error(`Unknown argument: ${a}`)
     }
@@ -95,8 +100,13 @@ function loadRegistry() {
   return JSON.parse(readFileSync(REGISTRY_PATH, 'utf8'))
 }
 
+// Base URL resolution: --base-url > BASE_URL env > VITE_URL env > dev server.
+function getServerBase() {
+  return process.env.BASE_URL || process.env.VITE_URL || 'http://localhost:5173'
+}
+
 function getUrl() {
-  return (process.env.VITE_URL || 'http://localhost:5173') + '?debug=1'
+  return getServerBase() + '?debug=1'
 }
 
 // ─── Dev server handling ───
@@ -114,7 +124,7 @@ async function reachable(base) {
 }
 
 async function ensureServer() {
-  const base = process.env.VITE_URL || 'http://localhost:5173'
+  const base = getServerBase()
   if (await reachable(base)) {
     console.log(`[server] using already-running server at ${base}`)
     return

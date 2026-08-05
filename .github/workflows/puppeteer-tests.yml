@@ -51,7 +51,13 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run build
+      # Dev-mode build (--mode development): the debug harness (window.__debug)
+      # is statically tree-shaken out of PRODUCTION builds (enforced locally by
+      # scripts/check-prod-bundle.mjs via `npm run test:prod-gate`), but the
+      # capture and e2e jobs below exist to drive the harness — so CI builds
+      # the dev-mode bundle instead. Production build integrity is still
+      # validated by the local test:prod-gate step in game-director's cycle.
+      - run: npm run build -- --mode development
       - uses: actions/upload-artifact@v4
         with:
           name: dist-build

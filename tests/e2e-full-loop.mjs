@@ -10,8 +10,10 @@
 //    END of the count-up, right as the overlay hides → poll the two conditions separately.
 import puppeteer from 'puppeteer-core'
 
-const CHROME = '/usr/bin/google-chrome'
-const URL_DEBUG = 'http://localhost:5173/?debug=1&fast=1'
+// CI-friendly: CHROME_PATH/BASE_URL come from the GitHub Actions workflow
+// (scripts/run-ci-puppeteer.sh); local runs fall back to the old defaults.
+const CHROME = process.env.CHROME_PATH || '/usr/bin/google-chrome'
+const URL_DEBUG = (process.env.BASE_URL || 'http://localhost:5173') + '/?debug=1&fast=1'
 const ARGS = ['--mute-audio', '--enable-unsafe-swiftshader', '--no-sandbox', '--disable-dev-shm-usage']
 
 const results = []

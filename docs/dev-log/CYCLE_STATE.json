@@ -1,6 +1,7 @@
 {
-  "status": "idle",
-  "feature": null,
-  "current_step": null,
-  "last_updated": "2026-08-05T00:00:00Z"
+  "status": "in-progress",
+  "feature": "ci-pipeline-verification",
+  "category": "Tech & Performance",
+  "current_step": "commit-fixes-and-register-workflow",
+  "last_updated": "2026-08-05T14:10:00Z"
 }

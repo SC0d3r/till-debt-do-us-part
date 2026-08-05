@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "capture": "node scripts/capture-screenshots.mjs",
+    "test:e2e": "node tests/e2e-full-loop.mjs",
     "test:prod-gate": "npm run build && node scripts/check-prod-bundle.mjs"
   },
   "dependencies": {
