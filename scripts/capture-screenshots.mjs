@@ -90,8 +90,10 @@ function parseArgs() {
   const args = process.argv.slice(2)
   let fixtures = null // null means --all
   let concurrency = 1
+  let software = false
   for (const a of args) {
     if (a === '--all') fixtures = null
+    else if (a === '--software') software = true
     else if (a.startsWith('--fixtures=')) {
       fixtures = a.slice('--fixtures='.length).split(',').map(s => s.trim()).filter(Boolean)
     } else if (a.startsWith('--concurrency=')) {
@@ -111,7 +113,7 @@ function parseArgs() {
   for (const name of fixtures) {
     if (!known.has(name)) throw new Error(`Unknown fixture "${name}" (see tests/scene-fixtures.json)`)
   }
-  return { fixtures, concurrency }
+  return { fixtures, concurrency, software }
 }
 
 function loadRegistry() {
@@ -190,6 +192,17 @@ async function loadPage(page, url) {
   // full on-demand module transform, which takes 15-30s+ on slow machines and
   // cold CI runners. Warm loads resolve in well under a second.
   await page.waitForFunction(() => !!window.__debug, { timeout: 60000 })
+  // Wait for the game's FIRST settle (boot: asset generation, shader compile,
+  // scene build). Without this, the first gotoFixture on a fresh page can blow
+  // the 15s fixture timeout while the page is still booting — the ready flag
+  // only settles ~600ms after boot quietens, but boot itself can take 10-30s
+  // under software rendering on a cold CI runner. Non-fatal: if it never
+  // settles pre-fixture, the fixture's own ready-wait still governs.
+  try {
+    await page.waitForFunction(() => window.__debug?.ready === true, { timeout: 30000 })
+  } catch {
+    console.log(`[loadPage] initial settle never became ready within 30s — continuing, fixture waits will govern`)
+  }
   // Headless Chrome reports `(hover: none)` and `(pointer: none)` (it has no
   // input devices), which trips the slot machine's mobile CSS media query
   // (`@media (max-width: 700px), (max-height: 620px) and (orientation:
@@ -305,34 +318,44 @@ function gitHash() {
 // ─── Main ───
 async function main() {
   const startedAt = Date.now()
-  const { fixtures, concurrency } = parseArgs()
+  const { fixtures, concurrency, software } = parseArgs()
   mkdirSync(SHOTS_DIR, { recursive: true })
   const url = getUrl()
   await ensureServer()
 
-  console.log(`[capture] ${fixtures.length} fixture(s), concurrency=${concurrency}`)
-  const probeName = fixtures[0]
-  // Probe the GPU flags on ONE fixture first. GitHub Actions runners have no
-  // GPU, and this dev machine's GPU flags stall/blank WebGL too — on such
-  // machines a full GPU pass wastes minutes producing all-blank frames. If
-  // the probe is blank/failed, skip straight to a single software pass.
-  const probe = await runAll({ fixtures: [probeName], concurrency: 1, url, args: GPU_ARGS, label: 'gpu' })
+  console.log(`[capture] ${fixtures.length} fixture(s), concurrency=${concurrency}${software ? ', software-only' : ''}`)
 
   let gpuResults = new Map()
   let softResults = new Map()
-  if (isGood(probe.get(probeName))) {
-    // GPU flags render correctly here — use them for everything, fall back
-    // per-fixture as before.
-    gpuResults = await runAll({ fixtures, concurrency, url, args: GPU_ARGS, label: 'gpu' })
-    const failed = fixtures.filter(name => !isGood(gpuResults.get(name)))
-    if (failed.length > 0) {
-      console.log(`[fallback] ${failed.length} fixture(s) failed/blank with GPU flags — retrying WITHOUT GPU flags (software rendering)`)
-      softResults = await runAll({ fixtures: failed, concurrency, url, args: SOFT_ARGS, label: 'software' })
-    }
-  } else {
-    // No usable GPU (GitHub runners, this dev box): one software pass for all.
-    console.log(`[probe] ${probeName} failed/blank with GPU flags — no usable GPU here, capturing everything with software rendering`)
+  if (software) {
+    // CI runners (GitHub Actions ubuntu-latest) have NO GPU at all, and this
+    // dev box's GPU flags stall/blank WebGL too. Probing wastes ~8-20s of a
+    // 2-4 minute CI job for an outcome we already know — so the workflow
+    // always passes --software and we skip the probe entirely. The probe path
+    // below is kept for local machines that DO have a usable GPU.
+    console.log('[capture] --software: skipping GPU probe, capturing everything with software rendering')
     softResults = await runAll({ fixtures, concurrency, url, args: SOFT_ARGS, label: 'software' })
+  } else {
+    const probeName = fixtures[0]
+    // Probe the GPU flags on ONE fixture first. GitHub Actions runners have no
+    // GPU, and this dev machine's GPU flags stall/blank WebGL too — on such
+    // machines a full GPU pass wastes minutes producing all-blank frames. If
+    // the probe is blank/failed, skip straight to a single software pass.
+    const probe = await runAll({ fixtures: [probeName], concurrency: 1, url, args: GPU_ARGS, label: 'gpu' })
+    if (isGood(probe.get(probeName))) {
+      // GPU flags render correctly here — use them for everything, fall back
+      // per-fixture as before.
+      gpuResults = await runAll({ fixtures, concurrency, url, args: GPU_ARGS, label: 'gpu' })
+      const failed = fixtures.filter(name => !isGood(gpuResults.get(name)))
+      if (failed.length > 0) {
+        console.log(`[fallback] ${failed.length} fixture(s) failed/blank with GPU flags — retrying WITHOUT GPU flags (software rendering)`)
+        softResults = await runAll({ fixtures: failed, concurrency, url, args: SOFT_ARGS, label: 'software' })
+      }
+    } else {
+      // No usable GPU (GitHub runners, this dev box): one software pass for all.
+      console.log(`[probe] ${probeName} failed/blank with GPU flags — no usable GPU here, capturing everything with software rendering`)
+      softResults = await runAll({ fixtures, concurrency, url, args: SOFT_ARGS, label: 'software' })
+    }
   }
 
   // Combine: software result wins if the GPU attempt failed or was blank.
@@ -372,8 +395,12 @@ async function main() {
   }
   writeFileSync(INDEX_PATH, JSON.stringify(index, null, 2) + '\n')
 
+  // Count THIS run's own results only — the merged index also holds entries
+  // from earlier runs, which made the old summary misleadingly report
+  // "9/9 captured" while fixtures were timing out.
+  const okThisRun = fixtures.filter(n => isGood(final.get(n))).length
   const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1)
-  console.log(`[capture] done in ${elapsed}s — ${Object.keys(index).length}/${fixtures.length} captured`)
+  console.log(`[capture] done in ${elapsed}s — ${okThisRun}/${fixtures.length} OK this run`)
   if (exitCode !== 0) {
     console.error('[capture] one or more fixtures failed/timed out')
   }

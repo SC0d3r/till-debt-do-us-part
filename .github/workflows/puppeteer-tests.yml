@@ -105,11 +105,14 @@ jobs:
           PUPPETEER_BUNDLED: ${{ inputs.browser == 'puppeteer-bundled' && '1' || '' }}
         run: |
           if [ "${{ inputs.all_fixtures }}" = "true" ]; then
-            node scripts/capture-screenshots.mjs --all --concurrency=${{ inputs.concurrency }} --base-url=http://localhost:4173
+            # --software: ubuntu-latest runners have no GPU, so the GPU probe
+            # would only waste ~20s of every run (see capture-screenshots.mjs).
+            node scripts/capture-screenshots.mjs --all --software --concurrency=${{ inputs.concurrency }} --base-url=http://localhost:4173
           else
-            node scripts/capture-screenshots.mjs --fixtures="${{ inputs.fixtures }}" --concurrency=${{ inputs.concurrency }} --base-url=http://localhost:4173
+            node scripts/capture-screenshots.mjs --fixtures="${{ inputs.fixtures }}" --software --concurrency=${{ inputs.concurrency }} --base-url=http://localhost:4173
           fi
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: screenshots
           path: tests/screenshots
