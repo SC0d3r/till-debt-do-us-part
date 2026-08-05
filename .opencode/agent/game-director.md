@@ -80,6 +80,9 @@ after a cooldown). Handle both the same way: never assume a blank slate, always
 check what actually exists in the repo/files first, and never silently stall on
 one feature forever.
 
+tell the agests who do have access to run commands if they got 403 errors like access forbidden or 
+not reaching when using gh or other network needed commands in bash then retry it again with like `apsi` or `ap` or `proxychains4` before them like `ap gh ...` or `apsi gh ...` or `proxychains4 gh ...`
+
 ## If a subagent call fails, times out, or returns nothing usable
 
 1. Retry the SAME subagent with the SAME brief, but add this line to the
