@@ -65,9 +65,12 @@ sending your work there just because your self-check looked fine.
    for animation hooks (e.g. `mesh.userData.parts.head`), or needs to attach
    to an existing system, build for that from the start.
 5. **Quick self-check, not a full review**: register a preview fixture (see
-   step 6), capture it yourself if `scene-capture`-equivalent tooling is
-   directly runnable by you (`node scripts/capture-screenshots.mjs --fixtures=<name>`),
-   and call one of `gemini-analyze-image_gemini_analyze_image` or
+   step 6), capture it (`./scripts/run-ci-puppeteer.sh --fixtures=<name>` if
+   present — this repo is public, so GitHub Actions is free and much faster
+   than local Chrome on this machine; fall back to
+   `node scripts/capture-screenshots.mjs --fixtures=<name>` locally only if
+   that script is missing or `gh` isn't available), and call one of
+   `gemini-analyze-image_gemini_analyze_image` or
    `box-mcp_box_image_description` on the result, asking it to describe what's
    visible and flag anything that looks obviously broken (missing geometry,
    inverted normals, floating parts, wrong scale). Fix anything glaring. This

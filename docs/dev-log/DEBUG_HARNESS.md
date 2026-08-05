@@ -147,10 +147,14 @@ Behavior:
   retry silently.
 - Writes/updates `tests/screenshots/index.json`:
   `{ "<name>": { "path": "...", "capturedAt": "<ISO timestamp>", "commit": "<git rev-parse HEAD>" } }`.
-- If a dev/preview server is needed to load the game, assume one is already
-  running and fail fast with a clear error if unreachable, or have the script
-  start/stop this project's existing `npm run` preview command itself — don't
-  invent a new run mode.
+- `--base-url=<url>` (or `BASE_URL` env var), default `http://localhost:4173`
+  — the script always assumes a server is ALREADY reachable at this URL and
+  fails fast with a clear error if it isn't. It never starts/stops a server
+  itself. Whatever calls this script (a local dev loop, or the CI workflow in
+  Part E) owns starting the preview server first and tearing it down after.
+  This is what lets the exact same script run unmodified whether the server
+  is `vite preview` on your machine or one spun up inside a GitHub Actions
+  runner.
 
 ### A.4 Production-bundle safety check
 
@@ -236,3 +240,84 @@ exists to remove. Instead:
    `setState` yet, don't work around it (e.g. don't scrape the canvas) — file
    it as a gap per Part B and note it explicitly in the review output instead
    of silently skipping coverage.
+
+## Part E — Running via GitHub Actions instead of locally (optional, recommended if local capture/testing is slow)
+
+This repo is public, so standard GitHub-hosted runners are free and
+unlimited — no reason to burn a slow local machine's CPU/GPU on Chrome when a
+much faster, consistent runner is free. `scene-capture` and `qa-tester` both
+default to this path; local execution (`node scripts/capture-screenshots.mjs`
+directly) still works and is kept as a fallback for when `gh` isn't
+authenticated or GitHub is unreachable.
+
+**Do not use GitHub Pages for this.** A repo only gets one Pages site, and
+this project's `master` already owns it (production deploy) — there's no way
+to also publish `dev` there, and there's no need to: the workflow below
+builds and serves `dev` entirely inside the ephemeral runner and never
+touches Pages at all. This is also faster (no deploy-and-propagate latency)
+and doesn't publicly expose in-progress/broken `dev` builds.
+
+### How code being evaluated (often uncommitted) reaches a runner
+
+`game-director`'s cycle evaluates a feature BEFORE committing it (so a
+rejected feature never touches `dev`'s history). GitHub Actions can only
+build from something pushed to GitHub, so `scripts/run-ci-puppeteer.sh`
+bridges this transparently, every time it's invoked:
+
+1. If there are uncommitted changes, make a throwaway local commit.
+2. Delete-and-recreate a disposable branch, `ci-eval`, pointing at that
+   commit (`git push origin --delete ci-eval` then a fresh, ordinary push —
+   never a force-push, and never to `dev`/`master`).
+3. If step 1 made a commit, immediately `git reset --soft HEAD~1` locally —
+   this undoes the commit but keeps every change staged exactly as it was.
+   Net effect: nothing about the local working tree changes from the caller's
+   perspective; only the remote `ci-eval` branch now mirrors it.
+4. Dispatch `.github/workflows/puppeteer-tests.yml` with `--ref=ci-eval`,
+   wait for it, and download the results.
+
+This means `game-director`'s own cycle (commit only in step 7, on full
+approval) never had to change — the commit/push/undo dance is fully contained
+inside this one script, invisible to everything else.
+
+### The workflow — `.github/workflows/puppeteer-tests.yml`
+
+`workflow_dispatch` only (never triggered by `push`, so it never fires on
+random commits — only when explicitly asked for exactly the fixtures/tests
+needed). Inputs: `ref`, `tag` (a caller-generated unique string, used in
+`run-name` so the caller can find the resulting run — `gh workflow run`
+doesn't return a run ID directly), `fixtures` (comma-separated), `all_fixtures`,
+`run_e2e`.
+
+Jobs: `build` (checkout at `ref`, `npm ci`, `npm run build`, upload `dist/` as
+an artifact) → `capture-screenshots` (only if `fixtures`/`all_fixtures` was
+given: install Chrome via `browser-actions/setup-chrome`, download `dist/`,
+serve it with `vite preview --port 4173 --strictPort`, run
+`capture-screenshots.mjs` against `--base-url=http://localhost:4173`, upload
+`tests/screenshots/` as an artifact) and `e2e-tests` (only if `run_e2e` was
+given: same setup, run this project's e2e suite, upload results). Both
+downstream jobs run in parallel off the same `build` output.
+
+### The wrapper — `scripts/run-ci-puppeteer.sh`
+
+The one command `scene-capture`/`qa-tester` actually run:
+
+```
+./scripts/run-ci-puppeteer.sh --fixtures=name1,name2   # or --all-fixtures, and/or --e2e
+```
+
+It does the commit/push/undo dance above, dispatches the workflow, polls
+`gh run list` for the run matching its tag, `gh run watch`s it, checks the
+real conclusion via `gh run view --json conclusion` (doesn't rely solely on
+`--exit-status`, which isn't guaranteed across every `gh` version), downloads
+the `screenshots`/`e2e-results` artifacts into the exact same local paths
+(`tests/screenshots/*.png`, `tests/screenshots/index.json`) the local script
+would have produced, and exits non-zero on failure. Everything downstream —
+`ui-critic`/`visual-critic` reading screenshot paths, `qa-tester`'s own
+assertions — is unaware whether a given run happened locally or in CI.
+
+### One-time setup
+
+- `gh auth login` once on this machine (already done, per the project owner).
+- Nothing else — no new npm packages. `browser-actions/setup-chrome` is a
+  GitHub Action, not an npm dependency, and it only runs inside the CI
+  runner.

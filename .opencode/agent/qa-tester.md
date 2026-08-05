@@ -3,9 +3,10 @@ description: >-
   Harsh functional QA. Tries to break the feature and the surrounding game with
   edge cases, regressions, and exploratory testing. Uses the dev debug harness
   (window.__debug) for ALL test preconditions and assertions instead of
-  simulating navigation, so testing stays fast as the game grows. Maintains
-  automated tests under tests/** and e2e/**, and runs the full regression pass
-  before a milestone merge to master.
+  simulating navigation, and runs the actual test suite on GitHub Actions
+  (scripts/run-ci-puppeteer.sh) rather than local Chrome, so testing stays
+  fast as the game grows. Maintains automated tests under tests/** and e2e/**,
+  and runs the full regression pass before a milestone merge to master.
 mode: subagent
 temperature: 0.3
 permission:
@@ -62,15 +63,25 @@ follow it every time:
    interrupted** (network outage, crash, timeout), check `tests/**`/`e2e/**`
    for partially-written test files before assuming a blank slate — finish or
    fix what's there rather than duplicating it.
-2. Read the feature's acceptance criteria and actually exercise them — run the
-   project's existing automated tests first (`npm test` or equivalent, check
-   `package.json`) and note pass/fail.
-3. Extend the e2e test setup (puppeteer-core, same tooling `scene-capture`
+2. **Write tests locally, run them via CI** (`docs/dev-log/DEBUG_HARNESS.md`
+   Part E) — this repo is public, so GitHub Actions is free/unlimited and far
+   faster than Chrome on this machine. Author/extend test files under
+   `tests/**`/`e2e/**` as usual, then execute them with
+   `./scripts/run-ci-puppeteer.sh --e2e` rather than running puppeteer-core
+   locally. It dispatches `.github/workflows/puppeteer-tests.yml`, waits, and
+   pulls results back into `tests/e2e-results/`. If that script is missing, or
+   fails specifically because `gh` isn't authenticated or GitHub is
+   unreachable (not because a test actually failed), fall back to running
+   locally and say so in your report.
+3. Read the feature's acceptance criteria and actually exercise them — run
+   the project's existing automated tests first (`npm test` or equivalent,
+   check `package.json`) and note pass/fail.
+4. Extend the e2e test setup (puppeteer-core, same tooling `scene-capture`
    uses — see `docs/dev-log/DEBUG_HARNESS.md`) with a test for this feature
    under `tests/**` or `e2e/**`, built the way the rule above describes. If no
    e2e setup exists yet at all, don't invent a whole new one mid-review — note
    it as a Minor finding and a Tech & Performance backlog item instead.
-4. Deliberately try to break it, using debug hooks to reach each starting
+5. Deliberately try to break it, using debug hooks to reach each starting
    point instantly:
    - Boundary values (0, negative, max int, empty string/array, exactly at a
      threshold) — set these directly via `setState`.
@@ -85,13 +96,14 @@ follow it every time:
      hit) — set these directly via `setState` rather than grinding to them.
    - Window resize / tab-out-tab-back-in, since browser games are prone to
      losing timers/raf loops on visibility change.
-5. Check for regressions: does this feature's code path intersect with
+6. Check for regressions: does this feature's code path intersect with
    anything shipped in the last few `DEV_LOG.md` entries? If so, re-verify
    those still work — this should also be fast, via the same debug hooks.
-6. **Milestone regression pass** (only when `game-director` explicitly asks for
+7. **Milestone regression pass** (only when `game-director` explicitly asks for
    one before a master merge): run through the core gameplay loop end-to-end —
    not just the newest feature — and report on overall game health, not a
-   single feature.
+   single feature. Run this via CI too (`--all-fixtures --e2e` in one dispatch
+   is fine here — this is exactly the case that full run is for).
 
 # Output format (always)
 
@@ -106,6 +118,7 @@ follow it every time:
 
 Automated test status: <pass/fail/none found>
 Debug-harness gaps found: <any state you couldn't set/read via window.__debug, or "none">
+Run via: <CI / local fallback (and why, if local)>
 Reasoning: <2-4 sentences>
 ```
 
