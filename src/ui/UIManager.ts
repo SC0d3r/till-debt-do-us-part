@@ -1,5 +1,6 @@
 import { PlayerState } from '../player/PlayerState'
 import { GAME_CONFIG, CROPS, TOOLS, MINE_ITEMS, MATERIAL_ITEMS, getItemInfo, getItemTexture, TOOL_MAX_DURABILITY } from '../data/gameData'
+import { formatClock } from '../core/DayCycle'
 import { sound } from '../core/SoundManager'
 
 const ITEM_COLORS: Record<string, string> = {
@@ -99,6 +100,14 @@ export class UIManager {
   }
 
   private lastDurHtml = ''
+
+  // HUD clock: 24h "HH:MM", written with the same change-diff pattern as
+  // updateHUD (only touches the DOM when the displayed string changes).
+  updateClock(minutes: number) {
+    const str = formatClock(minutes)
+    const el = document.getElementById('time-display')!
+    if (el.textContent !== str) el.textContent = str
+  }
 
   private lastRenderedSlot = -1
   private onSelectSlot: ((slot: number) => void) | null = null

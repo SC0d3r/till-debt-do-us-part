@@ -201,6 +201,14 @@ export function initDevHarness(game: unknown): void {
         case 'gold': p.gold = requireNum(v, 'player.gold'); break
         case 'debt': p.debt = requireNum(v, 'player.debt'); break
         case 'day': p.day = requireNum(v, 'player.day'); break
+        case 'timeOfDay': {
+          const tod = requireNum(v, 'player.timeOfDay')
+          if (!Number.isInteger(tod) || tod < 0 || tod > 1439) {
+            throw new Error(`setState: player.timeOfDay must be an integer in 0..1439, got ${tod}`)
+          }
+          p.timeOfDay = tod
+          break
+        }
         case 'stamina': p.stamina = requireNum(v, 'player.stamina'); break
         case 'waterLevel': p.waterLevel = requireNum(v, 'player.waterLevel'); break
         case 'selectedSlot': p.selectedSlot = requireNum(v, 'player.selectedSlot'); break
@@ -386,7 +394,7 @@ export function initDevHarness(game: unknown): void {
       slotOpen: g.slotOpen,
       scene: g.slotOpen ? 'slot' : g.inMine ? 'mine' : g.started ? 'farm' : 'menu',
       player: {
-        gold: p.gold, debt: p.debt, day: p.day, stamina: p.stamina, maxStamina: p.maxStamina,
+        gold: p.gold, debt: p.debt, day: p.day, timeOfDay: p.timeOfDay, stamina: p.stamina, maxStamina: p.maxStamina,
         waterLevel: p.waterLevel, maxWater: p.maxWater, selectedSlot: p.selectedSlot,
         inventory: p.inventory.map(s => s ? { id: s.id, count: s.count } : null),
         toolTiers: { ...p.toolTiers },
@@ -575,6 +583,7 @@ export function initDevHarness(game: unknown): void {
     p.gold = f.gold
     p.debt = f.debt
     p.day = f.day
+    p.timeOfDay = f.timeOfDay
     p.stamina = f.stamina
     p.waterLevel = f.waterLevel
     p.selectedSlot = f.selectedSlot
@@ -610,13 +619,37 @@ export function initDevHarness(game: unknown): void {
 
     'farm-day': async () => {
       g.debugDispatch('start', FIXED_SEED)
-      await setState({ player: { introSeen: true } })
+      // timeOfDay 720 (noon) keeps this baseline pixel-identical to the
+      // pre-day-cycle screenshots (keyframe 720 == original sky/lights).
+      await setState({ player: { introSeen: true, timeOfDay: 720 } })
     },
 
     'farm-crops-grown': async () => {
       g.debugDispatch('start', FIXED_SEED)
       await setState({
-        player: { introSeen: true },
+        player: { introSeen: true, timeOfDay: 720 },
+        farm: {
+          tiles: {
+            '7,5': { type: 'WATERED', cropId: 'turnip', growthDay: CROPS.turnip.growthDays, watered: false },
+            '8,5': { type: 'WATERED', cropId: 'potato', growthDay: CROPS.potato.growthDays, watered: false },
+            '9,5': { type: 'WATERED', cropId: 'tomato', growthDay: CROPS.tomato.growthDays, watered: false },
+            '7,6': { type: 'WATERED', cropId: 'corn', growthDay: CROPS.corn.growthDays, watered: false },
+            '8,6': { type: 'WATERED', cropId: 'flower', growthDay: CROPS.flower.growthDays, watered: false },
+            '9,6': { type: 'WATERED', cropId: 'rare', growthDay: CROPS.rare.growthDays, watered: false },
+          },
+        },
+        position: { x: 8, z: 8.5 },
+      })
+      // Face the ripe patch (patch at z=5..6, player at z=8.5 → facing -z).
+      g.playerModel.rotation.y = Math.PI
+    },
+
+    'farm-night': async () => {
+      // Same ripe patch as farm-crops-grown, but at 22:00: dark indigo sky,
+      // moon up, and the ripe Moonpetal (flower at 8,6) glowing.
+      g.debugDispatch('start', FIXED_SEED)
+      await setState({
+        player: { introSeen: true, timeOfDay: 1320 },
         farm: {
           tiles: {
             '7,5': { type: 'WATERED', cropId: 'turnip', growthDay: CROPS.turnip.growthDays, watered: false },

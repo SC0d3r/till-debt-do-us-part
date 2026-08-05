@@ -9,6 +9,7 @@ export class PlayerState {
   gold = GAME_CONFIG.startingGold
   debt = GAME_CONFIG.startingDebt
   day = 1
+  timeOfDay = 360 // in-game minutes 0..1439 (360 = 06:00)
   stamina = GAME_CONFIG.maxStamina
   maxStamina = GAME_CONFIG.maxStamina
   inventory: (InventoryItem | null)[] = new Array(16).fill(null)
@@ -116,6 +117,7 @@ export class PlayerState {
   restoreStamina() { this.stamina = this.maxStamina }
   advanceDay() {
     this.day++
+    this.timeOfDay = 360 // sleep resets the clock to 06:00
     this.restoreStamina()
     if (!this.dogPettedToday) this.daysWithoutPettingDog++
     else this.daysWithoutPettingDog = 0
@@ -138,7 +140,7 @@ export class PlayerState {
 
   save() {
     localStorage.setItem('till_debt_save', JSON.stringify({
-      gold: this.gold, debt: this.debt, day: this.day, stamina: this.stamina,
+      gold: this.gold, debt: this.debt, day: this.day, timeOfDay: this.timeOfDay, stamina: this.stamina,
       inventory: this.inventory, toolTiers: this.toolTiers,
       toolDurability: this.toolDurability, waterLevel: this.waterLevel,
       introSeen: this.introSeen, grimesFirstSeen: this.grimesFirstSeen, hasFarmed: this.hasFarmed, debtPaid: this.debtPaid,

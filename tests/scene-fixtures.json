@@ -2,6 +2,7 @@
   { "name": "main-menu", "description": "Start screen with world-seed input", "category": "menu" },
   { "name": "farm-day", "description": "Farm scene, day 1, default inventory", "category": "farm" },
   { "name": "farm-crops-grown", "description": "Farm with a patch of ripe, ready-to-harvest crops", "category": "farm" },
+  { "name": "farm-night", "description": "Farm at night (22:00) with a ripe Moonpetal glowing in the crop patch", "category": "farm" },
   { "name": "shop-open", "description": "General store panel open", "category": "shop" },
   { "name": "inventory-open", "description": "Inventory panel open", "category": "inventory" },
   { "name": "dialogue-open", "description": "Intro dialogue with choices visible (typewriter skipped)", "category": "dialogue" },

@@ -62,7 +62,7 @@ async function pollUntil(page, fn, deadlineMs, label) {
   return { hit: false, last }
 }
 
-const FIXTURES = ['main-menu', 'farm-day', 'farm-crops-grown', 'shop-open', 'inventory-open', 'dialogue-open', 'mine-floor-1', 'slot-machine']
+const FIXTURES = ['main-menu', 'farm-day', 'farm-crops-grown', 'shop-open', 'inventory-open', 'dialogue-open', 'mine-floor-1', 'slot-machine', 'farm-night']
 const DEFAULT_INV = [['hoe', 1], ['water', 1], ['pickaxe', 1], ['axe', 1], ['shovel', 1], ['seed_turnip', 5], ['seed_potato', 3]]
 function invMatches(s, expected) {
   const arr = s.player.inventory.slice(0, expected.length)
@@ -85,8 +85,8 @@ section('A. API surface & validation (fresh ?debug=1 page)')
     surf.ok && surf.value.ready === 'boolean' && ['setState', 'getState', 'gotoFixture', 'fastForward', 'triggerEvent', 'listFixtures'].every(k => surf.value[k] === 'function'),
     JSON.stringify(surf.value))
   const lf = await evl(page, () => window.__debug.listFixtures())
-  test('A2 listFixtures returns exactly the 8 registry names',
-    lf.ok && lf.value.length === 8 && lf.value.every(f => FIXTURES.includes(f.name)) && new Set(lf.value.map(f => f.name)).size === 8,
+  test('A2 listFixtures returns exactly the 9 registry names',
+    lf.ok && lf.value.length === 9 && lf.value.every(f => FIXTURES.includes(f.name)) && new Set(lf.value.map(f => f.name)).size === 9,
     lf.ok ? lf.value.map(f => f.name).join(',') : lf.error)
 
   await expectThrows(page, () => window.__debug.setState({ bogus: 1 }), 'unknown key', 'A3 setState unknown top-level key throws')
@@ -347,6 +347,13 @@ section('E. Fixture determinism & leak prevention (one page, two shuffled passes
     checks.inv = fname === 'inventory-open' ? s.ui.inventoryOpen === true : s.ui.inventoryOpen === false
     checks.dialogue = fname === 'dialogue-open' ? (s.ui.dialogueActive === true && s.dialogue.text.length > 20) : s.ui.dialogueActive === false
     checks.slotOpen = fname === 'slot-machine' ? (s.slotOpen === true && s.scene === 'slot') : (s.slotOpen === false && s.ui.slotScreenVisible === false)
+    // Day-cycle fixture pins: the live clock advances during settle, so assert
+    // with ±2 min tolerance (never exact equality).
+    checks.timeOfDay = fname === 'farm-night'
+      ? Math.abs(s.player.timeOfDay - 1320) <= 2
+      : (fname === 'farm-day' || fname === 'farm-crops-grown')
+        ? Math.abs(s.player.timeOfDay - 720) <= 2
+        : true
     const ls = await evl(page, () => ({ save: localStorage.getItem('till_debt_save'), farm: localStorage.getItem('till_debt_farm') }))
     checks.lsWiped = ls.ok && ls.value.save === null && ls.value.farm === null
     if (fname === 'shop-open') {
