@@ -10,6 +10,9 @@ import { COLORS, getTileTexture, createTexturedPlane, createPlayerModel, createN
 import { sound } from './core/SoundManager'
 import { initLang, setLang, t, getLang } from './core/i18n'
 import { SlotMachine } from './slot/SlotMachine'
+import { disposeObject } from './core/disposeObject'
+import { initDevHarness } from './debug/devHarness'
+import { getDayCycleState, sunPosition, moonPosition, formatClock, isNight, SUN_RADIUS, MOON_RADIUS } from './core/DayCycle'
 
 class Game {
   private paused = false
@@ -18,6 +21,15 @@ class Game {
   private scene: THREE.Scene
   private mineScene: THREE.Scene | null = null
   private camera: THREE.PerspectiveCamera
+  // Day/night cycle lights and sky state (promoted from constructor consts so
+  // the render loop can drive them every frame)
+  private ambient!: THREE.AmbientLight
+  private sun!: THREE.DirectionalLight
+  private fill!: THREE.DirectionalLight
+  private moonMesh!: THREE.Mesh
+  private sunTarget = new THREE.Vector3(8, 0, 6)
+  private skyColor = new THREE.Color()
+  private lastClockMinute = -1
   private input: InputManager
   private player: PlayerState
   private farm!: FarmGrid
@@ -78,6 +90,10 @@ class Game {
   // Slot machine (Cascade Desire casino)
   private slot: SlotMachine | null = null
   private slotOpen = false
+  // True while debugDispatch('closeSlot') is closing the slot: suppresses the
+  // onClosed saveGame() so a stale slot save can't land in localStorage during
+  // the next debug fixture's window. Normal R-key close keeps saving.
+  private _debugClosingSlot = false
 
   constructor() {
     this.renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -95,25 +111,36 @@ class Game {
     this.camera.lookAt(8, 0, 6)
 
     // Wholesome lighting
-    const ambient = new THREE.AmbientLight(0xffeedd, 0.7)
-    this.scene.add(ambient)
-    const sun = new THREE.DirectionalLight(0xfff5e0, 0.9)
+    this.ambient = new THREE.AmbientLight(0xffeedd, 0.7)
+    this.scene.add(this.ambient)
+    this.sun = new THREE.DirectionalLight(0xfff5e0, 0.9)
     // Keep the same light direction ((15,20,10) offset from the farm center)
     // but target the farm so the shadow map only covers the playable area.
     // The whole background (mountains, forest, river, far ground) no longer
     // renders into the per-frame shadow pass, and farm shadows get ~2x sharper.
-    sun.position.set(23, 26, 16)
-    sun.target.position.set(8, 0, 6)
-    sun.castShadow = true
-    sun.shadow.mapSize.set(1024, 1024)
-    sun.shadow.camera.left = -14; sun.shadow.camera.right = 14
-    sun.shadow.camera.top = 14; sun.shadow.camera.bottom = -14
-    sun.shadow.camera.updateProjectionMatrix()
-    this.scene.add(sun)
-    this.scene.add(sun.target)
-    const fill = new THREE.DirectionalLight(0xaaccff, 0.3)
-    fill.position.set(-10, 8, -5)
-    this.scene.add(fill)
+    this.sun.position.set(23, 26, 16)
+    this.sun.target.position.set(8, 0, 6)
+    this.sun.castShadow = true
+    this.sun.shadow.mapSize.set(1024, 1024)
+    this.sun.shadow.camera.left = -14; this.sun.shadow.camera.right = 14
+    this.sun.shadow.camera.top = 14; this.sun.shadow.camera.bottom = -14
+    this.sun.shadow.camera.updateProjectionMatrix()
+    this.scene.add(this.sun)
+    this.scene.add(this.sun.target)
+    this.fill = new THREE.DirectionalLight(0xaaccff, 0.3)
+    this.fill.position.set(-10, 8, -5)
+    this.scene.add(this.fill)
+
+    // Moon disc: unlit basic material so it stays bright at night (fog
+    // disabled so the farm fog can't wash it out). Positioned along the moon
+    // arc each frame; hidden during the day. The "sun" directional light
+    // doubles as moonlight at night (see DAY_KEYFRAMES sunColor/Intensity).
+    this.moonMesh = new THREE.Mesh(
+      new THREE.CircleGeometry(1.4, 24),
+      new THREE.MeshBasicMaterial({ color: 0xe8e4d8, fog: false }),
+    )
+    this.moonMesh.visible = false
+    this.scene.add(this.moonMesh)
 
     this.input = new InputManager()
     initLang()
@@ -151,7 +178,12 @@ class Game {
       this.slotOpen = false
       document.body.classList.remove('slot-open')
       sound.resumeMusic()
-      this.saveGame()
+      if (this._debugClosingSlot) {
+        // Debug-driven close (devHarness reset): skip the save.
+        this._debugClosingSlot = false
+      } else {
+        this.saveGame()
+      }
     })
 
     // Player model
@@ -265,25 +297,77 @@ class Game {
     startBtn.addEventListener('click', () => {
       const seedInput = document.getElementById('world-seed') as HTMLInputElement
       const seedVal = seedInput?.value.trim()
-      this.worldSeed = seedVal ? parseInt(seedVal, 10) || this.hashString(seedVal) : Date.now()
-
-      sound.init(); sound.startMusic()
-      document.getElementById('start-overlay')!.style.display = 'none'
-      this.started = true
-
-      // Create farm with seed
-      this.farm = new FarmGrid(this.worldSeed)
-      this.scene.add(this.farm.group)
-
-      if (!this.player.load()) { /* defaults */ }
-      else {
-        const sf = localStorage.getItem('till_debt_farm')
-        if (sf) try { this.farm.loadState(JSON.parse(sf)) } catch {}
-      }
-      this.updateHeldVisual()
+      const parsedSeed = seedVal ? parseInt(seedVal, 10) || this.hashString(seedVal) : undefined
+      this.startGame(parsedSeed)
     })
 
     this.loop()
+  }
+
+  // Starts a new farm. Idempotent: if a farm already exists (a second call
+  // from the debug harness), the old farm group is dropped first so repeated
+  // starts never stack farms.
+  public startGame(seed?: number) {
+    this.worldSeed = seed ?? Date.now()
+
+    sound.init(); sound.startMusic()
+    document.getElementById('start-overlay')!.style.display = 'none'
+    this.started = true
+
+    // Drop any existing farm before creating the new one (idempotency).
+    // Dispose GPU resources (geometries/materials) so repeated starts from the
+    // debug harness don't leak instanced-mesh buffers.
+    if (this.farm) {
+      this.scene.remove(this.farm.group)
+      this.farm.dispose()
+      this.binArrow = null
+    }
+
+    // Create farm with seed
+    this.farm = new FarmGrid(this.worldSeed)
+    this.scene.add(this.farm.group)
+
+    if (!this.player.load()) { /* defaults */ }
+    else {
+      const sf = localStorage.getItem('till_debt_farm')
+      if (sf) try { this.farm.loadState(JSON.parse(sf)) } catch {}
+    }
+    this.updateHeldVisual()
+  }
+
+  // Dev-harness only (src/debug/devHarness.ts): lets the debug API drive
+  // actions that can't be expressed as plain field writes. Never called by
+  // game code; harmless dead code in production builds.
+  debugDispatch(action: string, arg?: unknown): void {
+    switch (action) {
+      case 'start':
+        this.startGame(typeof arg === 'number' ? arg : undefined)
+        break
+      case 'openShop': this.openShop(); break
+      case 'closeShop': this.ui.closeShop(); break
+      case 'openInventory': this.ui.openInventory(this.player); break
+      case 'closeInventory': this.ui.closeInventory(); break
+      case 'enterMine': this.enterMine(); break
+      case 'exitMine': this.exitMine(); break
+      case 'openSlot': this.openSlot(); break
+      case 'closeSlot':
+        // Force the end state synchronously — slot.close() animates a ~430ms
+        // fade and only then flips flags via its onClosed callback.
+        this._debugClosingSlot = true
+        this.slotOpen = false
+        document.body.classList.remove('slot-open')
+        sound.resumeMusic()
+        this.slot?.close()
+        break
+      case 'slotSpin':
+        // Populate the reel grid (open() clears it; cells only exist after a
+        // spin). Result is random (Math.random) — acceptable for a baseline.
+        if (this.slotOpen) this.slot?.pressSpin()
+        break
+      case 'triggerMorningBuyer': this.triggerMorningBuyer(); break
+      default:
+        throw new Error(`debugDispatch: unknown action "${action}"`)
+    }
   }
 
   private hashString(s: string): number {
@@ -375,6 +459,12 @@ class Game {
     requestAnimationFrame(this.loop)
     const dt = Math.min(this.clock.getDelta(), 0.05)
     if (!this.started) { this.renderer.render(this.scene, this.camera); return }
+    // In-game clock: advances whenever the game is running and not paused, in
+    // every scene (farm, mine, slot). It does NOT stop for shop/dialogue/
+    // inventory. Sleep (PlayerState.advanceDay) resets it to 06:00.
+    if (!this.paused) {
+      this.player.timeOfDay = (this.player.timeOfDay + dt * GAME_CONFIG.minutesPerRealSecond) % 1440
+    }
     // Slot machine open: farm scene is NOT rendered at all (keeps FPS high)
     if (this.slotOpen) {
       this.slot!.update(dt)
@@ -382,13 +472,18 @@ class Game {
     }
     if (this.paused) { this.renderer.render(this.scene, this.camera); return }
 
+    this.updateDayCycle()
+
     this.tiredCooldown = Math.max(0, this.tiredCooldown - dt)
     this.unstuckCooldown = Math.max(0, this.unstuckCooldown - dt)
     if (this.paused) this.updateUnstuckBtn()
     this.input.update()
     this.actionCooldown = Math.max(0, this.actionCooldown - dt)
 
-    if (!this.inMine) this.farm.updateRipeAnim(dt)
+    if (!this.inMine) {
+      this.farm.updateRipeAnim(dt)
+      this.farm.setNightGlow(isNight(this.player.timeOfDay))
+    }
 
     if (!this.dialogue.active && !this.ui.shopOpen) {
       this.handleMovement(dt)
@@ -482,6 +577,43 @@ class Game {
 
     // Render correct scene
     this.renderer.render(this.inMine && this.mineScene ? this.mineScene : this.scene, this.camera)
+  }
+
+  // Applies the current day/night state to the sky, lights and moon. All
+  // colors/positions come from pooled DayCycle outputs — zero per-frame
+  // allocations. Not called while paused (time is frozen then).
+  private updateDayCycle() {
+    const t = this.player.timeOfDay
+    const s = getDayCycleState(t)
+    this.skyColor.copy(s.sky)
+    this.renderer.setClearColor(this.skyColor)
+    ;(this.scene.fog as THREE.Fog).color.copy(this.skyColor)
+    this.ambient.color.copy(s.ambientColor)
+    this.ambient.intensity = s.ambientIntensity
+    this.sun.color.copy(s.sunColor)
+    this.sun.intensity = s.sunIntensity
+    this.fill.color.copy(s.fillColor)
+    this.fill.intensity = s.fillIntensity
+
+    // Sun arc by day; at night the "sun" light doubles as moonlight along the
+    // moon arc (keyframes tint it pale blue) and the moon disc becomes visible.
+    const night = isNight(t)
+    if (night) {
+      this.sun.position.copy(moonPosition(t, this.sunTarget, MOON_RADIUS))
+      this.moonMesh.visible = true
+      this.moonMesh.position.copy(this.sun.position)
+      this.moonMesh.lookAt(this.camera.position)
+    } else {
+      this.sun.position.copy(sunPosition(t, this.sunTarget, SUN_RADIUS))
+      this.moonMesh.visible = false
+    }
+
+    // HUD clock: only when the displayed minute actually changes.
+    const minute = Math.floor(t)
+    if (minute !== this.lastClockMinute) {
+      this.lastClockMinute = minute
+      this.ui.updateClock(t)
+    }
   }
 
   private updateCamera(dt: number) {
@@ -1268,6 +1400,7 @@ class Game {
         npc.rotation.y = Math.atan2(dir.x, dir.z)
       } else {
         this.scene.remove(npc)
+        disposeObject(npc)
         this.npcModel = null
         this.morningBuyerActive = false
         this.morningBuyerPhase = 'idle'
@@ -1442,6 +1575,10 @@ class Game {
     if (this.mineScene) {
       this.mineScene.remove(this.playerModel)
       this.mineScene.remove(this.mine.group)
+      // Dispose mine-only resources (floor, stones, torches, flames) so
+      // repeated enter/exit cycles from the debug harness don't leak GPU
+      // buffers. playerModel and mine.group were removed above — they persist.
+      disposeObject(this.mineScene)
       this.mineScene = null
     }
     this.scene.add(this.playerModel)
@@ -1670,4 +1807,7 @@ class Game {
   }
 }
 
-new Game()
+const game = new Game()
+if (import.meta.env.DEV) {
+  initDevHarness(game)
+}

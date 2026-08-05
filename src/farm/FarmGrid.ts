@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { GAME_CONFIG, CROPS } from '../data/gameData'
 import { SeededRNG, COLORS, getTileTexture, createTree, createSapling, createSmallTree, createStone, createHouse, createShop, createMineEntrance, createWell, createShippingBin, createCropMesh, createFencePost, createFenceRail, createMountain, createRiverSegment } from '../core/MeshFactory'
 import { buildInstanced, type InstPlacement } from '../core/Instancing'
+import { disposeObject } from '../core/disposeObject'
 import { sound } from '../core/SoundManager'
 
 export enum TileType {
@@ -32,6 +33,14 @@ export interface FarmTile {
   cropGroup: THREE.Group | null
 }
 
+// Soft blue-purple emissive for Moonpetal (flower) crops at night. Tuned down
+// from the original neon 0x9955ff @ 1.0 to a gentler 0x8866cc @ 0.5; unripe
+// plants glow at a fraction of that (shop text promises Moonpetal "glows at
+// night" unconditionally). Shared consts so the glow pass never allocates.
+const MOONPETAL_GLOW = new THREE.Color(0x8866cc)
+const MOONPETAL_GLOW_INTENSITY = 0.5
+const MOONPETAL_UNRIPE_GLOW_INTENSITY = 0.175
+
 export class FarmGrid {
   width = GAME_CONFIG.farmWidth
   height = GAME_CONFIG.farmHeight
@@ -55,6 +64,16 @@ export class FarmGrid {
     this.buildGroundMeshes()
     this.buildVisuals()
     this.buildBoundary()
+  }
+
+  // Releases GPU resources (geometries/materials) for every mesh in this farm.
+  // Call before dropping the farm group (e.g. startGame() replacing an old
+  // farm) so repeated rebuilds from the debug harness don't leak buffers.
+  // Textures are shared/cached (MeshFactory.getTileTexture) and NOT disposed.
+  dispose() {
+    disposeObject(this.group)
+    this.group.clear()
+    this.groundMeshes = {}
   }
 
   isSolid(x: number, z: number): boolean {
@@ -370,6 +389,42 @@ export class FarmGrid {
         }
         this.jiggleTime.set(key, jt)
         this.jiggleDelay.set(key, jd)
+      }
+    }
+  }
+
+  // Night-glow for Moonpetal crops ('flower'): the ripe flower head emits a
+  // soft blue-purple light; unripe plants (growthDay < growthDays) emit a
+  // faint version of the same hue. Only touches materials when the night flag
+  // actually changes (one pass per transition, not per frame). Called from the
+  // main loop while on the farm; on re-entry after a mine visit the first
+  // frame applies whichever state is current.
+  private nightGlowOn = false
+
+  setNightGlow(night: boolean) {
+    if (night === this.nightGlowOn) return
+    this.nightGlowOn = night
+    for (let x = 0; x < this.width; x++) {
+      for (let z = 0; z < this.height; z++) {
+        const t = this.tiles[x][z]
+        if (!t.cropId || !t.cropGroup || t.cropId !== 'flower') continue
+        const crop = CROPS[t.cropId]
+        if (!crop) continue
+        const ripe = t.growthDay >= crop.growthDays
+        // Ripe flowers emit from the flower head ('fruit'); young plants have
+        // no head mesh yet (stages 0-1 are a single sprout/stem), so fall back
+        // to their first mesh so the faint young-plant glow has a target.
+        const fruit = t.cropGroup.getObjectByName('fruit') as THREE.Mesh | undefined
+        const mesh = fruit ?? (t.cropGroup.children[0] as THREE.Mesh | undefined)
+        if (!mesh) continue
+        const mat = mesh.material as THREE.MeshLambertMaterial
+        if (night) {
+          mat.emissive.copy(MOONPETAL_GLOW)
+          mat.emissiveIntensity = ripe ? MOONPETAL_GLOW_INTENSITY : MOONPETAL_UNRIPE_GLOW_INTENSITY
+        } else {
+          mat.emissive.set(0x000000)
+          mat.emissiveIntensity = 1.0
+        }
       }
     }
   }

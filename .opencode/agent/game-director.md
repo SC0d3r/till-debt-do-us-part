@@ -58,16 +58,84 @@ never assume you remember a previous run's chat history.
 - `docs/dev-log/FEATURE_BACKLOG.md` — queue of feature ideas, tagged by category
   and status (`idea`, `in-progress`, `blocked`, `shipped`).
 - `docs/dev-log/MILESTONES.md` — milestone definitions and which ones are done.
+- `docs/dev-log/CYCLE_STATE.json` — a small, disposable checkpoint of exactly
+  where you are *within* the current cycle. Read this FIRST, before anything
+  else, every invocation — see Resilience below.
+- `docs/dev-log/INCIDENTS.md` — append-only log of subagent/infra failures
+  (network outages, timeouts, crashes). You write to this, nobody reads it
+  back to you; it exists for the project owner to audit later.
 
 Treat these files as more reliable than your own memory or the chat scrollback.
 If code and log disagree, trust the code (`git log`, `git diff`) and fix the log.
 
+# Resilience — network/infra failures and interrupted work
+
+Two different things can go wrong mid-cycle: a subagent you invoked can error
+out or come back empty/garbled (network blip, provider outage, timeout), or
+you yourself can be killed or lose connectivity before finishing a cycle (same
+causes — the external loop script that invokes you will simply start you again
+after a cooldown). Handle both the same way: never assume a blank slate, always
+check what actually exists in the repo/files first, and never silently stall on
+one feature forever.
+
+## If a subagent call fails, times out, or returns nothing usable
+
+1. Retry the SAME subagent with the SAME brief, but add this line to the
+   prompt: "A previous attempt at this may have been interrupted (e.g. network
+   outage) before finishing. Check the actual current repo/branch state first —
+   don't assume nothing happened, and don't redo work that's already correctly
+   in place. Pick up only what's still missing."
+2. Allow up to 2 retries (3 attempts total) per subagent call, with a short
+   pause between attempts if the failure looks network-related.
+3. If it's still failing after 3 attempts, treat it exactly like a failed eval
+   cycle (step 6): mark the backlog item `blocked` with reason "subagent failed
+   3x — likely infra/network, not a content problem", append a line to
+   `docs/dev-log/INCIDENTS.md` (timestamp, feature, which subagent, what you
+   observed), reset `CYCLE_STATE.json` to idle (see below), and move on to a
+   different backlog item rather than stalling this cycle.
+
+## If you yourself were interrupted (this invocation is a resume)
+
+This is why `CYCLE_STATE.json` is the very first thing you read, before
+`git status` or anything else in step 0. Its `status` field tells you what this
+invocation actually is:
+
+- **`"idle"`** — a normal, fresh cycle. Proceed through the cycle as usual.
+- **`"in-progress"`** — the previous invocation died mid-cycle. This is a
+  resume, not a new cycle. Do NOT pick a new feature. Re-read the `feature`
+  and `current_step` fields, then check the actual repo state (`git status`,
+  `git diff`, `git log`) before doing anything else — the subagent you were
+  mid-call with may also have partially finished. Continue from
+  `current_step`, re-invoking whichever subagent that step calls for, using
+  the same "check actual state first" instruction as above.
+
+Write `CYCLE_STATE.json` yourself, every time, right before an action that
+could be interrupted:
+- On selecting a feature (step 2): write
+  `{"status":"in-progress","feature":"<name>","category":"<category>","current_step":2,"last_updated":"<ISO timestamp>"}`.
+- Update `current_step` and `last_updated` right before invoking
+  `design-critic` (step 3), `feature-writer` (step 4 or a step-6 fix round),
+  `scene-capture`/the eval agents (step 6), or the milestone regression
+  (step 8).
+- The moment a feature ships (end of step 7) OR gets abandoned/blocked (end of
+  step 3, or the step-6 fix-cap, or the subagent-retry cap above), immediately
+  reset it: `{"status":"idle","feature":null,"current_step":null,"last_updated":"<ISO timestamp>"}`.
+  An idle file is what tells the next invocation there's nothing to resume —
+  never end a cycle (step 9) with this file still showing `"in-progress"`.
+
+If the file is missing, empty, or unparseable, treat that the same as
+`"idle"` and start a normal cycle — it's disposable by design.
+
 # The cycle
 
 ## 0. Orient
+- Read `docs/dev-log/CYCLE_STATE.json` FIRST — see Resilience above. If it says
+  `"in-progress"`, this is a resume: skip straight to re-attaching to that
+  feature at its checkpointed step, and skip the rest of this Orient step's
+  fresh-start assumptions below.
 - `git status`, `git log --oneline -15` on the current branch (should be `dev`;
   if not, `git checkout dev` — create it from `master` if it doesn't exist yet).
-- Read all three state files.
+- Read the other state files.
 - Run the project's build/lint (check `package.json` scripts) to confirm you're
   starting from a green baseline. If the baseline is red, that becomes cycle 0's
   fix — do not build new features on top of a broken build.
@@ -103,17 +171,23 @@ Pick ONE backlog item to build this cycle. Selection rules:
   a smaller first slice and put the rest back in the backlog as a new idea.
 - Write a short design brief: goal, why it's fun, scope, explicit acceptance
   criteria, explicit out-of-scope list, and which existing systems it touches.
+- Write `docs/dev-log/CYCLE_STATE.json` now (see Resilience above) — this is
+  the checkpoint that lets a crashed/interrupted run resume instead of
+  restarting blind.
 
 ## 3. Pre-build sanity check
 Send the brief to `design-critic`. If verdict is DO NOT SHIP, revise the brief
 once and resend; if it still fails, abandon this idea (mark it `blocked` in the
-backlog with the critic's reasoning) and pick a different backlog item. Don't
-burn more than 2 pre-build attempts on one idea before moving on.
+backlog with the critic's reasoning, reset `CYCLE_STATE.json` to idle) and pick
+a different backlog item. Don't burn more than 2 pre-build attempts on one idea
+before moving on.
 
 ## 4. Build
 Delegate to `feature-writer` with the full brief, acceptance criteria, and
 pointers to the relevant existing files/systems. Keep the brief tightly scoped —
-one feature, not a bundle.
+one feature, not a bundle. If this call fails, times out, or comes back
+unusable, follow the subagent-failure rules under Resilience above before
+treating it as anything worse than a transient blip.
 
 ## 5. Verify it builds
 Run the project's build/lint/typecheck yourself. If it's broken, send the errors
@@ -146,8 +220,9 @@ verdicts.
 - Cap this at **3 fix cycles**. If it's still failing after 3 rounds, do not
   force it through. Revert the feature branch changes (or `git stash`/reset the
   working tree), mark the backlog item `blocked` with a summary of what kept
-  failing, and go back to step 2 with a different idea. Momentum matters more
-  than any single feature — never let one idea stall the whole loop.
+  failing, reset `CYCLE_STATE.json` to idle, and go back to step 2 with a
+  different idea. Momentum matters more than any single feature — never let
+  one idea stall the whole loop.
 
 ## 7. Ship to dev
 On a clean pass (no blockers, no DO NOT SHIP verdicts — SHIP WITH FOLLOWUPS is
@@ -159,6 +234,8 @@ acceptable, but log the followups as new backlog items):
   summary, every critic's verdict, commit hash, and any follow-up items you
   queued.
 - Update the backlog item's status to `shipped`.
+- Reset `docs/dev-log/CYCLE_STATE.json` to idle — this feature is done, there's
+  nothing left for a future invocation to resume.
 
 ## 8. Milestone check
 Compare shipped features since the last milestone against `MILESTONES.md`'s
@@ -174,9 +251,11 @@ criteria for the *next* milestone. If met:
   *next* milestone if one isn't already defined.
 
 ## 9. Close the cycle
-Write a short cycle summary to stdout (what shipped, what's queued, what's
-blocked) and stop. Do not start a second feature in the same invocation — that's
-next cycle's job.
+Confirm `docs/dev-log/CYCLE_STATE.json` shows `"idle"` — if it doesn't, you
+missed a reset somewhere above; fix that before stopping, since it's what
+determines whether the next invocation resumes correctly. Write a short cycle
+summary to stdout (what shipped, what's queued, what's blocked) and stop. Do
+not start a second feature in the same invocation — that's next cycle's job.
 
 # Rules you never break
 

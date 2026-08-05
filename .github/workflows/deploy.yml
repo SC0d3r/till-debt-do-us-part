@@ -19,7 +19,9 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npm run build
+      # test:prod-gate runs `npm run build` itself, then gates the bundle —
+      # running build separately here would double-build.
+      - run: npm run test:prod-gate
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

@@ -620,12 +620,14 @@ export function createCropMesh(cropId: string, stage: number): THREE.Group {
     const stem = createBox(0.06, 0.35, 0.06, cols[1]); stem.position.y = 0.18; g.add(stem)
     const leafCross = createBox(0.25, 0.04, 0.25, cols[1]); leafCross.position.y = 0.28; g.add(leafCross)
     const bud = new THREE.Mesh(new THREE.SphereGeometry(0.06, 4, 4), new THREE.MeshLambertMaterial({ color: col }))
+    bud.name = 'fruit'
     bud.position.y = 0.38; g.add(bud)
   } else {
     // Full growth: stem + cross leaf + fruit (3 meshes instead of 6)
     const stem = createBox(0.07, 0.4, 0.07, cols[1]); stem.position.y = 0.2; g.add(stem)
     const leafCross = createBox(0.3, 0.04, 0.3, cols[1]); leafCross.position.y = 0.3; g.add(leafCross)
     const fruit = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), new THREE.MeshLambertMaterial({ color: col }))
+    fruit.name = 'fruit'
     fruit.position.y = 0.45; g.add(fruit)
   }
   return g

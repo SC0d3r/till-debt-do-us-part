@@ -7,6 +7,8 @@ export const GAME_CONFIG = {
   startingDebt: 500,
   startingGold: 100,
   maxStamina: 100,
+  // In-game day/night clock: 2 in-game minutes per real second (full day = 12 min)
+  minutesPerRealSecond: 2,
 }
 
 export interface CropDef {
