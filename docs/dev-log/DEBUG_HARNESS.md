@@ -291,14 +291,23 @@ needed). Inputs: `ref`, `tag` (a caller-generated unique string, used in
 doesn't return a run ID directly), `fixtures` (comma-separated), `all_fixtures`,
 `run_e2e`.
 
-Jobs: `build` (checkout at `ref`, `npm ci`, `npm run build`, upload `dist/` as
-an artifact) → `capture-screenshots` (only if `fixtures`/`all_fixtures` was
-given: install Chrome via `browser-actions/setup-chrome`, download `dist/`,
-serve it with `vite preview --port 4173 --strictPort`, run
-`capture-screenshots.mjs` against `--base-url=http://localhost:4173`, upload
-`tests/screenshots/` as an artifact) and `e2e-tests` (only if `run_e2e` was
-given: same setup, run this project's e2e suite, upload results). Both
-downstream jobs run in parallel off the same `build` output.
+Jobs: `build` (checkout at `ref`, `npm ci`, `npm run test:prod-gate` — compile gate
+plus the production-bundle safety check) → `capture-screenshots` (only if
+`fixtures`/`all_fixtures` was given: install Chrome via
+`browser-actions/setup-chrome`, start the Vite **dev server** on 4173, run
+`capture-screenshots.mjs` against `--base-url=http://localhost:4173` with
+`--concurrency=<input>`, upload `tests/screenshots/` as an artifact) and
+`e2e-tests` (only if `run_e2e` was given: same setup, run `npm run test:e2e`
+with `BASE_URL=http://localhost:4173`, tee output into
+`tests/e2e-results/full-loop.txt`, upload as an artifact). Both downstream jobs
+run in parallel off the same `build` output.
+
+**Why the dev server and not `vite preview`?** The harness is gated by
+`import.meta.env.DEV`, which Vite statically replaces with `false` in *every*
+`vite build` (even `--mode development`) — a built bundle can never expose
+`window.__debug`. The dev server is what local capture/testing uses, and it
+works identically in the runner. The `build` job still validates the real
+production build via `test:prod-gate`.
 
 ### The wrapper — `scripts/run-ci-puppeteer.sh`
 

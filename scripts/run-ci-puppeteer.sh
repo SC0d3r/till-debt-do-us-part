@@ -12,6 +12,7 @@ set -uo pipefail
 #   ./scripts/run-ci-puppeteer.sh --all-fixtures [--ref=dev]
 #   ./scripts/run-ci-puppeteer.sh --e2e [--ref=dev]
 #   ./scripts/run-ci-puppeteer.sh --fixtures=name1 --e2e   # both in one dispatch
+#   ./scripts/run-ci-puppeteer.sh --all-fixtures --concurrency=3   # parallel capture pages
 #
 # Requires: gh CLI, already authenticated (`gh auth login`). Run from repo root.
 # Leaves results in the exact same local paths the local scripts would:
@@ -28,6 +29,7 @@ BRANCH="ci-eval-$TAG"   # unique per invocation — never shared between runs
 FIXTURES=""
 ALL_FIXTURES=false
 RUN_E2E=false
+CONCURRENCY=2
 
 for arg in "$@"; do
   case "$arg" in
@@ -35,6 +37,7 @@ for arg in "$@"; do
     --fixtures=*) FIXTURES="${arg#*=}" ;;
     --all-fixtures) ALL_FIXTURES=true ;;
     --e2e) RUN_E2E=true ;;
+    --concurrency=*) CONCURRENCY="${arg#*=}" ;;
     *) echo "Unknown arg: $arg" >&2; exit 1 ;;
   esac
 done
@@ -94,7 +97,8 @@ gh workflow run "$WORKFLOW" \
   -f "tag=$TAG" \
   -f "fixtures=$FIXTURES" \
   -f "all_fixtures=$ALL_FIXTURES" \
-  -f "run_e2e=$RUN_E2E"
+  -f "run_e2e=$RUN_E2E" \
+  -f "concurrency=$CONCURRENCY"
 
 echo "Waiting for the run to appear..."
 RUN_ID=""

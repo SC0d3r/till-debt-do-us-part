@@ -3,8 +3,15 @@ name: Puppeteer tests (screenshots / e2e)
 # Manual dispatch only — never on push. This exists so game-director's
 # scene-capture/qa-tester agents (via scripts/run-ci-puppeteer.sh) can ask for
 # exactly the fixtures/tests they need, on demand, against any ref (including
-# the disposable ci-eval branch used for pre-commit evaluation). It never
-# touches GitHub Pages — dist is built and served entirely inside the runner.
+# the disposable ci-eval-run-* branches used for pre-commit evaluation). It
+# never touches GitHub Pages — the game is built and served entirely inside
+# the runner.
+#
+# IMPORTANT: capture/e2e jobs serve the Vite DEV server, not `vite preview`.
+# The debug harness (window.__debug) is gated by import.meta.env.DEV, which
+# Vite statically replaces with `false` in EVERY `vite build` (even
+# --mode development) — so no built bundle can ever expose the harness. The
+# dev server is exactly what local capture/testing uses.
 on:
   workflow_dispatch:
     inputs:
@@ -29,6 +36,10 @@ on:
         required: false
         type: boolean
         default: false
+      concurrency:
+        description: "Parallel capture pages (ubuntu-latest has 4 vCPU; 2-3 is safe)"
+        required: false
+        default: "2"
 
 run-name: "puppeteer ${{ inputs.tag }} (${{ inputs.ref }})"
 
@@ -51,18 +62,9 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      # Dev-mode build (--mode development): the debug harness (window.__debug)
-      # is statically tree-shaken out of PRODUCTION builds (enforced locally by
-      # scripts/check-prod-bundle.mjs via `npm run test:prod-gate`), but the
-      # capture and e2e jobs below exist to drive the harness — so CI builds
-      # the dev-mode bundle instead. Production build integrity is still
-      # validated by the local test:prod-gate step in game-director's cycle.
-      - run: npm run build -- --mode development
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dist-build
-          path: dist
-          retention-days: 1
+      # Compile gate + production-bundle safety check: proves the game builds
+      # AND that the harness stays tree-shaken out of prod (scripts/check-prod-bundle.mjs).
+      - run: npm run test:prod-gate
 
   capture-screenshots:
     needs: build
@@ -79,13 +81,9 @@ jobs:
       - run: npm ci
       - id: setup-chrome
         uses: browser-actions/setup-chrome@v1
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist-build
-          path: dist
-      - name: Serve dist
+      - name: Serve dev server
         run: |
-          npx vite preview --port 4173 --strictPort &
+          npm run dev -- --port 4173 --strictPort &
           for i in $(seq 1 30); do
             curl -sf http://localhost:4173 -o /dev/null && break
             sleep 1
@@ -95,9 +93,9 @@ jobs:
           CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
         run: |
           if [ "${{ inputs.all_fixtures }}" = "true" ]; then
-            node scripts/capture-screenshots.mjs --all --base-url=http://localhost:4173
+            node scripts/capture-screenshots.mjs --all --concurrency=${{ inputs.concurrency }} --base-url=http://localhost:4173
           else
-            node scripts/capture-screenshots.mjs --fixtures="${{ inputs.fixtures }}" --base-url=http://localhost:4173
+            node scripts/capture-screenshots.mjs --fixtures="${{ inputs.fixtures }}" --concurrency=${{ inputs.concurrency }} --base-url=http://localhost:4173
           fi
       - uses: actions/upload-artifact@v4
         with:
@@ -120,13 +118,9 @@ jobs:
       - run: npm ci
       - id: setup-chrome
         uses: browser-actions/setup-chrome@v1
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist-build
-          path: dist
-      - name: Serve dist
+      - name: Serve dev server
         run: |
-          npx vite preview --port 4173 --strictPort &
+          npm run dev -- --port 4173 --strictPort &
           for i in $(seq 1 30); do
             curl -sf http://localhost:4173 -o /dev/null && break
             sleep 1
@@ -135,13 +129,14 @@ jobs:
         env:
           CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
           BASE_URL: http://localhost:4173
-        run: npm run test:e2e
+        run: |
+          set -o pipefail
+          mkdir -p tests/e2e-results
+          npm run test:e2e 2>&1 | tee tests/e2e-results/full-loop.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: e2e-results
-          path: |
-            tests/e2e-results
-            tests/screenshots/index.json
+          path: tests/e2e-results
           retention-days: 7
           if-no-files-found: ignore
