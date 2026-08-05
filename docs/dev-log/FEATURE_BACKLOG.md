@@ -14,10 +14,30 @@ split before building).
 Keep at least 3 un-started `idea` entries at all times — if the list gets thin,
 the next cycle's Ideate step will top it back up.
 
+## Standing directives (game-director — always in force)
+
+- **MODULAR CODE (2026-08-05, directive from project owner):** every
+  `feature-writer` brief MUST require modular code. New features go in a
+  purpose-named module under `src/<domain>/` (or an existing one); no new
+  feature logic is to be added inline to `src/main.ts`. `main.ts` stays the
+  thin composition root: wire subsystems, own the render loop, own nothing
+  else. This directive predates and outlives the main.ts refactor — it applies
+  from the next cycle onward even if the refactor is still in progress.
+
 ---
 
 ## Shipped
 
+- [shipped] (Tech & Performance, M) CI pipeline verification — moved the
+  puppeteer test/capture pipeline to GitHub Actions: `puppeteer-tests.yml`
+  workflow (dev-mode build so the harness survives, `test:e2e` script,
+  env-driven CHROME_PATH/BASE_URL, `--no-sandbox`, parallel-safe
+  `run-ci-puppeteer.sh` with per-run disposable branches, dev-server serve,
+  GPU probe skip on GPU-less runners, browser provisioning input
+  (setup-chrome/preinstalled/puppeteer-bundled), 60s cold-load wait, Vite
+  pre-warm, artifact upload on failure + download fix, `--browser`
+  passthrough, preinstalled Chrome as default, refreshed CI-captured fixture
+  screenshots). (dev 7942df8..9bbe43e, 2026-08-05)
 - [shipped] (World & Exploration, M) Day/night cycle slice 1 — in-game
   clock (24h, 2 in-game min per real sec) + sun/moon arc + sky/light color
   temperature shift + HUD clock + Moonpetal night glow. (dev 0695a04,
@@ -38,6 +58,13 @@ the next cycle's Ideate step will top it back up.
 
 ## Follow-ups from fast-QA review (2026-08-05)
 
+- [idea] (Tech & Performance, L) Modularize main.ts — 1946-line monolith Game
+  class; extract subsystems (player/actions, farm, mine, slot, shop/buyer,
+  dog, day-cycle driving, save, story) into modules under src/, leaving
+  main.ts a thin composition root. Owner directive (2026-08-05): modular code
+  is mandatory for all future features; this refactor is the enabler.
+  Zero-behavior-change refactor — gate on full test suite + screenshot
+  parity.
 - [idea] (Core Loop, M) Slot machine SPIN click populates 0 reel cells — real
   game bug surfaced by CI e2e (L9b, runs 30996286294/31006867682/31008271519/
   31008271710, all 56/57). Clicking the real SPIN button via puppeteer leaves

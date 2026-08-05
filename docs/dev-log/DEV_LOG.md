@@ -16,7 +16,28 @@ Follow-ups queued: <backlog items added as a result, or "none">
 
 ---
 
-## Fast QA mode (dev harness) — Tech & Performance — 2026-08-05
+## CI pipeline verification — Tech & Performance — 2026-08-05
+Commit: 9bbe43e (range 7942df8..9bbe43e, 12 commits)
+Summary: Moved the puppeteer test/capture pipeline from local Chrome to
+GitHub Actions so QA and screenshot capture run free and fast in CI. New
+`.github/workflows/puppeteer-tests.yml` (workflow_dispatch + branch triggers):
+dev-mode build so the harness survives, `npm run test:e2e`, env-driven
+CHROME_PATH/BASE_URL, `--no-sandbox` for GH runners, parallel-safe
+`scripts/run-ci-puppeteer.sh` with per-run disposable branches, dev-server
+serve inside the workflow, GPU probe skipped on GPU-less runners (--software),
+60s cold-load wait, Vite transform pre-warm, concurrency input, artifact
+upload on failure + fixed artifact download (extract to temp dir), `--browser`
+passthrough (setup-chrome/preinstalled/puppeteer-bundled), preinstalled Chrome
+as the default mode, and the fixture screenshot catalog refreshed from the
+final default-mode CI run. Also added proxy retry rules (ap/apsi/proxychains4)
+for agents hitting network errors.
+Verdicts: design=n/a (infra) ui=n/a visual=n/a performance=n/a qa=PASS via CI
+runs (e2e-full-loop, qa-harness, probe-daynight all green on GH Actions;
+screenshot catalog refreshed from CI capture)
+Follow-ups queued: none new (existing slot-spin-click CI-e2e red item remains
+open)
+
+---
 Commit: 07185e8
 Summary: QA suites ran 1-2fps under SwiftShader (10-20+ min each). New dev-only
 `?fast=1` mode (gated by import.meta.env.DEV, folded out of prod): 4ms setTimeout
