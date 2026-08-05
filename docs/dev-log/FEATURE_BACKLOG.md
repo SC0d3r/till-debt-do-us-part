@@ -28,6 +28,42 @@ the next cycle's Ideate step will top it back up.
 
 ## Follow-ups from harness review (2026-08-04)
 
+- [shipped] (Tech & Performance, M) Fast QA mode — decouple game logic ticks
+  from paint rate under software rendering so puppeteer tests (which ran 1-2fps
+  and took 15+ min) finish minutes-fast: rAF override + render throttle + cheap
+  renderer (no AA, half pixelRatio, no shadows) behind ?debug=1&fast=1, plus
+  __debug.setFastMode. Player-facing impact: zero (DEV+debug-gated). Suite
+  runtimes after fix round: qa-harness 120/124 @ 4m42s, probe-daynight 57/57 @
+  1m38s, e2e-full-loop 57/57 @ 3m13s. (dev, 2026-08-05)
+
+## Follow-ups from fast-QA review (2026-08-05)
+
+- [idea] (Tech & Performance, S) Fast-latch replay on panel open — clear the
+  InputManager fast-mode `latched` keys when a panel opens (shop/slot/dialogue/
+  pause) so a key pressed while a panel is open can't replay as an action after
+  it closes (confirmed repro, zero current-suite exposure; future fast-mode
+  suites must not be bitten). qa-tester + ui-critic.
+- [idea] (Tech & Performance, XS) DN2.3 comment + wrap bounds — DN2.3's comment
+  claims it catches "multi-hour leaps" but an average over ~625 ticks can't see
+  a single slow tick; assert a per-tick max on a small window too, and note it
+  only runs under fast=1 (fastMode.ticks is 0 in normal mode). DN1.1/DN8.1 still
+  use wrap-blind upper bounds (<1440) — switch to the modular helpers. design-critic.
+- [idea] (Tech & Performance, XS) Wide clock-bound margins — L6c (360-840) and
+  DN3.3 (360-600) relative clock windows shrink at 40 game-min/s on throttled
+  boxes; retighten or make them deadline-based. ui-critic.
+- [idea] (Polish & Game Feel, XS) Mine item settle freeze — items sliding fast
+  freeze abruptly at ground contact (pre-existing, more visible now that items
+  stay in play); add a friction ramp. visual-critic.
+- [idea] (Tech & Performance, XS) setFastMode-from-rAF race note — switching
+  drivers from inside a rAF callback could double-chain fast timers (theoretical,
+  unreachable via page.evaluate); harden or comment the invariant. visual-critic.
+- [idea] (Tech & Performance, XS) Prod fast-mode dead code — ~300B of
+  setFastMode/fast fields survive in prod as dead code; extend
+  scripts/check-prod-bundle.mjs to also grep for fast-gating leaks. performance-critic.
+- [idea] (Tech & Performance, S) FarmGrid.updateRipeAnim per-tick scan — the
+  12-37ms/tick grid scan caps fast-mode tick rate at ~27-80/s (design figure was
+  250/s); throttle to N ticks or dirty-flag the patch. performance-critic.
+
 - [idea] (Tech & Performance, M) Mine teardown leak — dispose floor children on
   every `buildFloorVisuals()` rebuild and null the five cached mine-light refs
   in `exitMine()` (stale follow-lights darken the mine on 2nd+ entry). perf-critic
@@ -38,6 +74,12 @@ the next cycle's Ideate step will top it back up.
 - [idea] (Tech & Performance, S) Overlay flags via computed style — getState
   pause/payment visibility currently reads inline style, false-positive while
   stylesheet-hidden. qa-tester.
+- [idea] (Tech & Performance, S) Mine item positions in getState — expose
+  bouncing mine item positions so the in-bounds invariant is assertable instead
+  of only observable via collection. qa-tester.
+- [idea] (Tech & Performance, XS) L7c margin watch — the dig sweep passes with a
+  1-item margin (before:1, after:2); seeded mine floor would make it fully
+  deterministic. qa-tester.
 - [idea] (Tech & Performance, S) Capture respawn leaks vite — kill the dev
   server's process group (`detached: true` + `process.kill(-pid)`) so the
   grandchild survives neither the script nor the shell. qa-tester.

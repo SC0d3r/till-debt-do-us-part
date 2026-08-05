@@ -16,6 +16,33 @@ Follow-ups queued: <backlog items added as a result, or "none">
 
 ---
 
+## Fast QA mode (dev harness) — Tech & Performance — 2026-08-05
+Commit: (see git log)
+Summary: QA suites ran 1-2fps under SwiftShader (10-20+ min each). New dev-only
+`?fast=1` mode (gated by import.meta.env.DEV, folded out of prod): 4ms setTimeout
+loop driver, render throttled to 1-in-60 ticks via a single renderFrame(force)
+choke point, cheap renderer at construction (no AA, 0.5 pixelRatio, no sun
+shadows), game clock scaled 20x via timeDt (clamp 0.25x20) while movement/stamina
+keep the 0.05 dt clamp (no teleports), HUD DOM writes throttled to render ticks,
+fast-mode key latching in InputManager (momentary presses between ticks no longer
+lost — 20/20 mine-entrance trials vs 33% loss before). `__debug.setFastMode`
+(enabled, renderEvery=60, dtScale=20) is idempotent with exactly one pending loop
+continuation (the old disable path froze the loop — fixed); getState gains
+additive fastMode{enabled,renderEvery,dtScale,ticks}. Suites flipped to
+?debug=1&fast=1 with wall-clock-coupled time assertions converted to tick-based
+(DN2.3) and wrap-aware modular compares (fwdDelta/pinNear/modDist). Measured on a
+real-input probe: 58.2s -> 11.6s total, per-action latency down 8-45x. Suite
+runtimes after the fix round: qa-harness 120/124 @ 4m42s, probe-daynight 57/57 @
+1m38s, e2e-full-loop 57/57 @ 3m13s (vs ~10-20+ min each before). Bundled gameplay
+bug fix discovered during testing: dug mine items launched past the floor bounds
+were unreachable forever — they now wall-bounce in-bounds (0.5..size-0.5,
+horizontal reflect x0.6); normal-mode change, L7c went green with a redesigned
+dig sweep.
+Verdicts: design=SHIP WITH FOLLOWUPS ui=SHIP WITH FOLLOWUPS visual=SHIP WITH FOLLOWUPS performance=SHIP qa=SHIP WITH FOLLOWUPS
+Follow-ups queued: fast-latch-replay-on-panel-open, dn23-comment-and-wrap-bounds, wide-clock-bounds-margins, mine-settle-freeze-polish, setfastmode-rAF-race-note, prod-fast-deadcode-and-gate-check, farmgrid-updateripeanim-scan, mine-item-positions-getstate, l7c-margin-watch
+
+---
+
 ## Debug/test harness (Part A) — Tech & Performance — 2026-08-04
 Commit: 55883ed (manifest refresh: 1da0e6d)
 Summary: Implemented docs/dev-log/DEBUG_HARNESS.md Part A end-to-end. `window.__debug` API (ready/setState/getState/gotoFixture/fastForward/triggerEvent/listFixtures) in src/debug/devHarness.ts, gated on `import.meta.env.DEV` + `?debug=1` and fully tree-shaken out of prod (verified by scripts/check-prod-bundle.mjs, wired into the Pages deploy). 8 seed fixtures (main-menu, farm-day, farm-crops-grown, shop-open, inventory-open, dialogue-open, mine-floor-1, slot-machine) with leak-free reset (localStorage wipe, fresh player/farm, story-trigger suppression, GPU teardown via FarmGrid.dispose + disposeObject). Puppeteer-core capture pipeline (scripts/capture-screenshots.mjs) with dev-server respawn, AbortSignal.timeout(2000) reachability, 960x720 desktop viewport + CSSOM hover:none strip, software-render fallback, merging index.json manifest. QA's automated suite tests/qa-harness.mjs: 118/122 probes green.

@@ -1,3 +1,14 @@
+## 2026-08-05 — Fast QA mode cycle
+Subagent: ui-critic (round 2), plus infra notes
+Observed: ui-critic round-2 review returned an empty result (task completed with
+no output). Retried once with the interrupted-attempt instruction; second run
+produced a full review. Also: shell tool calls touching `node tests/...` timed
+out at 30-120s with no output (pgrep/pkill hung; a 120s mini-probe run died
+silently) — leftover baseline e2e process survived a `pkill` and contended for
+CPU until killed by PID; /tmp/opencode reads were permission-denied, so temp
+logs moved to tests/.tmp-baseline/ (now gitignored).
+Retries: ui-critic 2 attempts (1 retry); pkill/process checks repeated
+
 # Incidents
 
 Append-only. `game-director` writes here whenever a subagent fails 3 retries

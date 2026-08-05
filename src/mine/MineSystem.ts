@@ -252,6 +252,11 @@ export class MineSystem {
 
   update(dt: number) {
     const gravity = -12
+    // Floor bounds for item wall-bounce (tile band [0, size): item centers may
+    // sit between 0.5 and size-0.5).
+    const floorSize = this.floors[this.currentFloor]?.length ?? 0
+    const minB = 0.5
+    const maxB = floorSize > 0 ? floorSize - 0.5 : 0.5
     for (const bi of this.bouncingItems) {
       if (bi.collected) continue
       bi.time += dt
@@ -259,6 +264,17 @@ export class MineSystem {
       bi.sprite.position.x += bi.velocity.x * dt
       bi.sprite.position.y += bi.velocity.y * dt
       bi.sprite.position.z += bi.velocity.z * dt
+
+      // Bounce off the floor edges: a launch aimed at the west/south border
+      // used to carry the item OFF the playable area, where no player position
+      // could ever reach it — dug ore lost forever. Reflect horizontally
+      // instead (friction mirrors the ground-bounce decay).
+      if (floorSize > 0) {
+        if (bi.sprite.position.x < minB) { bi.sprite.position.x = minB; bi.velocity.x = Math.abs(bi.velocity.x) * 0.6 }
+        else if (bi.sprite.position.x > maxB) { bi.sprite.position.x = maxB; bi.velocity.x = -Math.abs(bi.velocity.x) * 0.6 }
+        if (bi.sprite.position.z < minB) { bi.sprite.position.z = minB; bi.velocity.z = Math.abs(bi.velocity.z) * 0.6 }
+        else if (bi.sprite.position.z > maxB) { bi.sprite.position.z = maxB; bi.velocity.z = -Math.abs(bi.velocity.z) * 0.6 }
+      }
 
       // Bounce off ground
       if (bi.sprite.position.y < bi.baseY) {

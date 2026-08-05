@@ -14,6 +14,16 @@ import { disposeObject } from './core/disposeObject'
 import { initDevHarness } from './debug/devHarness'
 import { getDayCycleState, sunPosition, moonPosition, formatClock, isNight, SUN_RADIUS, MOON_RADIUS } from './core/DayCycle'
 
+// ─── Fast QA mode (dev-only) ───
+// `?fast=1` switches the game into QA-fast mode BEFORE the renderer is built:
+// cheap renderer settings (antialias off, 0.5 pixel ratio, no shadow pass),
+// a setTimeout-driven loop with throttled renders, and a 20x in-game clock so
+// headless QA suites finish minutes faster. import.meta.env.DEV is statically
+// replaced with `false` by Vite in production builds, so the whole constant
+// folds away and the URL param can never do anything in prod (same gating
+// style as initDevHarness below).
+const FAST_MODE = import.meta.env.DEV && new URLSearchParams(location.search).get('fast') === '1'
+
 class Game {
   private paused = false
   private tiredCooldown = 0
@@ -94,13 +104,37 @@ class Game {
   // onClosed saveGame() so a stale slot save can't land in localStorage during
   // the next debug fixture's window. Normal R-key close keeps saving.
   private _debugClosingSlot = false
+  // Fast QA mode (`?fast=1` / __debug.setFastMode): setTimeout-driven loop,
+  // render throttle, 20x in-game clock. Runtime half is toggled by the
+  // harness; the renderer-side half (antialias/pixelRatio/shadows) is fixed at
+  // construction by the URL flag and cannot be changed at runtime.
+  private fastModeEnabled = FAST_MODE
+  private fastRenderEvery = 60
+  private fastDtScale = 20
+  private fastTickCount = 0
+  // Pending loop continuations — EXACTLY ONE of these is live at any time:
+  // fastTimer (fast driver, 4ms setTimeout) XOR rafTimer (normal driver, rAF).
+  // loop() schedules the next one at the top of every iteration, and
+  // setFastMode swaps drivers by scheduling the new one BEFORE clearing the
+  // old one, so a driver switch can never leave the loop without a pending
+  // continuation (which used to freeze the game permanently) nor double-drive.
+  private fastTimer: number | null = null
+  private rafTimer: number | null = null
+  // Set by togglePause: forces exactly ONE render on the next loop iteration
+  // after a pause on/off transition (the DOM pause overlay sits on a canvas
+  // that needs one fresh frame; per-tick force-renders while paused would put
+  // us back at render-bound ~250 FPS).
+  private pauseRenderDirty = false
 
   constructor() {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true })
+    this.renderer = new THREE.WebGLRenderer({ antialias: !FAST_MODE })
     this.renderer.setSize(window.innerWidth, window.innerHeight)
     this.renderer.setClearColor(COLORS.sky)
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    // Fast QA mode: render at half resolution — SwiftShader frame cost scales
+    // with pixels, and QA never looks at the pixels, only at game state.
+    if (FAST_MODE) this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 0.5))
     document.body.appendChild(this.renderer.domElement)
 
     this.scene = new THREE.Scene()
@@ -120,7 +154,9 @@ class Game {
     // renders into the per-frame shadow pass, and farm shadows get ~2x sharper.
     this.sun.position.set(23, 26, 16)
     this.sun.target.position.set(8, 0, 6)
-    this.sun.castShadow = true
+    // Fast QA mode skips the shadow pass entirely (shadow map render is a big
+    // chunk of the SwiftShader frame cost); receivers keep their materials.
+    this.sun.castShadow = !FAST_MODE
     this.sun.shadow.mapSize.set(1024, 1024)
     this.sun.shadow.camera.left = -14; this.sun.shadow.camera.right = 14
     this.sun.shadow.camera.top = 14; this.sun.shadow.camera.bottom = -14
@@ -143,6 +179,7 @@ class Game {
     this.scene.add(this.moonMesh)
 
     this.input = new InputManager()
+    this.input.setFastLatch(FAST_MODE)
     initLang()
 
     // Language buttons on start screen
@@ -378,6 +415,7 @@ class Game {
 
   private togglePause() {
     this.paused = !this.paused
+    this.pauseRenderDirty = true
     const overlay = document.getElementById('pause-overlay')!
     if (this.paused) {
       overlay.style.display = 'flex'
@@ -456,21 +494,55 @@ class Game {
   }
 
   private loop = () => {
-    requestAnimationFrame(this.loop)
-    const dt = Math.min(this.clock.getDelta(), 0.05)
-    if (!this.started) { this.renderer.render(this.scene, this.camera); return }
+    // Fast QA mode drives the loop with a 4ms setTimeout (~250 ticks/s) so
+    // game logic stays responsive while renders are throttled (see
+    // renderFrame). Normal mode keeps rAF. This invocation consumed the one
+    // pending continuation, so schedule the next one for the CURRENT driver
+    // before doing any work — a mid-iteration setFastMode() always finds the
+    // pending handle to swap (and never a dead loop, see setFastMode). The
+    // stray-handle cleanup below is belt-and-suspenders for a continuation
+    // that fired during a driver switch window.
+    if (this.fastModeEnabled) {
+      if (this.rafTimer !== null) { cancelAnimationFrame(this.rafTimer); this.rafTimer = null }
+      this.fastTimer = window.setTimeout(() => this.loop(), 4)
+    } else {
+      if (this.fastTimer !== null) { window.clearTimeout(this.fastTimer); this.fastTimer = null }
+      this.rafTimer = requestAnimationFrame(this.loop)
+    }
+    const rawDt = this.clock.getDelta()
+    // Physics/movement/stamina/tools keep the 0.05 clamp even in fast mode:
+    // a slow render tick must never teleport the player or fast-forward
+    // stamina drain. Only the in-game clock uses the scaled timeDt below.
+    const dt = Math.min(rawDt, 0.05)
+    if (this.fastModeEnabled) this.fastTickCount++
+    if (!this.started) { this.renderFrame(this.scene); return }
     // In-game clock: advances whenever the game is running and not paused, in
     // every scene (farm, mine, slot). It does NOT stop for shop/dialogue/
     // inventory. Sleep (PlayerState.advanceDay) resets it to 06:00.
+    // Fast mode scales ONLY this clock: timeDt = min(rawDt, 0.25) * fastScale
+    // (20x default → a QA day passes in ~30 real seconds). The 0.25 raw cap
+    // keeps a single slow render tick from jumping more than
+    // 0.25 × dtScale × 2 game-minutes (10 game-minutes at 20x), never a
+    // multi-hour leap.
     if (!this.paused) {
-      this.player.timeOfDay = (this.player.timeOfDay + dt * GAME_CONFIG.minutesPerRealSecond) % 1440
+      const timeDt = this.fastModeEnabled ? Math.min(rawDt, 0.25) * this.fastDtScale : dt
+      this.player.timeOfDay = (this.player.timeOfDay + timeDt * GAME_CONFIG.minutesPerRealSecond) % 1440
     }
     // Slot machine open: farm scene is NOT rendered at all (keeps FPS high)
     if (this.slotOpen) {
       this.slot!.update(dt)
       return
     }
-    if (this.paused) { this.renderer.render(this.scene, this.camera); return }
+    if (this.paused) {
+      // Force exactly ONE render per pause transition (togglePause sets
+      // pauseRenderDirty), not per tick: the overlay is DOM and only needs a
+      // fresh canvas backdrop once; per-tick force-renders are render-bound.
+      if (this.pauseRenderDirty) {
+        this.renderFrame(this.scene, true)
+        this.pauseRenderDirty = false
+      }
+      return
+    }
 
     this.updateDayCycle()
 
@@ -561,22 +633,83 @@ class Game {
       this.dogModel.remove(this.dogHeartSprite)
     }
 
-    this.ui.updateHUD(this.player)
+    // HUD DOM throttling: in fast mode the gold/day/stamina/FPS DOM writes
+    // ride the render-tick throttle (every `fastRenderEvery` ticks) — game
+    // state still updates every tick, only DOM writes are throttled. EXCEPTION
+    // by design: the HUD clock (updateClock via updateDayCycle, below) writes
+    // every tick, diff-gated to the displayed "HH:MM" string, so the DOM clock
+    // tracks the live clock race-free for the clock-assertion tests. Normal
+    // mode updates everything every tick.
+    const hudTick = !this.fastModeEnabled || this.fastTickCount % this.fastRenderEvery === 0
+    if (hudTick) this.ui.updateHUD(this.player)
     this.updateCamera(dt)
 
-    // FPS counter
+    // FPS counter (DOM write rides the same render-tick throttle in fast mode)
     this.fpsFrames++
     this.fpsTime += dt
     if (this.fpsTime >= 0.5) {
       this.fpsDisplay = Math.round(this.fpsFrames / this.fpsTime)
       this.fpsFrames = 0
       this.fpsTime = 0
-      const fpsEl = document.getElementById('fps-display')
-      if (fpsEl) fpsEl.textContent = `${this.fpsDisplay} FPS`
+      if (hudTick) {
+        const fpsEl = document.getElementById('fps-display')
+        if (fpsEl) fpsEl.textContent = `${this.fpsDisplay} FPS`
+      }
     }
 
-    // Render correct scene
-    this.renderer.render(this.inMine && this.mineScene ? this.mineScene : this.scene, this.camera)
+    // Render correct scene (forced once right after an unpause transition so
+    // the canvas behind the disappearing pause overlay is fresh)
+    this.renderFrame(this.inMine && this.mineScene ? this.mineScene : this.scene, this.pauseRenderDirty)
+    this.pauseRenderDirty = false
+  }
+
+  // Single render choke point — every renderer.render call in the game loop
+  // routes through here. In fast mode the main-loop call sites render only
+  // every `fastRenderEvery` ticks (one SwiftShader frame takes 300-500ms, so
+  // ~1 render per 60 ticks keeps the main thread mostly free); force=true
+  // always renders (pause on/off transitions — exactly one frame each).
+  private renderFrame(scene: THREE.Scene, force = false) {
+    if (force || !this.fastModeEnabled || this.fastTickCount % this.fastRenderEvery === 0) {
+      this.renderer.render(scene, this.camera)
+    }
+  }
+
+  // Dev-harness only (src/debug/devHarness.ts): runtime toggle for fast QA
+  // mode — switches the loop driver (rAF ↔ 4ms setTimeout), the render
+  // throttle and the in-game clock scale. The renderer-side settings
+  // (antialias/pixelRatio/sun shadow) were fixed at construction by `?fast=1`
+  // and cannot be undone at runtime — accepted asymmetry, documented here.
+  //
+  // Loop-safety: the loop ALWAYS has exactly one pending continuation. When
+  // switching drivers we schedule the NEW driver's continuation BEFORE
+  // clearing the old one's pending handle, so the chain can never die (the
+  // disable path used to clear the pending setTimeout without ever scheduling
+  // a rAF, permanently freezing the game) and never double-drives. Repeated
+  // calls with the same `enabled` are idempotent (early return; parameters
+  // are still re-applied for reconfiguration).
+  public setFastMode(enabled: boolean, renderEvery = 60, dtScale = 20): void {
+    this.fastRenderEvery = Number.isFinite(renderEvery) && renderEvery >= 1 ? Math.floor(renderEvery) : 60
+    this.fastDtScale = Number.isFinite(dtScale) && dtScale >= 1 ? dtScale : 20
+    this.fastTickCount = 0
+    if (this.fastModeEnabled === enabled) return
+    this.fastModeEnabled = enabled
+    this.input.setFastLatch(enabled)
+    if (enabled) {
+      // Schedule the fast driver first, then drop the pending rAF: at every
+      // instant of the switch exactly one continuation remains pending.
+      this.fastTimer = window.setTimeout(() => this.loop(), 4)
+      if (this.rafTimer !== null) {
+        cancelAnimationFrame(this.rafTimer)
+        this.rafTimer = null
+      }
+    } else {
+      // Schedule the rAF driver first, then drop the pending fast timer.
+      this.rafTimer = requestAnimationFrame(this.loop)
+      if (this.fastTimer !== null) {
+        window.clearTimeout(this.fastTimer)
+        this.fastTimer = null
+      }
+    }
   }
 
   // Applies the current day/night state to the sky, lights and moon. All

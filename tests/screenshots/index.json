@@ -6,8 +6,8 @@
   },
   "farm-day": {
     "path": "tests/screenshots/farm-day.png",
-    "capturedAt": "2026-08-05T03:16:09.325Z",
-    "commit": "a9f08ddfb868f546da809cba4e2c7e6955357f12"
+    "capturedAt": "2026-08-05T04:47:10.342Z",
+    "commit": "b024034920d76520bdfedbcda92c15db53c66e38"
   },
   "farm-crops-grown": {
     "path": "tests/screenshots/farm-crops-grown.png",
@@ -41,7 +41,7 @@
   },
   "farm-night": {
     "path": "tests/screenshots/farm-night.png",
-    "capturedAt": "2026-08-05T03:16:09.325Z",
-    "commit": "a9f08ddfb868f546da809cba4e2c7e6955357f12"
+    "capturedAt": "2026-08-05T04:47:10.343Z",
+    "commit": "b024034920d76520bdfedbcda92c15db53c66e38"
   }
 }

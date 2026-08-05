@@ -43,6 +43,7 @@ interface DebugApi {
   fastForward(days: number): Promise<void>
   triggerEvent(name: string, payload?: unknown): Promise<void>
   listFixtures(): FixtureDef[]
+  setFastMode(enabled: boolean, renderEvery?: number, dtScale?: number): void
 }
 
 declare global {
@@ -63,7 +64,8 @@ const SETTLE_MS = 600
 const FIXED_SEED = 42
 
 export function initDevHarness(game: unknown): void {
-  if (!new URLSearchParams(window.location.search).has('debug')) return
+  const params = new URLSearchParams(window.location.search)
+  if (!params.has('debug')) return
 
   const g = game as any
   const freshPlayer = new PlayerState()
@@ -79,8 +81,19 @@ export function initDevHarness(game: unknown): void {
     fastForward,
     triggerEvent,
     listFixtures,
+    setFastMode,
   }
   window.__debug = api
+
+  // `?fast=1` (dev-only): re-assert the runtime side of fast QA mode. The
+  // renderer-side settings (antialias/pixelRatio/sun shadow) were already
+  // applied at construction in src/main.ts and are NOT toggleable here —
+  // acceptable asymmetry, documented in Game.setFastMode.
+  if (params.get('fast') === '1') api.setFastMode(true)
+
+  function setFastMode(enabled: boolean, renderEvery = 60, dtScale = 20): void {
+    g.setFastMode(enabled, renderEvery, dtScale)
+  }
 
   function markDirty() {
     api.ready = false
@@ -427,6 +440,17 @@ export function initDevHarness(game: unknown): void {
         active: g.dialogue.active,
         speaker: dialogSpeaker ? dialogSpeaker.textContent : '',
         text: dialogText ? dialogText.textContent : '',
+      },
+      // Additive fast-QA-mode report (never changes the fields above).
+      fastMode: {
+        enabled: g.fastModeEnabled === true,
+        renderEvery: g.fastRenderEvery,
+        dtScale: g.fastDtScale,
+        // Monotonic loop-iteration counter in fast mode (incremented once per
+        // loop() run): lets tests measure per-TICK clock increments instead of
+        // dividing by wall-clock frame counts (which broke under throttled
+        // renders). Undefined while fast mode is off.
+        ticks: g.fastTickCount,
       },
     }
   }

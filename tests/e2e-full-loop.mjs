@@ -11,7 +11,7 @@
 import puppeteer from 'puppeteer-core'
 
 const CHROME = '/usr/bin/google-chrome'
-const URL_DEBUG = 'http://localhost:5173/?debug=1'
+const URL_DEBUG = 'http://localhost:5173/?debug=1&fast=1'
 const ARGS = ['--mute-audio', '--enable-unsafe-swiftshader', '--no-sandbox', '--disable-dev-shm-usage']
 
 const results = []
@@ -21,6 +21,10 @@ function test(name, pass, detail = '') {
   current.tests.push({ name, pass: !!pass, detail })
   console.log(`  [${pass ? 'PASS' : 'FAIL'}] ${name}${detail ? ' — ' + detail : ''}`)
 }
+
+// Fast mode runs the in-game clock up to 20x, so a session can wrap past
+// 1440. Modular distance on the 1440-minute clock for relative round-trips.
+const modDist = (a, b) => Math.min((a - b + 1440) % 1440, (b - a + 1440) % 1440)
 
 const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ARGS,
   defaultViewport: { width: 960, height: 540, deviceScaleFactor: 1 } })
@@ -48,14 +52,19 @@ async function pollUntil(page, fn, deadlineMs, ...args) {
   while (Date.now() < deadline) {
     last = await evl(page, fn, ...args)
     if (last.ok && last.value) return { hit: true, last }
-    await sleep(500)
+    // Fast mode: game state responds in well under 200ms, so a 200ms poll
+    // cadence keeps suite runtime down without racing the state.
+    await sleep(200)
   }
   return { hit: false, last }
 }
 async function pressUntil(page, key, pred, maxTries = 12) {
   for (let i = 0; i < maxTries; i++) {
     await page.keyboard.press(key)
-    await sleep(900)
+    // Fast mode: the 0.25-0.5 game-s action cooldown drains in milliseconds of
+    // wall time (dt-clamped ticks at ~250/s), so a 300ms gap between presses
+    // is plenty (pre-fast-mode this was 900ms to cover ~1fps frame-dt).
+    await sleep(300)
     const s = await getState(page)
     if (s && pred(s)) return { ok: true, tries: i + 1 }
   }
@@ -243,7 +252,9 @@ section('L6. Sleep cycle (REAL E + click Sleep)')
   s = await getState(page)
   test('L6a sleep dialogue via E near house', dlg.ok && dlg.value.visible === true && dlg.value.hasSleep === true, JSON.stringify(dlg?.value))
   test('L6b day advances by 1', clicked.ok && dayOk, JSON.stringify({ was: before?.player?.day, now: s?.player?.day }))
-  test('L6c timeOfDay resets to 06:00 (≈360), stamina 100', s.player.timeOfDay >= 360 && s.player.timeOfDay < 380 && s.player.stamina === 100, JSON.stringify({ tod: s?.player?.timeOfDay, stamina: s?.player?.stamina }))
+  // Relative: sleep resets to 06:00 (360); the live clock then advances while
+  // the wake dialogues are cleared (fast mode ~40 min/s → <840 = 12s margin).
+  test('L6c timeOfDay resets to 06:00 (≈360), stamina 100', s.player.timeOfDay >= 360 && s.player.timeOfDay < 840 && s.player.stamina === 100, JSON.stringify({ tod: s?.player?.timeOfDay, stamina: s?.player?.stamina }))
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -268,16 +279,27 @@ section('L7. Mine loop: enter → dig → ore → descend → exit')
   s = await getState(page)
   test('L7b dug multiple tiles with shovel (real Space)', dugTiles.length >= 3 && s.mine.digsLeft < 15, JSON.stringify({ digsLeft: s?.mine?.digsLeft, dug: dugTiles.length }))
   const minedBefore = s.player.totalItemsMined
-  // Items launch up to ~4 tiles from the dug tile and only collect after they
-  // settle (~2s of bounces) — wait, then sweep the whole floor within 0.8 reach.
+  // Flakiness lesson (L7c): the 4×4 dig patch only holds ~2.5 items on
+  // average (16% per tile, minus rocks), and in fast mode most of those are
+  // collected at the player's feet during the dig loop itself — a pure
+  // movement sweep then often finds nothing left to collect. Sweep the whole
+  // floor (0.5-row × 1.0-col steps: every tile is within the 0.8 collect
+  // radius of some sweep point) and DIG at every position (stamina +
+  // digsLeft refilled via setState): the floor keeps spawning items ahead of
+  // the sweep, and the MineSystem wall-bounce keeps every launch inside the
+  // 14×14 floor.
+  const floorSize = 14 // floor 0 (L7d descends after this section)
   await sleep(3000)
-  for (let gz = 0.5; gz < 10; gz += 1.0) {
-    for (let gx = 0.5; gx < 10; gx += 1.0) {
-      await setState(page, { position: { x: gx, z: gz } })
+  for (let gz = 0.5; gz < floorSize; gz += 0.5) {
+    for (let gx = 0.5; gx < floorSize; gx += 1.0) {
+      await setState(page, { position: { x: gx, z: gz }, player: { stamina: 100 }, mine: { digsLeft: 15 } })
+      await page.keyboard.press(' ')
       await sleep(300)
-      if ((await getState(page)).player.totalItemsMined > minedBefore) break
+      const cur = await getState(page)
+      if (cur && cur.player.totalItemsMined > minedBefore) break
     }
-    if ((await getState(page)).player.totalItemsMined > minedBefore) break
+    const cur = await getState(page)
+    if (cur && cur.player.totalItemsMined > minedBefore) break
   }
   s = await getState(page)
   test('L7c ore collected (totalItemsMined increased)', s.player.totalItemsMined > minedBefore, JSON.stringify({ before: minedBefore, after: s?.player?.totalItemsMined, inv: s?.player?.inventory?.filter(x => x && (x.id.includes('ore') || x.id.includes('stone'))).map(x => x.id) }))
@@ -421,6 +443,12 @@ section('L11. Save/load round-trip at rich state')
   await page.keyboard.press('r'); await sleep(1500)
   await page.keyboard.press('Escape'); await sleep(2500)
   const saveWritten = await evl(page, () => localStorage.getItem('till_debt_save') !== null && localStorage.getItem('till_debt_farm') !== null)
+  const savedTod = await evl(page, () => {
+    const raw = localStorage.getItem('till_debt_save')
+    if (!raw) return null
+    const d = JSON.parse(raw)
+    return typeof d.timeOfDay === 'number' ? d.timeOfDay : null
+  })
   await page.reload({ waitUntil: 'domcontentloaded' })
   await page.waitForFunction(() => !!window.__debug, { timeout: 20000 })
   await sleep(800)
@@ -431,7 +459,11 @@ section('L11. Save/load round-trip at rich state')
   test('L11a save written on slot-close (real flow)', saveWritten.ok && saveWritten.value === true, JSON.stringify(saveWritten?.value))
   test('L11b reload+start: gold 777 restored', s.player.gold === 777, JSON.stringify({ gold: s?.player?.gold }))
   test('L11c day 7 restored', s.player.day === 7, JSON.stringify({ day: s?.player?.day }))
-  test('L11d timeOfDay ≈1234 restored (±60min clock drift)', s.player.timeOfDay >= 1174 && s.player.timeOfDay <= 1294, JSON.stringify({ tod: s?.player?.timeOfDay }))
+  // Relative: reload+start loads the SAVED clock, not a fresh morning. Fast
+  // mode keeps advancing after load (up to ~40 min/s), so compare modularly
+  // against the raw saved value (handles wrap past 1440).
+  test('L11d timeOfDay ≈1234 restored (modular drift ≤300min from saved clock)', savedTod.ok && savedTod.value !== null && modDist(s.player.timeOfDay, savedTod.value) <= 300,
+    JSON.stringify({ saved: savedTod.value, loaded: s?.player?.timeOfDay }))
   test('L11e inventory restored (turnip 3, ore_copper 2)', s.player.inventory.some(x => x?.id === 'turnip' && x.count === 3) && s.player.inventory.some(x => x?.id === 'ore_copper' && x.count === 2), JSON.stringify(s?.player?.inventory?.filter(Boolean).slice(5)))
   test('L11f farm crop at 7,7 restored', s.farm.tiles[7][7].cropId === 'turnip' && s.farm.tiles[7][7].growthDay === 2, JSON.stringify(s?.farm?.tiles?.[7]?.[7]))
   test('L11g no page errors across save/load', page.__pageErrors.length === 0, JSON.stringify(page.__pageErrors))

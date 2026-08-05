@@ -9,7 +9,7 @@
 import puppeteer from 'puppeteer-core'
 
 const CHROME = '/usr/bin/google-chrome'
-const URL_DEBUG = 'http://localhost:5173/?debug=1'
+const URL_DEBUG = 'http://localhost:5173/?debug=1&fast=1'
 const URL_PLAIN = 'http://localhost:5173/'
 const ARGS = ['--mute-audio', '--enable-unsafe-swiftshader', '--no-sandbox', '--disable-dev-shm-usage']
 
@@ -57,10 +57,19 @@ async function pollUntil(page, fn, deadlineMs, label) {
   while (Date.now() < deadline) {
     last = await evl(page, fn)
     if (last.ok && last.value) return { hit: true, last }
-    await sleep(500)
+    // Fast mode: game state responds in well under 200ms, so a 200ms poll
+    // cadence keeps suite runtime down without racing the state.
+    await sleep(200)
   }
   return { hit: false, last }
 }
+
+// Pinned-clock rule (both suites share it): where the intent is "same
+// time-of-day region" (e.g. a fixture pinned 22:00 and the live clock keeps
+// advancing), compare with modular distance — strict non-modular compare is
+// reserved for "exactly this elapsed interval" intents.
+const modDist = (a, b) => Math.min((a - b + 1440) % 1440, (b - a + 1440) % 1440)
+const pinNear = (tod, pin, margin) => Number.isFinite(tod) && modDist(tod, pin) <= margin
 
 const FIXTURES = ['main-menu', 'farm-day', 'farm-crops-grown', 'shop-open', 'inventory-open', 'dialogue-open', 'mine-floor-1', 'slot-machine', 'farm-night']
 const DEFAULT_INV = [['hoe', 1], ['water', 1], ['pickaxe', 1], ['axe', 1], ['shovel', 1], ['seed_turnip', 5], ['seed_potato', 3]]
@@ -347,12 +356,14 @@ section('E. Fixture determinism & leak prevention (one page, two shuffled passes
     checks.inv = fname === 'inventory-open' ? s.ui.inventoryOpen === true : s.ui.inventoryOpen === false
     checks.dialogue = fname === 'dialogue-open' ? (s.ui.dialogueActive === true && s.dialogue.text.length > 20) : s.ui.dialogueActive === false
     checks.slotOpen = fname === 'slot-machine' ? (s.slotOpen === true && s.scene === 'slot') : (s.slotOpen === false && s.ui.slotScreenVisible === false)
-    // Day-cycle fixture pins: the live clock advances during settle, so assert
-    // with ±2 min tolerance (never exact equality).
+    // Day-cycle fixture pins: fast mode (dtScale 20) advances the live clock
+    // ~40 min/s, so pins are asserted with the shared modular rule — intent is
+    // "fixture set the clock to 22:00 / noon" (same time-of-day region, either
+    // side of the 1440 wrap), never "clock frozen at the pin".
     checks.timeOfDay = fname === 'farm-night'
-      ? Math.abs(s.player.timeOfDay - 1320) <= 2
+      ? pinNear(s.player.timeOfDay, 1320, 120)
       : (fname === 'farm-day' || fname === 'farm-crops-grown')
-        ? Math.abs(s.player.timeOfDay - 720) <= 2
+        ? pinNear(s.player.timeOfDay, 720, 240)
         : true
     const ls = await evl(page, () => ({ save: localStorage.getItem('till_debt_save'), farm: localStorage.getItem('till_debt_farm') }))
     checks.lsWiped = ls.ok && ls.value.save === null && ls.value.farm === null
@@ -520,11 +531,14 @@ section('G. Regression: normal play WITHOUT ?debug=1 (fps-tolerant DOM checks)')
 
 // ─────────────────────────────────────────────────────────────
 // Press a key repeatedly (with settle gaps) until predicate(getState()) is true.
-// Works around frame-dt action cooldowns (0.25-0.5 game-s = 5-10 frames at 1fps headless).
+// Fast mode: the 0.25-0.5 game-s action cooldown drains in milliseconds of
+// wall time (dt-clamped ticks at ~250/s), so a 300ms gap between presses is
+// plenty — 12 tries still give ~3.6s of budget. (Pre-fast-mode this was 900ms
+// to cover ~1fps frame-dt cooldowns.)
 async function pressUntil(page, key, pred, maxTries = 12) {
   for (let i = 0; i < maxTries; i++) {
     await page.keyboard.press(key)
-    await sleep(900)
+    await sleep(300)
     const s = await getState(page)
     if (s && pred(s)) return { ok: true, tries: i + 1 }
   }
