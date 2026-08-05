@@ -1,0 +1,147 @@
+name: Puppeteer tests (screenshots / e2e)
+
+# Manual dispatch only — never on push. This exists so game-director's
+# scene-capture/qa-tester agents (via scripts/run-ci-puppeteer.sh) can ask for
+# exactly the fixtures/tests they need, on demand, against any ref (including
+# the disposable ci-eval branch used for pre-commit evaluation). It never
+# touches GitHub Pages — dist is built and served entirely inside the runner.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch/commit to build and test"
+        required: true
+        default: "dev"
+      tag:
+        description: "Caller-generated unique id, used in run-name so the caller can find this run"
+        required: true
+      fixtures:
+        description: "Comma-separated fixture names to screenshot (leave empty to skip)"
+        required: false
+        default: ""
+      all_fixtures:
+        description: "Capture the entire fixture catalog (milestone regressions only)"
+        required: false
+        type: boolean
+        default: false
+      run_e2e:
+        description: "Run the e2e test suite"
+        required: false
+        type: boolean
+        default: false
+
+run-name: "puppeteer ${{ inputs.tag }} (${{ inputs.ref }})"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: puppeteer-${{ inputs.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Dev-mode build (--mode development): the debug harness (window.__debug)
+      # is statically tree-shaken out of PRODUCTION builds (enforced locally by
+      # scripts/check-prod-bundle.mjs via `npm run test:prod-gate`), but the
+      # capture and e2e jobs below exist to drive the harness — so CI builds
+      # the dev-mode bundle instead. Production build integrity is still
+      # validated by the local test:prod-gate step in game-director's cycle.
+      - run: npm run build -- --mode development
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-build
+          path: dist
+          retention-days: 1
+
+  capture-screenshots:
+    needs: build
+    if: ${{ inputs.fixtures != '' || inputs.all_fixtures == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - id: setup-chrome
+        uses: browser-actions/setup-chrome@v1
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-build
+          path: dist
+      - name: Serve dist
+        run: |
+          npx vite preview --port 4173 --strictPort &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:4173 -o /dev/null && break
+            sleep 1
+          done
+      - name: Capture fixtures
+        env:
+          CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+        run: |
+          if [ "${{ inputs.all_fixtures }}" = "true" ]; then
+            node scripts/capture-screenshots.mjs --all --base-url=http://localhost:4173
+          else
+            node scripts/capture-screenshots.mjs --fixtures="${{ inputs.fixtures }}" --base-url=http://localhost:4173
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: tests/screenshots
+          retention-days: 7
+
+  e2e-tests:
+    needs: build
+    if: ${{ inputs.run_e2e == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - id: setup-chrome
+        uses: browser-actions/setup-chrome@v1
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-build
+          path: dist
+      - name: Serve dist
+        run: |
+          npx vite preview --port 4173 --strictPort &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:4173 -o /dev/null && break
+            sleep 1
+          done
+      - name: Run e2e tests
+        env:
+          CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+          BASE_URL: http://localhost:4173
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-results
+          path: |
+            tests/e2e-results
+            tests/screenshots/index.json
+          retention-days: 7
+          if-no-files-found: ignore
