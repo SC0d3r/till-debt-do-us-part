@@ -25,9 +25,15 @@ over the raw count when both could apply.
 
 ## Themed milestones (optional — fill in / reorder as you like)
 
-### M1: Core Farming Loop Complete — status: OPEN
+### M1: Core Farming Loop Complete — status: DONE (v0.1, 2026-08-04)
 Planting, growing, watering, harvesting, and selling all work end-to-end with
 at least basic feedback and no known softlocks.
+- QA regression PASS (e2e-full-loop.mjs 57/57, qa-harness 120/124 with only
+  documented harness-gap probes, probe-daynight 57/57, prod gate PASS).
+- Full screenshot catalog capture: 9/9 fixtures OK, 58.9s wall-clock (GPU
+  path), 0 timeouts. Slot-machine PNG +22.6% size variance noted (RNG reel
+  grid — covered by the slot-fixture-determinism backlog item; re-check next
+  full capture).
 
 ### M2: Animals & Economy — status: NOT STARTED
 At least one animal type with a care loop, plus a shop/upgrade system with a
@@ -48,10 +54,8 @@ its feature list suggests it should.
 
 ## History
 
-`game-director` appends completed milestones here, each with the date, the
-features included, and the git tag.
-
-<!-- example:
-### v0.1 — 2026-08-10 — M1: Core Farming Loop Complete
-Features: crop-planting-mvp, watering-can, harvest-and-sell, tool-durability, hud-inventory-panel
--->
+### v0.1 — 2026-08-04 — M1: Core Farming Loop Complete
+Features: day/night-cycle-slice-1, debug-test-harness-part-a, slot-machine,
+mine-loop-fixes, harvest-to-hotbar, mine-exit-and-tutorials (dev history
+e980f12..0695a04). Tag: v0.1. QA regression PASS; catalog capture 9/9 at
+58.9s.
