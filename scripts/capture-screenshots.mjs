@@ -57,12 +57,15 @@ if (!CHROME_PATH) {
 }
 
 // GPU flags FIRST per the spec; the fallback drops them entirely.
-const GPU_ARGS = ['--use-gl=desktop', '--ignore-gpu-blocklist', '--enable-gpu-rasterization', '--mute-audio']
+// --no-sandbox/--disable-dev-shm-usage are REQUIRED on GitHub Actions
+// runners (ubuntu-24.04 AppArmor blocks unprivileged user namespaces →
+// "No usable sandbox!" fatal unless --no-sandbox); harmless locally.
+const GPU_ARGS = ['--use-gl=desktop', '--ignore-gpu-blocklist', '--enable-gpu-rasterization', '--mute-audio', '--no-sandbox', '--disable-dev-shm-usage']
 // Software rendering: --enable-unsafe-swiftshader is REQUIRED on modern Chrome
 // — without it headless Chrome refuses the automatic software-WebGL fallback
 // ("Automatic fallback to software WebGL has been deprecated") and WebGL
 // scenes can crawl at ~2 fps.
-const SOFT_ARGS = ['--mute-audio', '--enable-unsafe-swiftshader']
+const SOFT_ARGS = ['--mute-audio', '--enable-unsafe-swiftshader', '--no-sandbox', '--disable-dev-shm-usage']
 
 const FIXTURE_TIMEOUT_MS = 20000 // 15s waitForFunction + margins
 const BLANK_PNG_BYTES = 8192 // < ~8 kB PNG = blank-frame heuristic

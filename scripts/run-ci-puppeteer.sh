@@ -16,17 +16,22 @@ set -uo pipefail
 # Requires: gh CLI, already authenticated (`gh auth login`). Run from repo root.
 # Leaves results in the exact same local paths the local scripts would:
 #   tests/screenshots/*.png, tests/screenshots/index.json, tests/e2e-results/*
+#
+# CONCURRENCY: safe to invoke from multiple agents at the same time. Each run
+# publishes its own snapshot to a UNIQUE disposable branch (ci-eval-<tag>) and
+# the workflow's concurrency group is keyed on that per-run ref, so parallel
+# dispatches neither race on a shared branch nor queue behind each other.
 
 WORKFLOW="puppeteer-tests.yml"
-SCRATCH_BRANCH="ci-eval"
-REF="dev"
+TAG="run-$(date +%s)-$$"
+BRANCH="ci-eval-$TAG"   # unique per invocation — never shared between runs
 FIXTURES=""
 ALL_FIXTURES=false
 RUN_E2E=false
 
 for arg in "$@"; do
   case "$arg" in
-    --ref=*) REF="${arg#*=}" ;;
+    --ref=*) : ;; # accepted for compatibility; the dispatch ref is always this run's branch
     --fixtures=*) FIXTURES="${arg#*=}" ;;
     --all-fixtures) ALL_FIXTURES=true ;;
     --e2e) RUN_E2E=true ;;
@@ -45,37 +50,42 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 1
 fi
 
+# --- 0. Best-effort cleanup of stale disposable branches (>48h) ---
+# Branch names embed their creation epoch (ci-eval-run-<epoch>-<pid>), so age
+# is parseable without extra API calls. The old shared `ci-eval` branch is
+# deleted too if it lingers from a previous design.
+git ls-remote origin "refs/heads/ci-eval-*" 2>/dev/null | while read -r _sha name; do
+  b="${name#refs/heads/}"
+  x="${b#ci-eval-run-}"
+  ts="${x%%-*}"
+  if [[ "$ts" =~ ^[0-9]+$ ]] && [ "$ts" -lt "$(( $(date +%s) - 172800 ))" ]; then
+    echo "Cleaning stale disposable branch $b"
+    git push origin --delete "$b" >/dev/null 2>&1 || true
+  fi
+done
+git push origin --delete ci-eval >/dev/null 2>&1 || true
+
 # --- 1. Get whatever's currently on disk (often uncommitted) onto GitHub ---
-# so a GitHub-hosted runner can actually build it.
-MADE_TEMP_COMMIT=false
+# `git stash create` snapshots the worktree + index (including untracked
+# files) into a commit WITHOUT touching the working tree or index, so
+# concurrent invocations never race on shared local git state — no
+# add/commit/reset dance. A clean tree just publishes HEAD as-is.
 if [ -n "$(git status --porcelain)" ]; then
-  echo "Uncommitted changes present — creating a throwaway commit to publish for CI..."
-  git add -A
-  git commit -m "ci-eval: temporary snapshot (auto-created, will be undone)" --no-verify --quiet
-  MADE_TEMP_COMMIT=true
+  echo "Uncommitted changes present — snapshotting worktree for CI (local tree untouched)..."
+  SHA="$(git stash create --include-untracked)"
+fi
+if [ -z "${SHA:-}" ]; then
+  SHA="$(git rev-parse HEAD)"
 fi
 
-echo "Publishing current state to disposable branch '$SCRATCH_BRANCH'..."
-git push origin --delete "$SCRATCH_BRANCH" >/dev/null 2>&1 || true
-if ! git push origin "HEAD:refs/heads/$SCRATCH_BRANCH" --quiet; then
-  echo "Failed to push to $SCRATCH_BRANCH — aborting." >&2
-  if [ "$MADE_TEMP_COMMIT" = true ]; then
-    git reset --soft HEAD~1
-  fi
+echo "Publishing snapshot $SHA to disposable branch '$BRANCH'..."
+if ! git push origin "$SHA:refs/heads/$BRANCH" --quiet; then
+  echo "Failed to push snapshot to $BRANCH — aborting." >&2
   exit 1
 fi
 
-# Undo the throwaway commit immediately so the local working tree is exactly
-# as it was before this script ran — this is transparent to whatever called
-# us. The commit lives on, on the disposable remote branch, which is all CI
-# needs.
-if [ "$MADE_TEMP_COMMIT" = true ]; then
-  git reset --soft HEAD~1
-fi
-
 # --- 2. Dispatch the workflow against that disposable branch ---
-CI_REF="$SCRATCH_BRANCH"
-TAG="run-$(date +%s)-$$"
+CI_REF="$BRANCH"
 
 echo "Dispatching $WORKFLOW on $CI_REF (tag=$TAG)..."
 gh workflow run "$WORKFLOW" \

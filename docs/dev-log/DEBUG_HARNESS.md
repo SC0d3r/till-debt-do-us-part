@@ -264,19 +264,22 @@ rejected feature never touches `dev`'s history). GitHub Actions can only
 build from something pushed to GitHub, so `scripts/run-ci-puppeteer.sh`
 bridges this transparently, every time it's invoked:
 
-1. If there are uncommitted changes, make a throwaway local commit.
-2. Delete-and-recreate a disposable branch, `ci-eval`, pointing at that
-   commit (`git push origin --delete ci-eval` then a fresh, ordinary push —
-   never a force-push, and never to `dev`/`master`).
-3. If step 1 made a commit, immediately `git reset --soft HEAD~1` locally —
-   this undoes the commit but keeps every change staged exactly as it was.
-   Net effect: nothing about the local working tree changes from the caller's
-   perspective; only the remote `ci-eval` branch now mirrors it.
-4. Dispatch `.github/workflows/puppeteer-tests.yml` with `--ref=ci-eval`,
-   wait for it, and download the results.
+1. If the working tree is dirty, `git stash create --include-untracked`
+   snapshots worktree + index (untracked files included) into a commit
+   WITHOUT touching the local tree or index — no add/commit/reset dance.
+   A clean tree publishes `HEAD` as-is.
+2. Pushes that commit to a disposable branch unique to this invocation,
+   `ci-eval-run-<epoch>-<pid>` (never a force-push, never to `dev`/`master`).
+   Unique branches mean **any number of agents can invoke this script in
+   parallel** — no shared branch to race on, and the workflow's concurrency
+   group (`puppeteer-${{ inputs.ref }}`) keys on that per-run ref, so runs
+   don't queue behind each other either.
+3. Dispatch `.github/workflows/puppeteer-tests.yml` with `--ref=<that branch>`,
+   wait for it, and download the results. Branches older than 48h are
+   best-effort deleted on the next invocation.
 
 This means `game-director`'s own cycle (commit only in step 7, on full
-approval) never had to change — the commit/push/undo dance is fully contained
+approval) never had to change — the snapshot/push dance is fully contained
 inside this one script, invisible to everything else.
 
 ### The workflow — `.github/workflows/puppeteer-tests.yml`
@@ -305,15 +308,16 @@ The one command `scene-capture`/`qa-tester` actually run:
 ./scripts/run-ci-puppeteer.sh --fixtures=name1,name2   # or --all-fixtures, and/or --e2e
 ```
 
-It does the commit/push/undo dance above, dispatches the workflow, polls
-`gh run list` for the run matching its tag, `gh run watch`s it, checks the
-real conclusion via `gh run view --json conclusion` (doesn't rely solely on
-`--exit-status`, which isn't guaranteed across every `gh` version), downloads
-the `screenshots`/`e2e-results` artifacts into the exact same local paths
-(`tests/screenshots/*.png`, `tests/screenshots/index.json`) the local script
-would have produced, and exits non-zero on failure. Everything downstream —
-`ui-critic`/`visual-critic` reading screenshot paths, `qa-tester`'s own
-assertions — is unaware whether a given run happened locally or in CI.
+It does the snapshot/push dance above (unique disposable branch per run),
+dispatches the workflow, polls `gh run list` for the run matching its tag,
+`gh run watch`es it, checks the real conclusion via `gh run view --json
+conclusion` (doesn't rely solely on `--exit-status`, which isn't guaranteed
+across every `gh` version), downloads the `screenshots`/`e2e-results`
+artifacts into the exact same local paths (`tests/screenshots/*.png`,
+`tests/screenshots/index.json`) the local script would have produced, and
+exits non-zero on failure. Everything downstream — `ui-critic`/`visual-critic`
+reading screenshot paths, `qa-tester`'s own assertions — is unaware whether a
+given run happened locally or in CI.
 
 ### One-time setup
 
