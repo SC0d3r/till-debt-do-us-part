@@ -1,47 +1,47 @@
 {
   "main-menu": {
     "path": "tests/screenshots/main-menu.png",
-    "capturedAt": "2026-08-05T13:03:08.393Z",
-    "commit": "31e16f7dbbbc698a357bd1870a3c9a7d3c092586"
+    "capturedAt": "2026-08-05T13:15:24.364Z",
+    "commit": "7c8c3a38539694ea27c0387cddf3ad7a3fa473d5"
   },
   "farm-day": {
     "path": "tests/screenshots/farm-day.png",
-    "capturedAt": "2026-08-05T13:03:08.393Z",
-    "commit": "31e16f7dbbbc698a357bd1870a3c9a7d3c092586"
+    "capturedAt": "2026-08-05T13:15:24.364Z",
+    "commit": "7c8c3a38539694ea27c0387cddf3ad7a3fa473d5"
   },
   "farm-crops-grown": {
     "path": "tests/screenshots/farm-crops-grown.png",
-    "capturedAt": "2026-08-05T13:03:08.393Z",
-    "commit": "31e16f7dbbbc698a357bd1870a3c9a7d3c092586"
+    "capturedAt": "2026-08-05T13:15:24.364Z",
+    "commit": "7c8c3a38539694ea27c0387cddf3ad7a3fa473d5"
   },
   "shop-open": {
     "path": "tests/screenshots/shop-open.png",
-    "capturedAt": "2026-08-05T13:03:08.393Z",
-    "commit": "31e16f7dbbbc698a357bd1870a3c9a7d3c092586"
+    "capturedAt": "2026-08-05T13:15:24.364Z",
+    "commit": "7c8c3a38539694ea27c0387cddf3ad7a3fa473d5"
   },
   "inventory-open": {
     "path": "tests/screenshots/inventory-open.png",
-    "capturedAt": "2026-08-05T13:03:08.394Z",
-    "commit": "31e16f7dbbbc698a357bd1870a3c9a7d3c092586"
+    "capturedAt": "2026-08-05T13:15:24.364Z",
+    "commit": "7c8c3a38539694ea27c0387cddf3ad7a3fa473d5"
   },
   "dialogue-open": {
     "path": "tests/screenshots/dialogue-open.png",
-    "capturedAt": "2026-08-05T13:03:08.394Z",
-    "commit": "31e16f7dbbbc698a357bd1870a3c9a7d3c092586"
+    "capturedAt": "2026-08-05T13:15:24.364Z",
+    "commit": "7c8c3a38539694ea27c0387cddf3ad7a3fa473d5"
   },
   "mine-floor-1": {
     "path": "tests/screenshots/mine-floor-1.png",
-    "capturedAt": "2026-08-05T13:03:08.394Z",
-    "commit": "31e16f7dbbbc698a357bd1870a3c9a7d3c092586"
+    "capturedAt": "2026-08-05T13:15:24.364Z",
+    "commit": "7c8c3a38539694ea27c0387cddf3ad7a3fa473d5"
   },
   "slot-machine": {
     "path": "tests/screenshots/slot-machine.png",
-    "capturedAt": "2026-08-05T13:03:08.394Z",
-    "commit": "31e16f7dbbbc698a357bd1870a3c9a7d3c092586"
+    "capturedAt": "2026-08-05T13:15:24.364Z",
+    "commit": "7c8c3a38539694ea27c0387cddf3ad7a3fa473d5"
   },
   "farm-night": {
     "path": "tests/screenshots/farm-night.png",
-    "capturedAt": "2026-08-05T13:03:08.393Z",
-    "commit": "31e16f7dbbbc698a357bd1870a3c9a7d3c092586"
+    "capturedAt": "2026-08-05T13:15:24.364Z",
+    "commit": "7c8c3a38539694ea27c0387cddf3ad7a3fa473d5"
   }
 }
