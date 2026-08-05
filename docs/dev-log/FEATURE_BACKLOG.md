@@ -18,6 +18,10 @@ the next cycle's Ideate step will top it back up.
 
 ## Shipped
 
+- [shipped] (World & Exploration, M) Day/night cycle slice 1 — in-game
+  clock (24h, 2 in-game min per real sec) + sun/moon arc + sky/light color
+  temperature shift + HUD clock + Moonpetal night glow. (dev 0695a04,
+  2026-08-04)
 - [shipped] (Tech & Performance, M) Debug/test harness Part A — window.__debug
   API, 8 seed fixtures, screenshot capture pipeline, prod tree-shake gate.
   (dev 55883ed / manifest 1da0e6d, 2026-08-04)
@@ -63,9 +67,45 @@ the next cycle's Ideate step will top it back up.
   to plot layout.
 - [idea] (Animals & Husbandry, M) Animal happiness meter — petting, feeding
   variety, and cleanliness affect produce quality/yield, not just quantity.
-- [idea] (World & Exploration, L) Day/night lighting cycle with a real sky
-  (split into: S — sun/moon position + color temperature shift; separate items
-  for stars/weather later).
+- [blocked] (World & Exploration, S) Night sky dressing — a static starfield
+  and a faint moon disc glow pass. BLOCKED by design: the game is isometric
+  and the camera never shows the sky (docs/DESIGN_NOTES.md) — sky bodies are
+  out of scope by direction, not by effort.
+- [idea] (World & Exploration, S) Weather system — cloud cover, overcast tint,
+  and light rain with sound, driven by the same time-of-day pipeline. (Per
+  docs/DESIGN_NOTES.md: convey via light/particles/puddles, never sky-dome
+  clouds.)
+- [idea] (World & Exploration, S) Day/night slice 2 design — give the clock
+  gameplay consequence: night harvest bonus on Moonpetal (design-critic: this
+  is the definition of slice 2), decide whether shop/inventory/dialogue pause
+  the clock, shorter night window once hooks exist, midnight day rollover,
+  and decide the sub-20fps dt-clamp clock slowdown (qa-tester finding).
+
+## Follow-ups from day/night review (2026-08-04)
+
+- [idea] (Polish & Game Feel, S) Sunrise keyframe pass — warm/saturate the
+  06:00 sky (default wake time) so it reads golden, not muddy; visual-critic
+  Major.
+- [idea] (Polish & Game Feel, S) Night coziness — warm lamp glow near the
+  house and a warmer night fill so 22:00 reads cozy, not murky; visual-critic
+  Minor + ui-critic night-contrast notes (controls-hint, fences, dog).
+- [idea] (Tech & Performance, S) Skip the sun shadow pass at night — toggle
+  `sun.castShadow` on day/night transitions (one-time rebuild); perf-critic
+  Minor.
+- [idea] (Tech & Performance, XS) fastForward fractional days — floor to
+  integer days or throw; qa-tester Nit.
+- [idea] (Tech & Performance, XS) HUD clock while slot open — time flows but
+  the clock DOM isn't refreshed (updateDayCycle early-returns); ui-critic
+  Minor.
+- [idea] (UI/UX & Accessibility, S) HUD group overflow at 320px in RTL +
+  night contrast — 4-stat hud-group is tight on small phones; ui-critic Minor.
+- [idea] (Polish & Game Feel, XS) Moon disc occlusion — fog:false disc renders
+  sticker-flat if it ever overlaps mountains. MOOT per docs/DESIGN_NOTES.md
+  (isometric view: sky bodies are never a design requirement); keep only if the
+  disc is ever made visible again.
+- [idea] (Polish & Game Feel, XS) Moonpetal glow ground halo — pure emissive
+  has no falloff on the ground; optional soft point light/halo for "magical"
+  read; visual-critic Minor on final pass.
 - [idea] (NPCs & Story, M) One rival farmer NPC with a simple relationship
   meter and 3-stage dialogue that reacts to your farm's progress.
 - [idea] (Economy & Progression, S) Tool upgrade forge — spend currency + a
