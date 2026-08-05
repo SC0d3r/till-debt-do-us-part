@@ -30,6 +30,7 @@ FIXTURES=""
 ALL_FIXTURES=false
 RUN_E2E=false
 CONCURRENCY=3
+BROWSER="setup-chrome" # setup-chrome (default) | preinstalled | puppeteer-bundled
 
 for arg in "$@"; do
   case "$arg" in
@@ -38,6 +39,7 @@ for arg in "$@"; do
     --all-fixtures) ALL_FIXTURES=true ;;
     --e2e) RUN_E2E=true ;;
     --concurrency=*) CONCURRENCY="${arg#*=}" ;;
+    --browser=*) BROWSER="${arg#*=}" ;;
     *) echo "Unknown arg: $arg" >&2; exit 1 ;;
   esac
 done
@@ -98,7 +100,8 @@ gh workflow run "$WORKFLOW" \
   -f "fixtures=$FIXTURES" \
   -f "all_fixtures=$ALL_FIXTURES" \
   -f "run_e2e=$RUN_E2E" \
-  -f "concurrency=$CONCURRENCY"
+  -f "concurrency=$CONCURRENCY" \
+  -f "browser=$BROWSER"
 
 echo "Waiting for the run to appear..."
 RUN_ID=""
