@@ -17,7 +17,7 @@ Follow-ups queued: <backlog items added as a result, or "none">
 ---
 
 ## Modularize main.ts — Tech & Performance — 2026-08-05
-Commit: <pending>
+Commit: 57fcc0c
 Summary: 1946-line Game monolith split into 14 subsystem modules under src/
 (WorldBuilder, DayNightDriver, PlayerController, PlayerActionsController,
 DogController, ShopNpcController, MorningBuyerController, ShipmentController,
