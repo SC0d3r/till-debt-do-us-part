@@ -2,7 +2,7 @@
 // Scope: the tile modules (src/assets/tiles/grass.js, transitionTexture.js)
 // and the extended dev harness (previewAsset + 13 asset-preview fixtures) must
 // NOT have broken anything else. This file verifies:
-//   T1  registry integrity (22 fixtures: 9 gameplay + 13 asset-preview)
+//   T1  registry integrity (23 fixtures: 9 gameplay + 13 asset-preview + 1 showcase)
 //   T2  all 9 existing gameplay fixtures still resolve deterministically
 //   T3  all 13 asset-preview fixtures resolve via gotoFixture/previewAsset
 //   T4  previewAsset stops the game loop cleanly (clock frozen during preview,
@@ -84,12 +84,15 @@ section('T1. Registry integrity')
   const lf = await evl(page, () => window.__debug.listFixtures())
   const names = lf.ok ? lf.value.map(f => f.name) : []
   const byCategory = lf.ok ? lf.value.reduce((m, f) => { m[f.category] = (m[f.category] || 0) + 1; return m }, {}) : {}
-  test('T1a listFixtures returns 22 entries (9 gameplay + 13 asset-preview)',
-    lf.ok && names.length === 22 &&
+  // 23 entries: 9 gameplay + 13 asset-preview + 1 showcase (tile-showcase,
+  // TileMapComposer slice A — added after the original 22-entry battery).
+  test('T1a listFixtures returns 23 entries (9 gameplay + 13 asset-preview + 1 showcase)',
+    lf.ok && names.length === 23 &&
     GAMEPLAY_FIXTURES.every(n => names.includes(n)) &&
-    PREVIEW_FIXTURES.every(n => names.includes(n)),
+    PREVIEW_FIXTURES.every(n => names.includes(n)) &&
+    names.includes('tile-showcase'),
     lf.ok ? `${names.length} entries; cat=${JSON.stringify(byCategory)}` : lf.error)
-  test('T1b fixture names unique', lf.ok && new Set(names).size === 22, lf.ok ? String(new Set(names).size) : lf.error)
+  test('T1b fixture names unique', lf.ok && new Set(names).size === 23, lf.ok ? String(new Set(names).size) : lf.error)
   test('T1c exactly 13 asset-preview fixtures, all from the grass family manifest',
     lf.ok && byCategory['asset-preview'] === 13 &&
     PREVIEW_FIXTURES.every(n => lf.value.find(f => f.name === n)?.category === 'asset-preview'),

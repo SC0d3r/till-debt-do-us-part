@@ -108,5 +108,10 @@
     "name": "dirt-plain",
     "description": "Grass tile family: plain dirt tile, showcase context for the transitions (asset preview)",
     "category": "asset-preview"
+  },
+  {
+    "name": "tile-showcase",
+    "description": "TileMapComposer showcase: 9x9 grass field with a dirt path, tilled patch and oriented transitions",
+    "category": "showcase"
   }
 ]
