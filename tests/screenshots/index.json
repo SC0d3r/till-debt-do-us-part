@@ -108,5 +108,10 @@
     "path": "tests/screenshots/grass-tilled-n.png",
     "capturedAt": "2026-08-06T10:44:47.558Z",
     "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+  },
+  "tile-showcase": {
+    "path": "tests/screenshots/tile-showcase.png",
+    "capturedAt": "2026-08-06T14:43:55.254Z",
+    "commit": "b6b1320764bebff695f5a0c3578ab810d3ba4a96"
   }
 }

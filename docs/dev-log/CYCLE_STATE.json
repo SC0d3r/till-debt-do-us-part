@@ -1,8 +1,16 @@
 {
-  "status": "idle",
-  "feature": null,
-  "current_step": null,
-  "last_updated": "2026-08-06T13:20:00Z",
-  "notes": "tile-kit grass family shipped (all critics green). Next cycle: TileMapComposer + showcase map per brief section 6.",
-  "subagent_sessions": {}
+  "status": "in-progress",
+  "feature": "tile-kit: TileMapComposer + showcase map (slice A, user revisions)",
+  "category": "Tech & Performance",
+  "current_step": 4,
+  "last_updated": "2026-08-06T19:05:00Z",
+  "notes": "REVISION 4 (user decision, 2026-08-06): SEAM OWNER RULE = the tile whose outline color MATCHES ITS OWN BIOME renders the shared edge (resolved color == biome-default palette color for its biome; edges use fromBiome); both/neither match -> lexicographic (x, then y) tie-break. This determines the COLOR of the single seam ribbon at color-mismatched boundaries (rev-3 already guarantees ONE ribbon per seam). Custom per-record colors yield at boundaries; natural biome colors delineate seams. Convention §3 updated. REV-3 status: implemented + 76/76 CI (one-line-per-seam, empty-mask '' group keeps 81 outline instances, dedupe, O5 seam cases). NEXT: fix round to feature-writer (ownership predicate + recompute EXPECTED_OUTLINE_MASKS + new biome-match test cases), build, re-capture tile-showcase (screenshot predates rev-3/4), visual-critic + ui-critic first look at outlines, design-critic re-verify, qa single pass, ship. Pending follow-ups: corner/elbow variants, 45-deg diagonal seams, selection slice B (+ outline color takeover), elevation (+ height-tuple cache key), DOM-overlay raycast gate, zipper canonical pixel-rotation, swap-initiative data-coord note, dev assert bbox-vs-userData, per-record width, hover cursor styling.",
+  "subagent_sessions": {
+    "design-critic-pre": "ses_0292e2906ffe5eFwWS25yrlKZy",
+    "feature-writer-build": "ses_0292a2654ffe12VTPQtbXLfT9G",
+    "performance-critic": "ses_028f86658ffefIBZzGlGdvLRS6",
+    "design-critic-recheck": "ses_028f87a98ffe3JAh82gPmwPYl5",
+    "visual-critic": "ses_028f84e94ffeH6BluD8HeEFC7v",
+    "ui-critic": "ses_028f83618ffe65nXr9nAn3oUB8"
+  }
 }
