@@ -30,11 +30,24 @@ import type { MineTile } from '../mine/MineSystem'
 import * as THREE from 'three'
 import fixtures from '../../tests/scene-fixtures.json'
 import * as grassTiles from '../assets/tiles/grass'
+import { TileMapComposer, type TileMapRecord, type TileMapOutlineOptions } from '../world/TileMapComposer'
+import { SHOWCASE_MAP, validateShowcaseMap } from '../world/showcaseMap'
 
 interface FixtureDef {
   name: string
   description: string
   category: string
+}
+
+/** Debug handle for the showcase map fixture (slice A of the tile composer).
+ *  Test-only read hooks: the live composer instance, the last onHover record,
+ *  the last validateShowcaseMap result, and a camera projection helper for
+ *  aiming synthetic pointer events at a specific tile. */
+interface ShowcaseDebugHandle {
+  composer: unknown
+  lastHover: unknown
+  validation: { ok: boolean; errors: string[] } | null
+  projectTile(x: number, y: number): { x: number; y: number } | null
 }
 
 interface DebugApi {
@@ -47,6 +60,8 @@ interface DebugApi {
   listFixtures(): FixtureDef[]
   setFastMode(enabled: boolean, renderEvery?: number, dtScale?: number): void
   previewAsset(name: string, opts?: Record<string, unknown>): Promise<void>
+  showcaseTileMap(data?: TileMapRecord[], opts?: { outline?: TileMapOutlineOptions }): Promise<void>
+  showcase: ShowcaseDebugHandle
 }
 
 declare global {
@@ -134,6 +149,13 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
   let dirtyAt = 0
   let pendingSettles: Array<() => void> = []
 
+  // Showcase-map debug handle (slice A of the tile composer). Declared before
+  // the api object because api references it directly; projectTile is a
+  // hoisted function declaration, so referencing it in the literal is safe.
+  const showcase: ShowcaseDebugHandle = { composer: null, lastHover: null, validation: null, projectTile }
+  // Reused projection scratch (event/test-driven, not per-frame).
+  const projVec = new THREE.Vector3()
+
   const api: DebugApi = {
     ready: false,
     setState,
@@ -144,6 +166,8 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
     listFixtures,
     setFastMode,
     previewAsset,
+    showcaseTileMap,
+    showcase,
   }
   window.__debug = api
 
@@ -538,6 +562,9 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
     savedOverlays: Array<{ el: HTMLElement; display: string }>
     savedStarted: boolean
     previewObjects: THREE.Object3D[]
+    /** Called FIRST in teardown (before scene restore) so map-sized fixtures
+     *  (showcaseTileMap) can dispose their composers while still in preview. */
+    onTeardown?: () => void
   }
   let previewState: PreviewState | null = null
 
@@ -584,32 +611,16 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
     for (const { el, display } of saved) el.style.display = display
   }
 
-  function teardownPreview() {
-    if (!previewState) return
-    const scene = world.scene
-    const cam = world.camera
-    for (const obj of previewState.previewObjects) scene.remove(obj)
-    for (const child of previewState.savedChildren) scene.add(child)
-    scene.fog = previewState.savedFog
-    scene.background = previewState.savedBackground
-    cam.position.copy(previewState.savedCameraPos)
-    cam.quaternion.copy(previewState.savedCameraQuat)
-    restorePreviewOverlays(previewState.savedOverlays)
-    // Restore the game loop LAST, after the scene/fog are fully restored: the
-    // loop's DayNightDriver.update() dereferences scene.fog every tick when
-    // started, so it must never run while fog is null.
-    g.started = previewState.savedStarted
-    previewState = null
-  }
-
-  async function previewAsset(name: string, opts?: Record<string, unknown>): Promise<void> {
-    const def = registry.find(f => f.name === name)
-    if (!def) throw new Error(`previewAsset: unknown asset "${name}"`)
-    const factory = assetFactories[name]
-    if (!factory) {
-      throw new Error(`previewAsset: no factory registered for "${name}" (add it to the family's VARIANTS manifest)`)
-    }
-    teardownPreview()
+  /**
+   * Shared preview staging (single-tile previewAsset AND map-sized
+   * showcaseTileMap): save the previous scene contents/camera/fog/overlays/
+   * started flag, stop the game loop, clear the scene and swap in the neutral
+   * studio background. Everything is restored by teardownPreview() in the
+   * disciplined order (objects → scene → fog → background → camera →
+   * overlays → started LAST, because the loop's DayNightDriver.update()
+   * dereferences scene.fog every tick once started).
+   */
+  function beginPreviewState(): PreviewState {
     const scene = world.scene
     const cam = world.camera
     // STOP the game loop for the duration of the preview. The loop gates on
@@ -635,8 +646,13 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
     while (scene.children.length) scene.remove(scene.children[0])
     scene.fog = null
     scene.background = new THREE.Color(0xe8e8e8)
+    return preview
+  }
 
-    // Standard 3-point studio rig (key / fill / rim + soft ambient)
+  /** Standard 3-point studio rig (key / fill / rim + soft ambient) shared by
+   *  the asset preview and the showcase map so both read as the same neutral
+   *  studio. */
+  function addStudioRig(): THREE.Object3D[] {
     const ambient = new THREE.AmbientLight(0xffffff, 0.55)
     const key = new THREE.DirectionalLight(0xffffff, 0.9)
     key.position.set(3, 5, 4)
@@ -644,8 +660,41 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
     fill.position.set(-3, 2, 1)
     const rim = new THREE.DirectionalLight(0xffffff, 0.3)
     rim.position.set(0, 3, -4)
-    scene.add(ambient, key, fill, rim)
-    preview.previewObjects.push(ambient, key, fill, rim)
+    world.scene.add(ambient, key, fill, rim)
+    return [ambient, key, fill, rim]
+  }
+
+  function teardownPreview() {
+    if (!previewState) return
+    const scene = world.scene
+    const cam = world.camera
+    if (previewState.onTeardown) previewState.onTeardown()
+    for (const obj of previewState.previewObjects) scene.remove(obj)
+    for (const child of previewState.savedChildren) scene.add(child)
+    scene.fog = previewState.savedFog
+    scene.background = previewState.savedBackground
+    cam.position.copy(previewState.savedCameraPos)
+    cam.quaternion.copy(previewState.savedCameraQuat)
+    restorePreviewOverlays(previewState.savedOverlays)
+    // Restore the game loop LAST, after the scene/fog are fully restored: the
+    // loop's DayNightDriver.update() dereferences scene.fog every tick when
+    // started, so it must never run while fog is null.
+    g.started = previewState.savedStarted
+    previewState = null
+  }
+
+  async function previewAsset(name: string, opts?: Record<string, unknown>): Promise<void> {
+    const def = registry.find(f => f.name === name)
+    if (!def) throw new Error(`previewAsset: unknown asset "${name}"`)
+    const factory = assetFactories[name]
+    if (!factory) {
+      throw new Error(`previewAsset: no factory registered for "${name}" (add it to the family's VARIANTS manifest)`)
+    }
+    teardownPreview()
+    const preview = beginPreviewState()
+    const scene = world.scene
+    const cam = world.camera
+    preview.previewObjects.push(...addStudioRig())
 
     const asset = factory()
     asset.position.set(0, 0, 0)
@@ -661,6 +710,85 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
 
     markDirty()
     await waitForSettle()
+  }
+
+  // ── Showcase map (slice A of the tile composer) ──
+  // Same preview state as previewAsset (loop stopped, overlays hidden, clean
+  // studio background) but builds the whole SHOWCASE_MAP grid through the
+  // data-driven TileMapComposer and frames the camera for the entire 9x9 map.
+  // Default map-level outline config: mode 'interior' (edges touching another
+  // cell) — the outline color demo lives in SHOWCASE_MAP's per-record
+  // outlineColor fields (green grass columns x=0..2 vs the brown biome
+  // default). Tests may override the outline config via opts.
+  async function showcaseTileMap(data?: TileMapRecord[], opts?: { outline?: TileMapOutlineOptions }): Promise<void> {
+    const mapData = data ?? SHOWCASE_MAP
+    // Data-level acceptance gate FIRST: a bad map throws before any staging
+    // happens, so the harness is never left half-entered by bad data.
+    const validation = validateShowcaseMap(mapData)
+    showcase.validation = validation
+    if (!validation.ok) {
+      throw new Error(`showcaseTileMap: invalid map data (${validation.errors.length} error(s)):\n  - ${validation.errors.join('\n  - ')}`)
+    }
+    teardownPreview()
+    const preview = beginPreviewState()
+    const scene = world.scene
+    const cam = world.camera
+    preview.previewObjects.push(...addStudioRig())
+
+    let composer: TileMapComposer
+    try {
+      composer = new TileMapComposer({
+        parent: scene,
+        data: mapData,
+        // Variant STRING → grass-family factory (the composer knows nothing
+        // about families; resolveFactory is the only family knowledge and it
+        // lives here, in the debug harness).
+        resolveFactory: (variant) => () => grassTiles.createGrassTile(variant),
+        raycastTarget: cam,
+        onHover: (record) => { showcase.lastHover = record },
+        outline: opts?.outline ?? { mode: 'interior' },
+      })
+    } catch (e) {
+      // Composer build failed (bad variant/elevation/data): restore the
+      // previous scene immediately so the harness stays usable.
+      teardownPreview()
+      throw e
+    }
+    showcase.composer = composer
+    preview.onTeardown = () => {
+      composer.dispose()
+      showcase.composer = null
+      showcase.lastHover = null
+    }
+
+    // 3/4 isometric framing of the WHOLE map: same neutral rig look as
+    // previewAsset (32° elevation, camera from the south/+z) but pulled back
+    // so the 9x9 lattice fits with margin. The lattice maps data (x, y) to
+    // world ((x−y)·0.5, 0, (x+y)·0.5), so the map's world x spans −4..4 and
+    // z spans 0..8 — center (0, 0.2, 4). The edge NEAREST the camera is the
+    // data-NORTH edge (y=8, world z=8), which fills the lower part of the
+    // frame; the data-south edge (y=0) is the far edge, matching the
+    // previews' studio feel.
+    cam.position.set(0, 8.2, 16.8)
+    cam.lookAt(0, 0.2, 4)
+
+    markDirty()
+    await waitForSettle()
+  }
+
+  /** Projects a data-grid tile center to client pixel coordinates through the
+   *  current camera (test hook — lets the composer regression test aim
+   *  synthetic pointer events at a specific tile). Applies the composer's
+   *  diagonal-lattice transform ((x−y)·0.5, 0, (x+y)·0.5) so the projection
+   *  lands on the same world point the instance occupies. Returns null if the
+   *  point is behind the camera. */
+  function projectTile(x: number, y: number): { x: number; y: number } | null {
+    projVec.set((x - y) * 0.5, 0.25, (x + y) * 0.5).project(world.camera)
+    if (projVec.z > 1 || projVec.z < -1) return null
+    return {
+      x: (projVec.x * 0.5 + 0.5) * window.innerWidth,
+      y: (-projVec.y * 0.5 + 0.5) * window.innerHeight,
+    }
   }
 
   // ── gotoFixture ──
@@ -947,6 +1075,8 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
       markDirty()
       await waitForSettle()
     },
+
+    'tile-showcase': () => showcaseTileMap(),
   }
 
   // Initial settle: ready=true shortly after page load (covers main-menu).

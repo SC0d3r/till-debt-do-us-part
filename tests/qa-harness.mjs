@@ -108,21 +108,24 @@ section('A. API surface & validation (fresh ?debug=1 page)')
     surf.ok && surf.value.ready === 'boolean' && ['setState', 'getState', 'gotoFixture', 'fastForward', 'triggerEvent', 'listFixtures'].every(k => surf.value[k] === 'function'),
     JSON.stringify(surf.value))
   const lf = await evl(page, () => window.__debug.listFixtures())
-  // Tile-kit grass family (2026-08-06) added 13 asset-preview fixtures: the
-  // registry is now 22 names = the 9 gameplay fixtures below + 13 previews.
+  // Tile-kit grass family (2026-08-06) added 13 asset-preview fixtures; the
+  // TileMapComposer showcase (2026-08-06) added 1 showcase fixture. The
+  // registry is now 23 names = the 9 gameplay fixtures + 13 previews + 1
+  // showcase.
   const PREVIEW_FIXTURES = [
     'grass-plain', 'grass-flowers', 'grass-bushes',
     'grass-dirt-n', 'grass-dirt-e', 'grass-dirt-s', 'grass-dirt-w',
     'grass-tilled', 'grass-tilled-n', 'grass-tilled-e', 'grass-tilled-s', 'grass-tilled-w',
     'dirt-plain',
   ]
-  test('A2 listFixtures returns the 9 gameplay + 13 asset-preview registry names',
-    lf.ok && lf.value.length === 22 &&
+  test('A2 listFixtures returns the 9 gameplay + 13 asset-preview + 1 showcase registry names',
+    lf.ok && lf.value.length === 23 &&
     FIXTURES.every(n => lf.value.some(f => f.name === n)) &&
     PREVIEW_FIXTURES.every(n => lf.value.some(f => f.name === n)) &&
+    lf.value.some(f => f.name === 'tile-showcase' && f.category === 'showcase') &&
     lf.value.filter(f => f.category === 'asset-preview').length === 13 &&
-    new Set(lf.value.map(f => f.name)).size === 22,
-    lf.ok ? `${lf.value.length} names; asset-preview=${lf.value.filter(f => f.category === 'asset-preview').length}` : lf.error)
+    new Set(lf.value.map(f => f.name)).size === 23,
+    lf.ok ? `${lf.value.length} names; asset-preview=${lf.value.filter(f => f.category === 'asset-preview').length}; showcase=${lf.value.filter(f => f.category === 'showcase').length}` : lf.error)
 
   await expectThrows(page, () => window.__debug.setState({ bogus: 1 }), 'unknown key', 'A3 setState unknown top-level key throws')
   await expectThrows(page, () => window.__debug.setState({ player: { bogus: 1 } }), 'unknown player key', 'A4 setState unknown player key throws')
