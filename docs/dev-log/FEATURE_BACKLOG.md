@@ -28,6 +28,15 @@ the next cycle's Ideate step will top it back up.
 
 ## Shipped
 
+- [shipped] (Tech & Performance, M) CI pipeline: arbitrary tests + async +
+  gh rules — extended the puppeteer pipeline so ANY agent can run arbitrary
+  custom puppeteer scripts through GitHub Actions (`--tests=` workflow input +
+  custom-tests job), added `--async`/`--collect` multitasking, and made every
+  gh/git call retry through ap/apsi/proxychains4 on 403/unreachable. Fixed the
+  snapshot bug (git stash create drops untracked files → private temp index +
+  commit-tree) and the CI build gate (typescript ^5.9.3 for madge@8 peer).
+  Agent docs: qa-tester runs ONCE at end of eval; workflow yml synced to
+  master. Validated on CI with tests/smoke-ci.mjs. (dev 5644ae0, 2026-08-06)
 - [shipped] (Tech & Performance, L) Modularize main.ts — 1946-line Game
   monolith split into 14 subsystem modules (WorldBuilder, DayNightDriver,
   PlayerController, PlayerActionsController, Dog/ShopNpc/MorningBuyer

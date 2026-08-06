@@ -16,6 +16,30 @@ Follow-ups queued: <backlog items added as a result, or "none">
 
 ---
 
+## CI pipeline: arbitrary tests, async dispatch, gh/network rules — Tech & Performance — 2026-08-06
+Commit: 5644ae0
+Summary: Extended the GitHub Actions puppeteer pipeline so ANY agent can run
+arbitrary custom puppeteer tests through CI (new `tests` workflow input +
+custom-tests job; `run-ci-puppeteer.sh --tests=tests/<file>.mjs`), added
+multitasking (`--async` dispatch + `--collect=<tag>` fetch-later), and made
+every gh/git network call in the script retry through ap/apsi/proxychains4
+proxy wrappers on 403/unreachable. Fixed a latent snapshot bug: `git stash
+create` silently drops untracked files, so brand-new test/source files never
+reached the runner — the script now stages the full worktree into a private
+temp index + commit-tree. Fixed the pre-existing CI build gate (typescript
+~5.3.0 -> ^5.9.3; madge@8 peer wants ^5.4.4 and newer runner npm fails npm ci
+with ERESOLVE). Agent docs updated: game-director now runs qa-tester ONCE at
+the end of evaluation (not per fix round), dispatches scene-capture async,
+invokes fast critics in parallel, and syncs .github/workflows/** to master;
+all agents told to use `gh` CLI (never WebFetch against api.github.com, which
+403s) and to retry 403s with ap/apsi/proxychains4. qa-harness.mjs made
+CI-friendly (BASE_URL/CHROME_PATH/PUPPETEER_BUNDLED). Validated end-to-end on
+CI: build gate + custom-tests job + smoke test PASS, artifacts collected via
+--collect.
+Verdicts: n/a — owner-commissioned infra change, validated by a real CI run
+of the new pipeline (tests/smoke-ci.mjs), not by the game critics.
+Follow-ups queued: none.
+
 ## Modularize main.ts — Tech & Performance — 2026-08-05
 Commit: 57fcc0c
 Summary: 1946-line Game monolith split into 14 subsystem modules under src/
