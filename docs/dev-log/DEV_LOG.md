@@ -16,6 +16,29 @@ Follow-ups queued: <backlog items added as a result, or "none">
 
 ---
 
+## Tile-kit: grass family (Modular Isometric Biome Tile System) — Assets & Art — 2026-08-06
+Commit: 3599808
+Summary: FIRST biome family of the tile-system initiative: 13 distinct variants
+(grass-plain / grass-flowers / grass-bushes, grass-dirt-n/e/s/w edge transitions,
+grass-tilled plain + grass-tilled-n/e/s/w edges, dirt-plain). Construction per
+the pinned convention: straight-sided diamond prism (inscribed ±0.5 footprint)
+with exactly TWO bands — top face ~55% (y 0.20..0.45) and root band ~45%
+(y 0..0.20) — distinguished by color, per-biome root colors (GRASS_ROOT
+0x4a3a2a dark soil, DIRT_ROOT 0x6e4a24 dark earth, TILLED_ROOT 0x4e4832 dark
+loam; transition tiles split the root per side). Color pipeline unified to
+sRGB (SRGBColorSpace on all tile canvas textures; plain tops now render
+byte-equal to transition halves). Transitions baked as 4 orientations via the
+shared transitionTexture.js (32x32, 4px stair-step zipper); every variant is
+ONE merged BufferGeometry + ONE MeshLambertMaterial (~78-tri worst case),
+InstancedMesh-safe, shared lazy cache, dispose() frees every texture exactly
+once. Debug harness: previewAsset + 13 asset-preview fixtures; qa-tester added
+tests/qa-tile-kit-regression.mjs (51 assertions) and fixed qa-harness.mjs A2
+(9 -> 22 fixture registry). 6 review rounds incl. 5 user-driven design
+iterations (straight-sided, two bands, per-biome roots, 55/45 split, plain
+tilled tile).
+Verdicts: design=SHIP w/followups (round 1; all resolved) ui=SHIP (round-1 re-check) visual=SHIP (final pass) performance=SHIP asset=SHIP (final pass + round-6 fix verification) qa=SHIP (51/51 regression, 22/22 fixtures, only pre-existing pinned failures)
+Follow-ups queued: TileMapComposer + showcase map (brief §6 — next tile-kit item); screenshot byte-dedupe check in capture pipeline (asset-critic nit); persist HUD-scan results in screenshots/index.json for auditability (ui-critic nit).
+
 ## CI pipeline: arbitrary tests, async dispatch, gh/network rules — Tech & Performance — 2026-08-06
 Commit: 5644ae0
 Summary: Extended the GitHub Actions puppeteer pipeline so ANY agent can run
