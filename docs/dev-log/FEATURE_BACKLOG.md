@@ -26,6 +26,27 @@ the next cycle's Ideate step will top it back up.
 
 ---
 
+## Tile-kit initiative batch (2026-08-06) — Modular Isometric Biome Tile System
+
+One-time initiative per `docs/dev-log/VISUAL_OVERHAUL_TILE_SYSTEM_BRIEF.md`.
+Draw exclusively from this batch until its Definition of Done (section 5) is
+met; category-variety rules are temporarily suspended for this batch. Items
+are tagged `tile-kit:` so they're recognizable. Sequencing per brief section
+6: composer right after the FIRST biome family ships, so the data-driven API
+is validated early.
+
+- [idea] (Assets & Art, M) tile-kit: grass family — plain grass, flowers-decorated, bush/tree-decorated, grass→dirt edge-transition family (several diagonal splits/orientations), tilled-soil-adjacent edge. FIRST biome family; validates the tile construction convention + preview pipeline.
+- [idea] (Tech & Performance, L) tile-kit: TileMapComposer + showcase map — data-driven `src/world/TileMapComposer.js` taking `{x,y,biome,variant,elevation?}` grids; InstancedMesh per (biome,variant) group; hover (per-instance color via setColorAt) + selection feedback; showcase map proving every family built so far in one view; wire through `window.__debug` fixture. Ships right after the grass family.
+- [idea] (Assets & Art, S) tile-kit: decorative props base set — crystals (color variants), rocks/boulders (small+large), low-poly tree/bush, grass tufts, flowers; each a small reusable factory, heavily instanced, composable onto tile top faces by the composer.
+- [idea] (Assets & Art, M) tile-kit: dirt/farmland family — plain, tilled, watered, grass-transition edges (reuse/extend grass edges).
+- [idea] (Assets & Art, M) tile-kit: water family — plain, shoreline/edge-to-grass or edge-to-sand transition.
+- [idea] (Assets & Art, M) tile-kit: sand/desert family — plain, dune/cracked variant, cactus-decorated, grass-transition edge.
+- [idea] (Assets & Art, M) tile-kit: rock/stone family — plain, ore/boulder-decorated, cliff/elevated variant (raised block on top).
+- [idea] (Assets & Art, M) tile-kit: crystal/volcanic fantasy family — crystal-cluster tiles + lava-vent tiles with glow; the "diverse enough to build any map" stress test.
+- [idea] (Tech & Performance, L) tile-kit: farm layout data + swap-over initiative — build today's farm layout as composer data and swap the live scene onto the tile system (SEPARATE later initiative; only once explicitly told gameplay is being rebuilt on this foundation).
+
+---
+
 ## Shipped
 
 - [shipped] (Tech & Performance, M) CI pipeline: arbitrary tests + async +
