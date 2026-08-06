@@ -83,7 +83,12 @@ const GPU_ARGS = ['--use-gl=desktop', '--ignore-gpu-blocklist', '--enable-gpu-ra
 const SOFT_ARGS = ['--mute-audio', '--enable-unsafe-swiftshader', '--no-sandbox', '--disable-dev-shm-usage']
 
 const FIXTURE_TIMEOUT_MS = 20000 // 15s waitForFunction + margins
-const BLANK_PNG_BYTES = 8192 // < ~8 kB PNG = blank-frame heuristic
+// Blank-frame heuristic: a truly blank 960x720 uniform frame compresses to
+// ~3.6 kB (measured). Clean solid-color asset-preview tiles (transition
+// tiles with flat colors) compress to ~7.5 kB, so 8 kB was too aggressive and
+// flagged real renders as blank. 5 kB still catches blank frames with margin
+// while passing every registered asset-preview fixture.
+const BLANK_PNG_BYTES = 5000
 
 // ─── CLI parsing ───
 function parseArgs() {

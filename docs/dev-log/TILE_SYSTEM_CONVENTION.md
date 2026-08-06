@@ -9,19 +9,36 @@ needs fixing.
 
 ## 1. Tile anatomy (every tile, every biome, no exceptions)
 
-- Footprint: a square of side `1.0` in world units, rotated 45° about Y, so
-  the top face reads as a diamond/parallelogram from the isometric camera.
-  Grid spacing is `1.0` along X/Z (diamonds touch at corners; small gaps are
-  fine — floating-tile look is intentional).
-- Three vertical bands, bottom to top:
-  1. **Root base band** — darker, desaturated color (the "root"). Sells the
-     floating-block feeling.
-  2. **Side-wall band** — a distinct color from the top material, usually a
-     darker/more saturated shade of it (e.g. grass top / earthy-green side,
-     NOT grass top / darker-grass side).
-  3. **Top face** — the visible/playable surface; flat or very slightly varied.
-- Total height ~0.42–0.5 units; top slab ~40% of height, root band ~60%
-  (reference image 3 proportions).
+- Footprint: a diamond **inscribed in a 1.0×1.0 grid cell** — vertices at
+  `(±0.5, 0, ±0.5)`, center at the grid point. Grid spacing is `1.0` along
+  X/Z, so adjacent diamonds touch at corners (corner-touching, no overlap —
+  overlapping top faces would break raycast picking). Do NOT model the tile as
+  a rotated square of side 1.0: that produces vertices at ±0.707 and overlaps
+  neighbors at 1.0 spacing.
+- **Two layers, not three (pinned 2026-08-06, user decision):** every tile has
+  exactly TWO vertical bands, bottom to top, of a total height ~0.45:
+  1. **Root band** — bottom ~45% (the bottom is the SAME height as the top
+     or slightly SHORTER — pinned: top band slightly taller, ~55/45): the
+     floating block's body. Its color is
+     **BIOME-SPECIFIC** and must read as that biome's earth at a glance —
+     grass: dark soil; dirt: dark rich earth; tilled: dark tilled loam. It
+     must be darker and more desaturated than the top material, must stand
+     out, and must never read as near-black. (The old middle side-wall band
+     was removed; its height merged into the root band.)
+  2. **Top face** — top ~55%: the visible/playable surface; flat or very
+     slightly varied. The top slab's side thickness (riser) carries the
+     top-face color per side.
+- **Straight-sided prism (pinned 2026-08-06, user decision):** all bands
+  share the SAME diamond footprint (vertices at ±0.5) — the tile is a
+  straight-sided diamond prism, and the bands are distinguished by COLOR, not
+  by inset geometry. There are NO stepped ledges/overhangs between bands; the
+  side walls drop straight from the top cap to the base. (Reference image 3
+  shows a terraced silhouette; the user chose straight-sided so composed maps
+  read as clean floating blocks against sky/void.) The band boundary is the
+  horizontal color change on the continuous wall.
+- On transition tiles, the root band is split PER SIDE to match the top
+  halves: the side under the dirt half gets the dirt root color, the side
+  under the grass half gets the grass root color, etc.
 - Flat/faceted shading everywhere (`flatShading: true` or equivalent flat
   normals). Crisp edges, no bevels, no smooth gradients.
 - A subtle soft shadow/AO directly under the tile so it separates from the
@@ -45,10 +62,46 @@ needs fixing.
   texture with `NearestFilter`/`NearestFilter` and `RepeatWrapping` off —
   pixelated, crisp, matching the flat style. Transition tiles draw a
   stair-step diagonal split between two biome colors on the top-face texture
-  (reference image 3's "zipper" pattern).
-- Because all variants of a biome share the same prism geometry (only the top
-  texture differs), every tile is InstancedMesh-compatible: the composer
-  groups by `(biome, variant)` and uses one `InstancedMesh` per group.
+  (reference image 3's "zipper" pattern). **All transition splits go through
+  the shared utility `src/assets/tiles/transitionTexture.js`** —
+  `makeTransitionTopTexture(colorA, colorB, orientation, ratio)` with pinned
+  canvas resolution and stair-step size — never reimplemented per family.
+  Ownership rule: the family that builds an edge owns it (grass owns
+  grass↔dirt; the dirt family reuses those edges).
+- **Transition orientation is baked as variants, never runtime rotation.**
+  Each transition family ships exactly 4 baked orientation variants — the
+  four diamond axis directions (e.g. `grass-dirt-n/e/s/w`). The composer does
+  NOT rotate tiles; per-instance rotation is a deliberate later schema change.
+  This applies to EVERY transition (grass→tilled included) — a partial
+  transition family (1 orientation only) is a convention violation unless the
+  composer explicitly supports a "no edge tile available" fallback.
+- **Transition semantics (pinned):** a variant named `<a>-<b>-<o>` means
+  "the biome named SECOND (`b`) occupies the `<o>` half of the tile"
+  (`grass-dirt-n` = dirt toward the north). The edge tile is placed at the
+  cell of the FIRST biome (`grass`), adjacent to a `b`-biome neighbor.
+  Orientation `o` points AT the `b`-biome neighbor. The staircase runs along
+  the perpendicular axis ('n'/'s' splits run east-west, 'e'/'w' run
+  north-south). All of this lives in `transitionTexture.js`'s doc header and
+  the family's VARIANTS manifest; the composer reads it from the manifest,
+  never from family code.
+- **Module ownership:** one module per biome family (`src/assets/tiles/grass.js`,
+  later `dirt.js`, ...). Until a family's own module ships, its placeholder
+  variants live in the nearest shipped family module (dirt-plain currently
+  lives in grass.js) — the composer keys variants by STRING, never by module,
+  so this stays invisible to it.
+- **Decorated variants must be InstancedMesh-safe from the start**: a variant
+  is a single merged geometry with a single material (e.g. a bush built into
+  the tile's own flat-shaded palette and merged into the prism geometry).
+  Multi-mesh/multi-material variant Groups are forbidden — the composer
+  groups by `(biome, variant)` and uses ONE `InstancedMesh` per group, and
+  hover must `setColorAt` on exactly one mesh.
+- **Every family module exports a machine-readable `VARIANTS` manifest**
+  (`{ 'grass-plain': {...}, 'grass-dirt-n': {...}, ... }`) used for fixture
+  registration and by the composer to map data-level variant strings.
+- Reuse `COLORS` from `src/core/MeshFactory.ts` where the palette overlaps;
+  define new family colors (e.g. the earthy side-wall band) once in the
+  family module and reference them from the manifest so later families
+  harmonize.
 - **Hover/selection must work on instances**: use per-instance color
   highlighting (`InstancedMesh.setColorAt` + `instanceColor.needsUpdate =
   true`) from the start, never per-object material swaps.

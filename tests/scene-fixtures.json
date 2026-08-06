@@ -1,11 +1,112 @@
 [
-  { "name": "main-menu", "description": "Start screen with world-seed input", "category": "menu" },
-  { "name": "farm-day", "description": "Farm scene, day 1, default inventory", "category": "farm" },
-  { "name": "farm-crops-grown", "description": "Farm with a patch of ripe, ready-to-harvest crops", "category": "farm" },
-  { "name": "farm-night", "description": "Farm at night (22:00) with a ripe Moonpetal glowing in the crop patch", "category": "farm" },
-  { "name": "shop-open", "description": "General store panel open", "category": "shop" },
-  { "name": "inventory-open", "description": "Inventory panel open", "category": "inventory" },
-  { "name": "dialogue-open", "description": "Intro dialogue with choices visible (typewriter skipped)", "category": "dialogue" },
-  { "name": "mine-floor-1", "description": "Inside the mine, floor 1, mine HUD visible", "category": "mine" },
-  { "name": "slot-machine", "description": "Cascade Desire slot machine open with a spin in progress (populated reel grid)", "category": "slot" }
+  {
+    "name": "main-menu",
+    "description": "Start screen with world-seed input",
+    "category": "menu"
+  },
+  {
+    "name": "farm-day",
+    "description": "Farm scene, day 1, default inventory",
+    "category": "farm"
+  },
+  {
+    "name": "farm-crops-grown",
+    "description": "Farm with a patch of ripe, ready-to-harvest crops",
+    "category": "farm"
+  },
+  {
+    "name": "farm-night",
+    "description": "Farm at night (22:00) with a ripe Moonpetal glowing in the crop patch",
+    "category": "farm"
+  },
+  {
+    "name": "shop-open",
+    "description": "General store panel open",
+    "category": "shop"
+  },
+  {
+    "name": "inventory-open",
+    "description": "Inventory panel open",
+    "category": "inventory"
+  },
+  {
+    "name": "dialogue-open",
+    "description": "Intro dialogue with choices visible (typewriter skipped)",
+    "category": "dialogue"
+  },
+  {
+    "name": "mine-floor-1",
+    "description": "Inside the mine, floor 1, mine HUD visible",
+    "category": "mine"
+  },
+  {
+    "name": "slot-machine",
+    "description": "Cascade Desire slot machine open with a spin in progress (populated reel grid)",
+    "category": "slot"
+  },
+  {
+    "name": "grass-plain",
+    "description": "Grass tile family: plain grass tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "grass-flowers",
+    "description": "Grass tile family: grass with scattered flower dots (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "grass-bushes",
+    "description": "Grass tile family: grass with a merged low-poly bush (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "grass-dirt-n",
+    "description": "Grass tile family: grass to dirt transition, dirt toward north (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "grass-dirt-e",
+    "description": "Grass tile family: grass to dirt transition, dirt toward east (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "grass-dirt-s",
+    "description": "Grass tile family: grass to dirt transition, dirt toward south (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "grass-dirt-w",
+    "description": "Grass tile family: grass to dirt transition, dirt toward west (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "grass-tilled",
+    "description": "Grass tile family: grass to tilled-soil transition (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "grass-tilled-n",
+    "description": "Grass tile family: grass to tilled-soil transition, tilled toward north (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "grass-tilled-e",
+    "description": "Grass tile family: grass to tilled-soil transition, tilled toward east (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "grass-tilled-s",
+    "description": "Grass tile family: grass to tilled-soil transition, tilled toward south (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "grass-tilled-w",
+    "description": "Grass tile family: grass to tilled-soil transition, tilled toward west (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "dirt-plain",
+    "description": "Grass tile family: plain dirt tile, showcase context for the transitions (asset preview)",
+    "category": "asset-preview"
+  }
 ]

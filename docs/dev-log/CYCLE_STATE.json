@@ -1,8 +1,8 @@
 {
-  "status": "in-progress",
-  "feature": "tile-kit: grass family",
-  "category": "Assets & Art",
-  "current_step": 6,
-  "last_updated": "2026-08-06T11:30:00Z",
+  "status": "idle",
+  "feature": null,
+  "current_step": null,
+  "last_updated": "2026-08-06T13:20:00Z",
+  "notes": "tile-kit grass family shipped (all critics green). Next cycle: TileMapComposer + showcase map per brief section 6.",
   "subagent_sessions": {}
 }

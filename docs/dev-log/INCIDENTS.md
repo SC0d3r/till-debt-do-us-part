@@ -44,3 +44,19 @@ qa-tester and feature-writer both ran it to completion under their own
 budgets).
 Retries: 2–3 per call per Resilience rules; all calls eventually completed.
 Resolution: no feature work lost; all resumed successfully on next attempt.
+
+## 2026-08-06 ~11:00–12:00 — tile-kit grass family review rounds
+Subagent: asset-critic (x2), visual-critic (x2)
+Observed: critics could not run the NVIDIA vision API recipe — bash permission
+allowlist in .opencode/agent/*.md allowed only git/cat/ls/find/grep, so
+source/base64/python3/curl were denied ("The bash permission system denies
+source"). Root cause: opencode loads agent config ONCE at process start and
+does not hot-reload; the running `opencode --continue` process (PID 211988,
+started 11:04) predated the permission edits (11:30), so spawned subagents
+kept the stale allowlist until the user restarted opencode. Also: one pair of
+final critic dispatches returned completely empty results (silent failure);
+both sessions resumed successfully via task_id with a continue nudge (per the
+new SILENT-FAILURE PROTOCOL) and delivered full reviews.
+Retries: 2 rounds of critics before restart; 1 resume each after silent empty.
+Resolution: agent MDs fixed + committed (777b146); opencode restarted by user;
+critics re-ran successfully with NVIDIA vision.

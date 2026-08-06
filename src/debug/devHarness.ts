@@ -29,6 +29,7 @@ import { sound } from '../core/SoundManager'
 import type { MineTile } from '../mine/MineSystem'
 import * as THREE from 'three'
 import fixtures from '../../tests/scene-fixtures.json'
+import * as grassTiles from '../assets/tiles/grass'
 
 interface FixtureDef {
   name: string
@@ -45,6 +46,7 @@ interface DebugApi {
   triggerEvent(name: string, payload?: unknown): Promise<void>
   listFixtures(): FixtureDef[]
   setFastMode(enabled: boolean, renderEvery?: number, dtScale?: number): void
+  previewAsset(name: string, opts?: Record<string, unknown>): Promise<void>
 }
 
 declare global {
@@ -71,7 +73,7 @@ const FIXED_SEED = 42
 // mode fields, setFastMode and debugDispatch. Every private member the harness
 // used to poke via (game as any) routes through here instead.
 export interface DevHarnessGraph {
-  world: { scene: THREE.Scene; playerModel: THREE.Group }
+  world: { scene: THREE.Scene; playerModel: THREE.Group; camera: THREE.PerspectiveCamera }
   player: PlayerState
   playerController: {
     getFacingTile: () => { x: number; z: number }
@@ -141,6 +143,7 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
     triggerEvent,
     listFixtures,
     setFastMode,
+    previewAsset,
   }
   window.__debug = api
 
@@ -513,16 +516,167 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
     }
   }
 
+  // ── Asset preview (category "asset-preview" fixtures) ──
+  // Loads exactly one asset into a neutral studio: plain background, standard
+  // 3-point rig, camera framed to fill the viewport. Deliberately separate from
+  // gotoFixture's in-game scenes — asset review needs a clean, unambiguous shot
+  // with no gameplay context, lighting variance, or occlusion.
+  //
+  // Iterate the family's VARIANTS manifest so new variants get previews
+  // automatically (no per-variant hardcoding here).
+  const assetFactories: Record<string, () => THREE.Object3D> = {}
+  for (const variant of Object.keys(grassTiles.VARIANTS)) {
+    assetFactories[variant] = () => grassTiles.createGrassTile(variant)
+  }
+
+  interface PreviewState {
+    savedChildren: THREE.Object3D[]
+    savedFog: THREE.FogBase | null
+    savedBackground: THREE.Color | THREE.Texture | null
+    savedCameraPos: THREE.Vector3
+    savedCameraQuat: THREE.Quaternion
+    savedOverlays: Array<{ el: HTMLElement; display: string }>
+    savedStarted: boolean
+    previewObjects: THREE.Object3D[]
+  }
+  let previewState: PreviewState | null = null
+
+  /**
+   * Overlay/HUD DOM elements that must be hidden for the duration of an asset
+   * preview so the screenshot is a clean studio shot of just the tile. The
+   * game loop never re-shows these during a preview: the start overlay is only
+   * hidden by startGame() and re-shown by the main-menu fixture setup, the
+   * HUD DOM writes only touch children of #hud (which is itself hidden here),
+   * and the hotbar (#inventory-bar) is a sibling of #hud that the loop writes
+   * directly — hiding it here keeps it out of the shot.
+   */
+  const PREVIEW_OVERLAY_IDS = [
+    'start-overlay',
+    'pause-overlay',
+    'payment-overlay',
+    'slot-screen',
+    'dialog-box',
+    'delete-confirm-overlay',
+    'shop-panel',
+    'inventory-panel',
+    'hud',
+    'inventory-bar',
+    'controls-hint',
+    'fps-display',
+    'unstuck-btn',
+    'unstuck-hint',
+    'mine-hud',
+    'item-tooltip',
+  ]
+
+  function hidePreviewOverlays(): Array<{ el: HTMLElement; display: string }> {
+    const saved: Array<{ el: HTMLElement; display: string }> = []
+    for (const id of PREVIEW_OVERLAY_IDS) {
+      const el = document.getElementById(id)
+      if (!el) continue
+      saved.push({ el, display: el.style.display })
+      el.style.display = 'none'
+    }
+    return saved
+  }
+
+  function restorePreviewOverlays(saved: Array<{ el: HTMLElement; display: string }>) {
+    for (const { el, display } of saved) el.style.display = display
+  }
+
+  function teardownPreview() {
+    if (!previewState) return
+    const scene = world.scene
+    const cam = world.camera
+    for (const obj of previewState.previewObjects) scene.remove(obj)
+    for (const child of previewState.savedChildren) scene.add(child)
+    scene.fog = previewState.savedFog
+    scene.background = previewState.savedBackground
+    cam.position.copy(previewState.savedCameraPos)
+    cam.quaternion.copy(previewState.savedCameraQuat)
+    restorePreviewOverlays(previewState.savedOverlays)
+    // Restore the game loop LAST, after the scene/fog are fully restored: the
+    // loop's DayNightDriver.update() dereferences scene.fog every tick when
+    // started, so it must never run while fog is null.
+    g.started = previewState.savedStarted
+    previewState = null
+  }
+
+  async function previewAsset(name: string, opts?: Record<string, unknown>): Promise<void> {
+    const def = registry.find(f => f.name === name)
+    if (!def) throw new Error(`previewAsset: unknown asset "${name}"`)
+    const factory = assetFactories[name]
+    if (!factory) {
+      throw new Error(`previewAsset: no factory registered for "${name}" (add it to the family's VARIANTS manifest)`)
+    }
+    teardownPreview()
+    const scene = world.scene
+    const cam = world.camera
+    // STOP the game loop for the duration of the preview. The loop gates on
+    // g.started (src/main.ts): when started is false it only renders the
+    // current scene and returns — no DayNightDriver.update (which dereferences
+    // scene.fog and would crash on the studio's null fog), no
+    // PlayerController.updateCamera (which would fight the studio framing
+    // every tick). Save the previous value and restore it in teardownPreview;
+    // the loop is never permanently stopped.
+    const savedStarted = g.started
+    g.started = false
+    const preview: PreviewState = {
+      savedChildren: scene.children.slice(),
+      savedFog: scene.fog,
+      savedBackground: scene.background,
+      savedCameraPos: cam.position.clone(),
+      savedCameraQuat: cam.quaternion.clone(),
+      savedOverlays: hidePreviewOverlays(),
+      savedStarted,
+      previewObjects: [],
+    }
+    previewState = preview
+    while (scene.children.length) scene.remove(scene.children[0])
+    scene.fog = null
+    scene.background = new THREE.Color(0xe8e8e8)
+
+    // Standard 3-point studio rig (key / fill / rim + soft ambient)
+    const ambient = new THREE.AmbientLight(0xffffff, 0.55)
+    const key = new THREE.DirectionalLight(0xffffff, 0.9)
+    key.position.set(3, 5, 4)
+    const fill = new THREE.DirectionalLight(0xffffff, 0.35)
+    fill.position.set(-3, 2, 1)
+    const rim = new THREE.DirectionalLight(0xffffff, 0.3)
+    rim.position.set(0, 3, -4)
+    scene.add(ambient, key, fill, rim)
+    preview.previewObjects.push(ambient, key, fill, rim)
+
+    const asset = factory()
+    asset.position.set(0, 0, 0)
+    scene.add(asset)
+    preview.previewObjects.push(asset)
+
+    // Iso framing from the south (+z): the diamond's N-S axis is vertical on
+    // screen and the two front side walls are visible, like reference image 3.
+    // Camera pulled in tight so the tile fills ~60% of the frame height (the
+    // previous 2.7-unit distance left the shot half empty gray).
+    cam.position.set(0, 1.0, 1.28)
+    cam.lookAt(0, 0.2, 0)
+
+    markDirty()
+    await waitForSettle()
+  }
+
   // ── gotoFixture ──
   async function gotoFixture(name: string): Promise<void> {
     if (typeof name !== 'string') throw new Error('gotoFixture: name must be a string')
     const def = registry.find(f => f.name === name)
     if (!def) throw new Error(`gotoFixture: unknown fixture "${name}" (see tests/scene-fixtures.json)`)
+    await reset()
+    if (def.category === 'asset-preview') {
+      await previewAsset(name)
+      return
+    }
     const setup = fixtureSetups[name]
     if (!setup) {
       throw new Error(`gotoFixture: fixture "${name}" is registered in tests/scene-fixtures.json but has no setup in src/debug/devHarness.ts`)
     }
-    await reset()
     await setup()
     await waitForSettle()
   }
@@ -617,6 +771,8 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
 
   // ── Reset / leak prevention ──
   async function reset(): Promise<void> {
+    // Restore the game scene if the previous fixture was an asset preview.
+    teardownPreview()
     // Close every open panel/overlay so nothing leaks into the next fixture.
     if (dialogue?.active) dialogue.close()
     if (ui?.shopOpen) ui.closeShop()
