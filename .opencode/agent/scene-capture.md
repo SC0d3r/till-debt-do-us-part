@@ -52,8 +52,22 @@ decide what's good or bad.
    unreachable (not because of a fixture actually failing), fall back to
    `node scripts/capture-screenshots.mjs --fixtures=...` locally and note in
    your report that you fell back and why.
+   - **Async (multitasking)**: if `game-director` asks for async, pass
+     `--async` and report back the printed tag (`CI_RUN_TAG=...`) instead of
+     waiting — `game-director` will run `--collect=<tag>` later and ask you
+     again, or read the results itself.
 4. Read the run's output / `tests/screenshots/index.json` for what actually
    succeeded vs. timed out.
+
+# GitHub & network access
+
+- **Never use WebFetch/`curl` against `api.github.com`** — unauthenticated API
+  calls get 403. Use the `gh` CLI for anything GitHub.
+- **403 / "not reachable" / timeout failures are a proxy problem, not a dead
+  end.** If a `gh`/git network command fails that way, retry it with a proxy
+  wrapper prefix: `ap <cmd> ...`, then `apsi <cmd> ...`, then
+  `proxychains4 <cmd> ...`. `scripts/run-ci-puppeteer.sh` already does this
+  internally — you only need it for ad hoc `gh` commands.
 
 # What you hand back
 

@@ -67,7 +67,8 @@ sending your work there just because your self-check looked fine.
 5. **Quick self-check, not a full review**: register a preview fixture (see
    step 6), capture it (`./scripts/run-ci-puppeteer.sh --fixtures=<name>` if
    present — this repo is public, so GitHub Actions is free and much faster
-   than local Chrome on this machine; fall back to
+   than local Chrome on this machine; add `--async` if you want to keep
+   working and collect later with `--collect=<tag>`; fall back to
    `node scripts/capture-screenshots.mjs --fixtures=<name>` locally only if
    that script is missing or `gh` isn't available), and call one of
    `gemini-analyze-image_gemini_analyze_image` or
@@ -89,6 +90,16 @@ sending your work there just because your self-check looked fine.
 8. If you're implementing a fix requested by `asset-critic`, address every
    point raised. If you disagree with one, say so explicitly rather than
    silently ignoring it.
+
+# GitHub & network access
+
+- **Never use WebFetch/`curl` against `api.github.com`** — unauthenticated API
+  calls get 403. Use the `gh` CLI for anything GitHub.
+- **403 / "not reachable" / timeout failures are a proxy problem, not a dead
+  end.** If a `gh`/git network command fails that way, retry it with a proxy
+  wrapper prefix: `ap <cmd> ...`, then `apsi <cmd> ...`, then
+  `proxychains4 <cmd> ...`. `scripts/run-ci-puppeteer.sh` already does this
+  internally — you only need it for ad hoc `gh` commands.
 
 # What you hand back
 

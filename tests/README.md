@@ -123,6 +123,26 @@ script strips that clause from the media rules via CSSOM so the desktop layout
 is captured. Real touch devices are unaffected (`(pointer: coarse)` clauses
 remain).
 
+## Running tests via CI (not local Chrome)
+
+This repo is public, so GitHub Actions is free/unlimited and far faster than
+local Chrome. All puppeteer-based work (screenshots, e2e suite, arbitrary
+custom tests) goes through `scripts/run-ci-puppeteer.sh`:
+
+```sh
+./scripts/run-ci-puppeteer.sh --fixtures=farm-day,shop-open   # screenshots
+./scripts/run-ci-puppeteer.sh --e2e                           # full-loop suite
+./scripts/run-ci-puppeteer.sh --tests=tests/qa-harness.mjs    # arbitrary custom test(s)
+./scripts/run-ci-puppeteer.sh --tests=tests/qa-harness.mjs --async   # dispatch, don't wait
+./scripts/run-ci-puppeteer.sh --collect=run-<epoch>-<pid>     # later: fetch results of an async run
+```
+
+**Custom test scripts must be CI-friendly**: read `BASE_URL` and `CHROME_PATH`
+from the environment (see `tests/qa-harness.mjs` for the pattern) instead of
+hardcoding `http://localhost:5173` — the runner serves the dev server on port
+4173. The script retries GitHub 403/network failures internally via
+`ap`/`apsi`/`proxychains4` proxy wrappers.
+
 ## Production-bundle gate
 
 ```sh

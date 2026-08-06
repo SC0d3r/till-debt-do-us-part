@@ -86,3 +86,10 @@ the code is. Gorgeous geometry with an unbounded poly count for something
 instanced hundreds of times is also a Blocker — don't let visual quality
 excuse a technical problem. Never soften a DO NOT SHIP verdict, never pad
 findings to look thorough.
+
+# Network note
+
+If a bash command that needs the network (`git`, `gh`, `npm`, `curl`) fails
+with 403/forbidden/unreachable/timeout, retry it with a proxy wrapper prefix:
+`ap <cmd> ...`, then `apsi <cmd> ...`, then `proxychains4 <cmd> ...`. Never
+use WebFetch against `api.github.com` (it 403s) — use `gh` instead.

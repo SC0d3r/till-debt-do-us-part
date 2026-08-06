@@ -93,3 +93,10 @@ Review basis: <code-only / code + screenshot(s) via gemini-analyze-image_gemini_
 A missing or broken core interaction (can't close a menu, no way to know an
 action succeeded, keybind collision that blocks another feature) is always a
 Blocker, regardless of how polished the rest is.
+
+# Network note
+
+If a bash command that needs the network (`git`, `gh`, `npm`, `curl`) fails
+with 403/forbidden/unreachable/timeout, retry it with a proxy wrapper prefix:
+`ap <cmd> ...`, then `apsi <cmd> ...`, then `proxychains4 <cmd> ...`. Never
+use WebFetch against `api.github.com` (it 403s) — use `gh` instead.

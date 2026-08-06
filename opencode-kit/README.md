@@ -132,6 +132,31 @@ a given state, this kit adds a debug/test harness:
   `opencode agent list`/a session shows either tool under a different exact
   name, adjust the pattern in that file's frontmatter.
 
+## CI test pipeline: arbitrary tests, async, and network resilience
+
+`scripts/run-ci-puppeteer.sh` (see `DEBUG_HARNESS.md` Part E) dispatches
+`.github/workflows/puppeteer-tests.yml` on GitHub Actions — free and much
+faster than local Chrome. It supports:
+
+- `--fixtures=name1,name2` / `--all-fixtures` — screenshot capture.
+- `--e2e` — the full-loop suite.
+- `--tests=tests/qa-harness.mjs,<any>.mjs` — **arbitrary custom puppeteer
+  test scripts**; the workflow runs each with `node` and uploads output to
+  `tests/e2e-results/`. Custom tests must read `BASE_URL`/`CHROME_PATH` env
+  (see `tests/qa-harness.mjs`).
+- `--async` then `--collect=<tag>` — dispatch without waiting, keep working,
+  fetch results later. Agents are expected to multitask this way instead of
+  blocking on CI.
+- Built-in network resilience: every `gh`/git call retries through
+  `ap`/`apsi`/`proxychains4` proxy wrappers on 403/unreachable. Agents are
+  told to use `gh` CLI for GitHub (never WebFetch against `api.github.com`,
+  which 403s) and to apply the same proxy retry to ad hoc commands.
+
+`game-director`'s cycle runs `qa-tester` ONCE at the end of evaluation (not in
+every fix round — it's the slowest agent), and syncs any `.github/workflows/**`
+change to `master` in the same cycle (GitHub resolves `workflow_dispatch` by
+name from the default branch).
+
 ## Assets: a dedicated creator + critic, not ad hoc geometry
 
 - **`.opencode/agent/asset-creator.md`** — builds one game asset per

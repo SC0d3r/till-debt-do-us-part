@@ -264,10 +264,14 @@ rejected feature never touches `dev`'s history). GitHub Actions can only
 build from something pushed to GitHub, so `scripts/run-ci-puppeteer.sh`
 bridges this transparently, every time it's invoked:
 
-1. If the working tree is dirty, `git stash create --include-untracked`
-   snapshots worktree + index (untracked files included) into a commit
-   WITHOUT touching the local tree or index — no add/commit/reset dance.
-   A clean tree publishes `HEAD` as-is.
+1. If the working tree is dirty, the script builds a snapshot commit WITHOUT
+   touching the working tree or index: it stages the full worktree — tracked
+   changes AND untracked files (respecting `.gitignore`) — into a private
+   temp index (`GIT_INDEX_FILE`) and commits it with `commit-tree`, parented
+   on `HEAD`. No add/commit/reset dance, no races between concurrent
+   invocations. (Not `git stash create`: that plumbing command silently
+   ignores `--include-untracked`, so brand-new test/source files would never
+   reach the runner.) A clean tree publishes `HEAD` as-is.
 2. Pushes that commit to a disposable branch unique to this invocation,
    `ci-eval-run-<epoch>-<pid>` (never a force-push, never to `dev`/`master`).
    Unique branches mean **any number of agents can invoke this script in
@@ -289,7 +293,8 @@ random commits — only when explicitly asked for exactly the fixtures/tests
 needed). Inputs: `ref`, `tag` (a caller-generated unique string, used in
 `run-name` so the caller can find the resulting run — `gh workflow run`
 doesn't return a run ID directly), `fixtures` (comma-separated), `all_fixtures`,
-`run_e2e`, `concurrency` (default 3 — the runners have 4 vCPUs), `browser`
+`run_e2e`, `tests` (comma-separated paths of arbitrary custom puppeteer test
+scripts), `concurrency` (default 3 — the runners have 4 vCPUs), `browser`
 (default `preinstalled`; see the benchmark table below).
 
 Jobs: `build` (checkout at `ref`, `npm ci`, `npm run test:prod-gate` — compile gate
@@ -299,10 +304,20 @@ plus the production-bundle safety check) → `capture-screenshots` (only if
 `capture-screenshots.mjs` against `--base-url=http://localhost:4173` with
 `--concurrency=<input>` and `--software`, upload `tests/screenshots/` as an
 artifact **even on failure** — `if: always()` on the upload step, so partial
-captures still come back) and `e2e-tests` (only if `run_e2e` was given: same
+captures still come back), `e2e-tests` (only if `run_e2e` was given: same
 setup, run `npm run test:e2e` with `BASE_URL=http://localhost:4173`, tee
-output into `tests/e2e-results/full-loop.txt`, upload as an artifact). Both
-downstream jobs run in parallel off the same `build` output.
+output into `tests/e2e-results/full-loop.txt`, upload as an artifact), and
+`custom-tests` (only if `tests` was given: same setup, then run each listed
+script with `node <path>`, tee output into
+`tests/e2e-results/<basename>.txt`, upload as an artifact; the job fails if
+any custom test exits non-zero). All downstream jobs run in parallel off the
+same `build` output.
+
+**Custom test scripts must be CI-friendly**: read `BASE_URL` and `CHROME_PATH`
+from the environment instead of hardcoding `http://localhost:5173` (the runner
+serves the dev server on port 4173) — see `tests/qa-harness.mjs` for the exact
+pattern, including optional `PUPPETEER_BUNDLED=1` support for the bundled
+Chromium provisioning mode.
 
 **Why the dev server and not `vite preview`?** The harness is gated by
 `import.meta.env.DEV`, which Vite statically replaces with `false` in *every*
@@ -310,6 +325,17 @@ downstream jobs run in parallel off the same `build` output.
 `window.__debug`. The dev server is what local capture/testing uses, and it
 works identically in the runner. The `build` job still validates the real
 production build via `test:prod-gate`.
+
+### Workflow-file sync: the yml must exist on `master`
+
+GitHub resolves `workflow_dispatch` by name from the DEFAULT branch
+(`master`): a workflow that only exists on `dev` can never be dispatched. The
+file actually executed for a run is the one on the ref passed to
+`gh workflow run --ref` — which `run-ci-puppeteer.sh` sets to the disposable
+branch snapshot of local state, so **new inputs and yml edits take effect even
+if `master`'s copy is stale**. Still, keep `.github/workflows/puppeteer-tests.yml`
+in sync on `master` whenever it changes (game-director's step 7 does this), so
+dispatch-by-name always resolves and the Actions UI shows the current version.
 
 ### Software rendering & the GPU probe
 
@@ -342,10 +368,13 @@ the runner's preinstalled Chrome ever diverges from what local testing uses.
 
 ### The wrapper — `scripts/run-ci-puppeteer.sh`
 
-The one command `scene-capture`/`qa-tester` actually run:
+The one command `scene-capture`/`qa-tester`/`feature-writer` actually run:
 
 ```
 ./scripts/run-ci-puppeteer.sh --fixtures=name1,name2   # or --all-fixtures, and/or --e2e
+./scripts/run-ci-puppeteer.sh --tests=tests/qa-harness.mjs,tests/probe-daynight.mjs  # arbitrary custom tests
+./scripts/run-ci-puppeteer.sh --fixtures=name1 --async  # dispatch, don't wait
+./scripts/run-ci-puppeteer.sh --collect=run-1785922569-12345   # later: fetch that run's results
 ```
 
 It does the snapshot/push dance above (unique disposable branch per run),
@@ -360,6 +389,20 @@ files, so downloads go to a temp dir first and are copied over — stale files
 from earlier runs never block a download.) Everything downstream —
 `ui-critic`/`visual-critic` reading screenshot paths, `qa-tester`'s own
 assertions — is unaware whether a given run happened locally or in CI.
+
+**Async mode (multitasking)**: `--async` dispatches and returns immediately,
+printing `CI_RUN_TAG=<tag>`; the caller continues other work and later runs
+`--collect=<tag>` to wait for that run and pull its results. This is the
+recommended pattern whenever the caller has anything else to do — CI runs take
+minutes, and blocking on them wastes the whole point of running on GitHub.
+
+**Network resilience is built in**: every `gh`/git network call in the script
+is wrapped so a 403 / "not reachable" / timeout failure is retried through the
+proxy wrappers `ap`, `apsi`, `proxychains4` (whichever exist) before giving
+up. Agents calling the script never need to wrap it themselves; for ad hoc
+`gh` commands, apply the same rule manually (`ap gh ...`, `apsi gh ...`,
+`proxychains4 gh ...`) and never use WebFetch against `api.github.com` (it
+403s).
 
 ### One-time setup
 

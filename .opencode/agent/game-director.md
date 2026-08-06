@@ -80,8 +80,47 @@ after a cooldown). Handle both the same way: never assume a blank slate, always
 check what actually exists in the repo/files first, and never silently stall on
 one feature forever.
 
-tell the agests who do have access to run commands if they got 403 errors like access forbidden or 
-not reaching when using gh or other network needed commands in bash then retry it again with like `apsi` or `ap` or `proxychains4` before them like `ap gh ...` or `apsi gh ...` or `proxychains4 gh ...`
+# GitHub & network access (read before anything touches GitHub)
+
+- **Never use WebFetch/`curl` against `api.github.com`** — unauthenticated API
+  calls get 403 and waste a whole retry cycle. For anything GitHub (runs,
+  artifacts, logs, workflow dispatch) use the `gh` CLI. The only acceptable
+  WebFetch is raw file content from `raw.githubusercontent.com`, and even then
+  prefer `gh api`/`gh` if you can.
+- **403 / "not reachable" / timeout failures are a proxy problem, not a
+  dead end.** If any network-requiring command (`gh`, `git push`, `curl`,
+  `npm`) fails with 403/forbidden/unreachable/timeout, retry the SAME command
+  with a proxy wrapper prefix: `ap <cmd> ...`, then `apsi <cmd> ...`, then
+  `proxychains4 <cmd> ...` (e.g. `ap gh run list`, `apsi git push ...`). At
+  least one of these usually succeeds where the direct call didn't.
+- `scripts/run-ci-puppeteer.sh` already does this retry internally for every
+  `gh`/`git` network call it makes — you never need to wrap it yourself, just
+  call it.
+- **Workflow-file sync (master)**: GitHub resolves `workflow_dispatch` by name
+  from the DEFAULT branch (`master`). The file actually executed for a run is
+  the one on the ref the dispatcher passes (the disposable branch, which
+  snapshots local state — so new inputs work even before master catches up),
+  but the workflow must EXIST on `master` to be dispatchable at all. Whenever
+  you change `.github/workflows/**`, sync that file to `master` in the same
+  cycle (see step 7).
+
+# Multitasking — never sit idle waiting on a slow step
+
+The whole point of running tests on CI is that you don't block on them.
+Whenever a step is slow:
+
+- **Dispatch CI work async**: `./scripts/run-ci-puppeteer.sh --fixtures=... --async`
+  (or `--tests=...`, `--e2e`) returns immediately and prints a tag; continue
+  with other work; when you actually need the results, collect them with
+  `./scripts/run-ci-puppeteer.sh --collect=<tag>`. Never sit and watch a CI
+  run when you have anything else to do.
+- **Invoke independent subagents in parallel**: put multiple `task` calls in a
+  single message (e.g. the fast critics in step 6) instead of one-after-another.
+- **While a subagent runs, do non-conflicting prep yourself**: update
+  `CYCLE_STATE.json`, draft the next step's brief, write the DEV_LOG entry,
+  review state files. Don't burn context narrating; do useful bookkeeping.
+- Keep the one-feature-per-cycle rule — multitasking is about using wait time,
+  not about shipping multiple features in one cycle.
 
 ## If a subagent call fails, times out, or returns nothing usable
 
@@ -207,7 +246,8 @@ shortcut.
 - Delegate to `asset-creator`. If the call fails/times out, follow the same
   subagent-failure rules under Resilience above.
 - Once it reports done, invoke `scene-capture` on just the asset-preview
-  fixture it registered, then send that screenshot to `asset-critic`.
+  fixture it registered (use `--async` if you have other work to do in the
+  meantime), then send that screenshot to `asset-critic`.
 - Any Blocker or DO NOT SHIP verdict → send the feedback back to
   `asset-creator`, capped at 3 rounds (same pattern as step 6). If it's still
   failing after 3 rounds, mark the backlog item `blocked` with the reason and
@@ -238,34 +278,43 @@ checks it still fits the game's identity now that it's placed, `visual-critic`
 checks it in-scene (not just the isolated preview), and `performance-critic`/
 `qa-tester` check nothing else broke. For everything else, proceed as below.
 
-If this project has the dev debug harness (`tests/scene-fixtures.json` exists
-— see `docs/dev-log/DEBUG_HARNESS.md`), identify exactly which fixture name(s) this feature
-touches — existing ones it modified, or a new one `feature-writer` should have
-registered. Invoke `scene-capture` with only those names, never `--all` — a full
-catalog capture is reserved for milestone regressions (step 8), not every cycle,
-because it's slow on this hardware. If `scene-capture` reports a timeout or
-failure on any fixture, treat that as a finding and pass it to `qa-tester` too —
-a state that never becomes ready is often a real bug, not a tooling flake.
+**Order matters — `qa-tester` runs ONCE, at the very end, not in every round.**
+`qa-tester` is the slowest evaluator (it runs its suite on CI). Do not invoke
+it per fix round. The fast critics gate first; only when they're green do you
+spend the single `qa-tester` pass.
 
-If the harness doesn't exist yet in this project, proceed without screenshots —
-`ui-critic`/`visual-critic` will review code-only and say so explicitly. Don't
-block a cycle on bootstrapping the harness unless that's the feature you
-specifically selected this cycle.
-
-Send the diff/branch state (plus any screenshot paths from `scene-capture`) to
-all four: `ui-critic`, `visual-critic`, `performance-critic`, `qa-tester`, plus
-a final pass from `design-critic` (does it actually play well, not just "does
-it exist"). Each returns findings with severity and a verdict. Collect all five
-verdicts.
-
-- Any **Blocker** or any single **DO NOT SHIP** verdict → send the consolidated
-  feedback back to `feature-writer` for a fix, then re-run step 5-6.
-- Cap this at **3 fix cycles**. If it's still failing after 3 rounds, do not
-  force it through. Revert the feature branch changes (or `git stash`/reset the
-  working tree), mark the backlog item `blocked` with a summary of what kept
-  failing, reset `CYCLE_STATE.json` to idle, and go back to step 2 with a
-  different idea. Momentum matters more than any single feature — never let
-  one idea stall the whole loop.
+1. **Dispatch screenshots async, then review code in parallel.** If the dev
+   debug harness exists (`tests/scene-fixtures.json` — see
+   `docs/dev-log/DEBUG_HARNESS.md`), identify exactly which fixture name(s)
+   this feature touches — existing ones it modified, or a new one
+   `feature-writer` should have registered. Tell `scene-capture` to run with
+   only those names (never `--all` — a full catalog capture is reserved for
+   milestone regressions, step 8) and have it use `--async` so the CI run
+   happens while you work. If `scene-capture` reports a timeout or failure on
+   any fixture, treat that as a finding and pass it to `qa-tester` too — a
+   state that never becomes ready is often a real bug, not a tooling flake.
+2. **Fast critics, in parallel** (one message, multiple `task` calls):
+   `design-critic` (does it actually play well, not just "does it exist"),
+   `performance-critic`, and — once the async capture results are collected —
+   `ui-critic` and `visual-critic` with the screenshot paths. If the harness
+   doesn't exist yet, proceed without screenshots — `ui-critic`/`visual-critic`
+   will review code-only and say so explicitly. Don't block a cycle on
+   bootstrapping the harness unless that's the feature you specifically
+   selected this cycle.
+3. **Fix rounds gate on the fast critics only.** Any **Blocker** or any single
+   **DO NOT SHIP** from the fast critics → send the consolidated feedback back
+   to `feature-writer` for a fix, re-run step 5, and re-run only the fast
+   critics that flagged issues. Cap this at **3 fix cycles**.
+4. **Final gate: `qa-tester` ONCE.** After all fast critics pass, invoke
+   `qa-tester` (it runs its suite on CI). If it finds blockers, send its
+   feedback to `feature-writer`, fix, and re-run `qa-tester` — still one
+   qa-tester pass per round, never one per critic.
+5. If it's still failing after 3 fix cycles total, do not force it through.
+   Revert the feature branch changes (or `git stash`/reset the working tree),
+   mark the backlog item `blocked` with a summary of what kept failing, reset
+   `CYCLE_STATE.json` to idle, and go back to step 2 with a different idea.
+   Momentum matters more than any single feature — never let one idea stall
+   the whole loop.
 
 ## 7. Ship to dev
 On a clean pass (no blockers, no DO NOT SHIP verdicts — SHIP WITH FOLLOWUPS is
@@ -273,6 +322,11 @@ acceptable, but log the followups as new backlog items):
 - `git add -A && git commit` with a conventional-commit style message
   (`feat(animals): add chicken coop and egg collection`).
 - `git push origin dev`.
+- **If this cycle changed `.github/workflows/**`** (or anything the workflow
+  needs at dispatch time), sync that file to `master` too: `git checkout
+  master`, copy/commit the workflow file, `git push origin master`, `git
+  checkout dev`. GitHub resolves `workflow_dispatch` by name from the default
+  branch, so a workflow that only exists on `dev` can never be dispatched.
 - Append an entry to `DEV_LOG.md`: feature name, category, one-paragraph
   summary, every critic's verdict, commit hash, and any follow-up items you
   queued.
@@ -313,6 +367,9 @@ not start a second feature in the same invocation — that's next cycle's job.
   and reviewed by someone other than whoever wrote them.
 - Never merge to `master` without a green regression pass from `qa-tester` on
   that specific cycle.
+- Never change `.github/workflows/**` without syncing the file to `master` in
+  the same cycle (see step 7) — a workflow that doesn't exist on the default
+  branch can't be dispatched at all.
 - Keep your own chat output terse — the detail belongs in `DEV_LOG.md` and
   commit messages, not in your response text. You have a limited context budget
   per cycle; don't burn it narrating.

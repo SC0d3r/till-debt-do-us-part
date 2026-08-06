@@ -57,6 +57,17 @@ follow it every time:
   explicitly in your report and flag it as a Tech & Performance backlog item —
   testing without this will only get slower as the game grows.
 
+# GitHub & network access
+
+- **Never use WebFetch/`curl` against `api.github.com`** — unauthenticated API
+  calls get 403. Use the `gh` CLI for anything GitHub (run status, artifacts,
+  logs).
+- **403 / "not reachable" / timeout failures are a proxy problem, not a dead
+  end.** Retry the SAME command with a proxy wrapper prefix: `ap <cmd> ...`,
+  then `apsi <cmd> ...`, then `proxychains4 <cmd> ...` (e.g. `ap gh run list`).
+- `scripts/run-ci-puppeteer.sh` already does this retry internally for every
+  `gh`/`git` call it makes — you don't need to wrap it yourself.
+
 # What you do
 
 1. **If you're told a previous attempt at this review may have been
@@ -67,11 +78,20 @@ follow it every time:
    Part E) — this repo is public, so GitHub Actions is free/unlimited and far
    faster than Chrome on this machine. Author/extend test files under
    `tests/**`/`e2e/**` as usual, then execute them with
-   `./scripts/run-ci-puppeteer.sh --e2e` rather than running puppeteer-core
-   locally. It dispatches `.github/workflows/puppeteer-tests.yml`, waits, and
-   pulls results back into `tests/e2e-results/`. If that script is missing, or
-   fails specifically because `gh` isn't authenticated or GitHub is
-   unreachable (not because a test actually failed), fall back to running
+   `./scripts/run-ci-puppeteer.sh --e2e` (the existing full-loop suite) or
+   `./scripts/run-ci-puppeteer.sh --tests=tests/qa-harness.mjs,<your-file>.mjs`
+   (arbitrary custom puppeteer scripts — the workflow runs each with `node`
+   and uploads their stdout to `tests/e2e-results/`). It dispatches
+   `.github/workflows/puppeteer-tests.yml`, waits, and pulls results back.
+   **Any test file you want run on CI must read `BASE_URL` and `CHROME_PATH`
+   from the environment** (see `tests/qa-harness.mjs` for the pattern) —
+   hardcoded `http://localhost:5173` won't reach the runner's dev server on
+   port 4173.
+   **Multitask**: use `--async` to dispatch and keep writing/running more
+   tests, then `./scripts/run-ci-puppeteer.sh --collect=<tag>` when you need
+   the results. If the script is missing, or fails specifically because `gh`
+   isn't authenticated or GitHub is unreachable even through the proxy
+   fallbacks (not because a test actually failed), fall back to running
    locally and say so in your report.
 3. Read the feature's acceptance criteria and actually exercise them — run
    the project's existing automated tests first (`npm test` or equivalent,

@@ -63,6 +63,13 @@ You are used twice:
 Reasoning: <2-4 sentences, specific, no hedging>
 ```
 
+# Network note
+
+If a bash command that needs the network (`git`, `gh`, `npm`, `curl`) fails
+with 403/forbidden/unreachable/timeout, retry it with a proxy wrapper prefix:
+`ap <cmd> ...`, then `apsi <cmd> ...`, then `proxychains4 <cmd> ...`. Never
+use WebFetch against `api.github.com` (it 403s) — use `gh` instead.
+
 Severity guide:
 - **Blocker** — actively bad for the game (breaks an existing system, contradicts
   the game's identity, is not actually fun on inspection)

@@ -93,3 +93,10 @@ directly yourself.
 Reasoning: <2-4 sentences>
 Review basis: <code-only / code + screenshot(s) via gemini-analyze-image_gemini_analyze_image (note that if you want to use gemini-analyze use gemini-analyze-image_gemini_analyze_image and not box-mcp_gemini_analyze_image) or box-mcp_box_image_description>
 ```
+
+# Network note
+
+If a bash command that needs the network (`git`, `gh`, `npm`, `curl`) fails
+with 403/forbidden/unreachable/timeout, retry it with a proxy wrapper prefix:
+`ap <cmd> ...`, then `apsi <cmd> ...`, then `proxychains4 <cmd> ...`. Never
+use WebFetch against `api.github.com` (it 403s) — use `gh` instead.

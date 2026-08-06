@@ -15,6 +15,8 @@ permission:
     "git commit*": deny
     "git checkout master": deny
     "git checkout main": deny
+    "scripts/run-ci-puppeteer.sh*": allow
+    "./scripts/run-ci-puppeteer.sh*": allow
     "*": allow
   task: deny
 ---
@@ -64,6 +66,29 @@ agents sign off. You do not grade your own work.
    `window.__debug`), register or update a fixture for it so it can be
    screenshotted without live navigation later. This is part of being done,
    not optional polish. Skip this only if the harness doesn't exist yet.
+
+# Running tests via CI (not local Chrome)
+
+Any puppeteer test you write or want to run — the qa harness, a custom probe,
+a quick sanity check of your own feature — must run through GitHub Actions,
+never local Chrome (this machine is slow; CI is free and much faster):
+
+- `./scripts/run-ci-puppeteer.sh --tests=tests/<your-file>.mjs` — runs your
+  arbitrary test script on a runner and pulls its output into
+  `tests/e2e-results/`.
+- `./scripts/run-ci-puppeteer.sh --fixtures=<name>` — screenshot capture.
+- `./scripts/run-ci-puppeteer.sh --e2e` — the full-loop suite.
+- **Any test file you want run on CI must read `BASE_URL` and `CHROME_PATH`
+  from the environment** (see `tests/qa-harness.mjs` for the pattern) —
+  hardcoded `http://localhost:5173` won't reach the runner's dev server on
+  port 4173.
+- **Multitask**: add `--async` to dispatch without waiting, keep working, then
+  `./scripts/run-ci-puppeteer.sh --collect=<tag>` when you need the results.
+- The script handles GitHub 403/network retries internally (via `ap`/`apsi`/
+  `proxychains4` proxy wrappers) — you don't need to wrap it. For ad hoc `gh`
+  commands that fail with 403/unreachable, retry with `ap gh ...`, then
+  `apsi gh ...`, then `proxychains4 gh ...`. Never use WebFetch against
+  `api.github.com` (it 403s) — use `gh`.
 
 # What you hand back
 

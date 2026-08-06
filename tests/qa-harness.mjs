@@ -6,11 +6,25 @@
 //  - Overlay ground truth is getComputedStyle() in-page; getState's *_OverlayVisible flags
 //    read INLINE style (CSS-hidden overlays report "visible" — a documented harness gap).
 //  - Crops spoil when unwatered: growth tests water each day before fastForward.
-import puppeteer from 'puppeteer-core'
-
-const CHROME = '/usr/bin/google-chrome'
-const URL_DEBUG = 'http://localhost:5173/?debug=1&fast=1'
-const URL_PLAIN = 'http://localhost:5173/'
+// CI-friendly: CHROME_PATH/BASE_URL come from the GitHub Actions workflow
+// (scripts/run-ci-puppeteer.sh --tests=...); local runs fall back to the old
+// defaults. PUPPETEER_BUNDLED=1 switches to the `puppeteer` package's bundled
+// Chromium (one of the browser provisioning options in DEBUG_HARNESS.md Part E).
+const useBundled = process.env.PUPPETEER_BUNDLED === '1'
+let puppeteer
+if (useBundled) {
+  try {
+    puppeteer = (await import('puppeteer')).default
+  } catch {
+    throw new Error('PUPPETEER_BUNDLED=1 but the `puppeteer` package is not installed (npm i -D puppeteer)')
+  }
+} else {
+  puppeteer = (await import('puppeteer-core')).default
+}
+const CHROME = useBundled ? undefined : (process.env.CHROME_PATH || '/usr/bin/google-chrome')
+const BASE = process.env.BASE_URL || 'http://localhost:5173'
+const URL_DEBUG = BASE + '/?debug=1&fast=1'
+const URL_PLAIN = BASE + '/'
 const ARGS = ['--mute-audio', '--enable-unsafe-swiftshader', '--no-sandbox', '--disable-dev-shm-usage']
 
 const results = []
@@ -25,7 +39,7 @@ function test(name, pass, detail = '') {
   console.log(`  [${pass ? 'PASS' : 'FAIL'}] ${name}${detail ? ' — ' + detail : ''}`)
 }
 
-const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ARGS,
+const browser = await puppeteer.launch({ ...(useBundled ? {} : { executablePath: CHROME }), headless: true, args: ARGS,
   defaultViewport: { width: 960, height: 540, deviceScaleFactor: 1 } })
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
