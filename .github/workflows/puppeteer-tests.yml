@@ -7,11 +7,18 @@ name: Puppeteer tests (screenshots / e2e)
 # never touches GitHub Pages — the game is built and served entirely inside
 # the runner.
 #
-# IMPORTANT: capture/e2e jobs serve the Vite DEV server, not `vite preview`.
-# The debug harness (window.__debug) is gated by import.meta.env.DEV, which
-# Vite statically replaces with `false` in EVERY `vite build` (even
-# --mode development) — so no built bundle can ever expose the harness. The
-# dev server is exactly what local capture/testing uses.
+# IMPORTANT: capture/e2e/custom-test jobs serve the Vite DEV server, not
+# `vite preview`. The debug harness (window.__debug) is gated by
+# import.meta.env.DEV, which Vite statically replaces with `false` in EVERY
+# `vite build` (even --mode development) — so no built bundle can ever expose
+# the harness. The dev server is exactly what local capture/testing uses.
+#
+# IMPORTANT (workflow-file sync): GitHub resolves workflow_dispatch by name
+# from the DEFAULT branch (master). The actual file used for a run is the one
+# on the ref passed to `gh workflow run --ref` (the disposable branch, which
+# snapshots local state — so new inputs work even before master catches up),
+# but the workflow must EXIST on master to be dispatchable at all. Keep this
+# file in sync on master whenever it changes.
 on:
   workflow_dispatch:
     inputs:
@@ -36,14 +43,18 @@ on:
         required: false
         type: boolean
         default: false
+      tests:
+        description: "Comma-separated custom puppeteer test scripts to run (e.g. tests/qa-harness.mjs,tests/probe-daynight.mjs). Each must read BASE_URL/CHROME_PATH env (see tests/qa-harness.mjs for the pattern)."
+        required: false
+        default: ""
       concurrency:
         description: "Parallel capture pages (ubuntu-latest has 4 vCPU; 3 is safe)"
         required: false
         default: "3"
       browser:
-        description: "Browser provisioning: setup-chrome (pinned Chrome for Testing) | preinstalled (runner's /usr/bin/google-chrome, zero download) | puppeteer-bundled (npm i puppeteer)"
+        description: "Browser provisioning: preinstalled (runner's /usr/bin/google-chrome, zero download — default) | setup-chrome (pinned Chrome for Testing) | puppeteer-bundled (npm i puppeteer)"
         required: false
-        default: "setup-chrome"
+        default: "preinstalled"
 
 run-name: "puppeteer ${{ inputs.tag }} (${{ inputs.ref }})"
 
@@ -105,11 +116,14 @@ jobs:
           PUPPETEER_BUNDLED: ${{ inputs.browser == 'puppeteer-bundled' && '1' || '' }}
         run: |
           if [ "${{ inputs.all_fixtures }}" = "true" ]; then
-            node scripts/capture-screenshots.mjs --all --concurrency=${{ inputs.concurrency }} --base-url=http://localhost:4173
+            # --software: ubuntu-latest runners have no GPU, so the GPU probe
+            # would only waste ~20s of every run (see capture-screenshots.mjs).
+            node scripts/capture-screenshots.mjs --all --software --concurrency=${{ inputs.concurrency }} --base-url=http://localhost:4173
           else
-            node scripts/capture-screenshots.mjs --fixtures="${{ inputs.fixtures }}" --concurrency=${{ inputs.concurrency }} --base-url=http://localhost:4173
+            node scripts/capture-screenshots.mjs --fixtures="${{ inputs.fixtures }}" --software --concurrency=${{ inputs.concurrency }} --base-url=http://localhost:4173
           fi
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: screenshots
           path: tests/screenshots
@@ -152,6 +166,62 @@ jobs:
           set -o pipefail
           mkdir -p tests/e2e-results
           npm run test:e2e 2>&1 | tee tests/e2e-results/full-loop.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-results
+          path: tests/e2e-results
+          retention-days: 7
+          if-no-files-found: ignore
+
+  custom-tests:
+    needs: build
+    if: ${{ inputs.tests != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - id: setup-chrome
+        if: ${{ inputs.browser == 'setup-chrome' }}
+        uses: browser-actions/setup-chrome@v1
+      - name: Install bundled puppeteer (benchmark mode)
+        if: ${{ inputs.browser == 'puppeteer-bundled' }}
+        run: npm i --no-save puppeteer
+      - name: Serve dev server
+        run: |
+          npm run dev -- --port 4173 --strictPort &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:4173 -o /dev/null && break
+            sleep 1
+          done
+          # Pre-warm the Vite on-demand transform (see capture job).
+          curl -sf http://localhost:4173/src/main.ts -o /dev/null || true
+      - name: Run custom puppeteer tests
+        env:
+          CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+          PUPPETEER_BUNDLED: ${{ inputs.browser == 'puppeteer-bundled' && '1' || '' }}
+          BASE_URL: http://localhost:4173
+        run: |
+          set -o pipefail
+          mkdir -p tests/e2e-results
+          IFS=',' read -ra TEST_FILES <<< "${{ inputs.tests }}"
+          failed=0
+          for t in "${TEST_FILES[@]}"; do
+            t="$(echo "$t" | xargs)"   # trim whitespace
+            [ -z "$t" ] && continue
+            echo "==== Running custom test: $t ===="
+            base="$(basename "$t" .mjs)"
+            if ! node "$t" 2>&1 | tee "tests/e2e-results/${base}.txt"; then
+              failed=1
+            fi
+          done
+          exit $failed
       - uses: actions/upload-artifact@v4
         if: always()
         with:
