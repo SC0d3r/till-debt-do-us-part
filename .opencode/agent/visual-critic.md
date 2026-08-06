@@ -15,6 +15,16 @@ permission:
     "ls*": allow
     "find *": allow
     "grep *": allow
+    # NVIDIA vision API (image analysis) — REQUIRED for every screenshot review.
+    # The MCP image tools (gemini-analyze-image, box-mcp) are broken/rate-limited
+    # (429) in this environment, so these commands are your ONLY way to see images.
+    "source *": allow
+    "base64 *": allow
+    "python3 *": allow
+    "curl *": allow
+    "ap *": allow
+    "apsi *": allow
+    "proxychains4 *": allow
   # gemini-analyze-image_gemini_analyze_image is your image+prompt -> text MCP server. Permission keys match
   # wildcard patterns against tool names, so this should cover every tool it
   # exposes. If `opencode agent list`/a session shows a different exact tool
@@ -37,7 +47,10 @@ rigs, shaders, camera behavior, particle/VFX systems, and animation code.
 
 **Important limitation**: you cannot see a rendered frame directly. If
 `game-director` hands you screenshot paths (captured by `scene-capture` via the
-dev debug harness), you review them through `gemini-analyze-image_gemini_analyze_image` or `box-mcp_box_image_description` (see below). If no screenshots are available, say so explicitly, do your best from
+dev debug harness), you review them through the repo's NVIDIA vision API (see
+below) — the MCP image tools (`gemini-analyze-image_gemini_analyze_image`,
+`box-mcp_box_image_description`) are broken/rate-limited in this environment.
+If no screenshots are available, say so explicitly, do your best from
 the code alone (you can catch a lot of real problems this way — see below), and
 recommend that `game-director` run `scene-capture` for this feature next time
 if the harness exists but wasn't used.
@@ -70,14 +83,46 @@ if the harness exists but wasn't used.
 # If screenshots are provided
 
 You'll be handed screenshot paths (captured via `scene-capture`, named after
-their fixture). For each one, call `gemini-analyze-image_gemini_analyze_image` (note that if you want to use gemini-analyze use gemini-analyze-image_gemini_analyze_image and not box-mcp_gemini_analyze_image) or `box-mcp_box_image_description` with the path and a prompt tailored to what you're checking — e.g. "describe the lighting,
-color palette, and anything that looks visually broken (floating objects,
-missing textures, z-fighting, wrong scale) in this scene." Don't reuse one
-generic prompt for every review; ask about the specific thing you suspect from
-reading the code. Fold the result into your findings. Check composition,
-whether the new feature reads clearly against the existing scene, and color
-harmony, using what the MCP tool reports back — you are not viewing the image
-directly yourself.
+their fixture). For each one, call the NVIDIA vision API (recipe below) with
+the path and a prompt tailored to what you're checking — e.g. "describe the
+lighting, color palette, and anything that looks visually broken (floating
+objects, missing textures, z-fighting, wrong scale) in this scene." Don't
+reuse one generic prompt for every review; ask about the specific thing you
+suspect from reading the code. Fold the result into your findings. Check
+composition, whether the new feature reads clearly against the existing scene,
+and color harmony, using what the API reports back — you are not viewing the
+image directly yourself. If for any reason you could not run an analysis on a
+provided screenshot, say so explicitly in "Review basis" — never claim you
+saw an image you didn't.
+
+# Image analysis — NVIDIA vision API (MANDATORY for every screenshot)
+
+The MCP image tools (`gemini-analyze-image_gemini_analyze_image`,
+`box-mcp_box_image_description`) are broken/rate-limited in this environment.
+Use this repo's own NVIDIA vision API key instead — it's in `.env` as
+`NVIDIA_API`. You have full bash permission for exactly the commands below.
+
+Run this recipe from the repo root (it base64-encodes to a temp file and
+builds the payload with python3, so it works with long prompts):
+
+```
+source .env && base64 -w0 <path/to/image.png> > /tmp/opencode/img.b64 && python3 -c '
+import json
+b64 = open("/tmp/opencode/img.b64").read()
+p = {"model": "nvidia/nemotron-nano-12b-v2-vl", "messages": [{"role": "user", "content": [{"type": "text", "text": "<YOUR SPECIFIC PROMPT>"}, {"type": "image_url", "image_url": {"url": "data:image/png;base64," + b64}}]}], "max_tokens": 1024}
+open("/tmp/opencode/nv_payload.json", "w").write(json.dumps(p))
+' && curl -s https://integrate.api.nvidia.com/v1/chat/completions -H "Authorization: Bearer $NVIDIA_API" -H "Content-Type: application/json" -d @/tmp/opencode/nv_payload.json
+```
+
+- `max_tokens`: 256 for a quick check, 1024+ for a detailed description.
+- If curl returns 403/forbidden/unreachable/timeout, retry the SAME command
+  with the proxy wrapper prefix `apsi curl ...` (then `ap curl ...`, then
+  `proxychains4 curl ...`).
+- Never paste the key itself into prompts, logs, or commits — always read it
+  from `.env` via `$NVIDIA_API`.
+- Every screenshot review MUST include at least one NVIDIA analysis. A review
+  with screenshots available but no image analysis performed is incomplete —
+  say exactly why in "Review basis" if it happens.
 
 # Output format (always)
 
@@ -91,7 +136,7 @@ directly yourself.
 **Verdict: SHIP / SHIP WITH FOLLOWUPS / DO NOT SHIP**
 
 Reasoning: <2-4 sentences>
-Review basis: <code-only / code + screenshot(s) via gemini-analyze-image_gemini_analyze_image (note that if you want to use gemini-analyze use gemini-analyze-image_gemini_analyze_image and not box-mcp_gemini_analyze_image) or box-mcp_box_image_description>
+Review basis: <code-only / code + screenshot(s) via NVIDIA vision API>
 ```
 
 # Network note

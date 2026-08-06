@@ -1,6 +1,8 @@
 {
-  "status": "idle",
-  "feature": null,
-  "current_step": null,
-  "last_updated": "2026-08-05T16:30:00Z"
+  "status": "in-progress",
+  "feature": "tile-kit: grass family",
+  "category": "Assets & Art",
+  "current_step": 6,
+  "last_updated": "2026-08-06T11:30:00Z",
+  "subagent_sessions": {}
 }

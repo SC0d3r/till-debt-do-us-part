@@ -14,6 +14,16 @@ permission:
     "ls*": allow
     "find *": allow
     "grep *": allow
+    # NVIDIA vision API (image analysis) — REQUIRED for every screenshot review.
+    # The MCP image tools (gemini-analyze-image, box-mcp) are broken/rate-limited
+    # (429) in this environment, so these commands are your ONLY way to see images.
+    "source *": allow
+    "base64 *": allow
+    "python3 *": allow
+    "curl *": allow
+    "ap *": allow
+    "apsi *": allow
+    "proxychains4 *": allow
   # gemini-analyze-image_gemini_analyze_image is your image+prompt -> text MCP server. Permission keys match
   # wildcard patterns against tool names, so this should cover every tool it
   # exposes. If `opencode agent list`/a session shows a different exact tool
@@ -64,8 +74,9 @@ limitation for a given review, say so explicitly and note what you'd need
 # If screenshots are provided
 
 You were handed one or more screenshot paths (captured via `scene-capture`,
-each named after a fixture). For each one, call `gemini-analyze-image_gemini_analyze_image` (note that if you want to use gemini-analyze use gemini-analyze-image_gemini_analyze_image and not box-mcp_gemini_analyze_image) or `box-mcp_box_image_description` with the screenshot
-path and a specific prompt built from what you're actually checking this time — e.g. "describe every visible text element, its
+each named after a fixture). For each one, call the NVIDIA vision API (recipe
+below) with the screenshot path and a specific prompt built from what you're
+actually checking this time — e.g. "describe every visible text element, its
 approximate size, and whether it looks readable against its background" or
 "describe what's on screen and whether the currently-interactive element (if
 any) is visually obvious." Don't send one generic "describe this image" prompt
@@ -73,7 +84,38 @@ for every review — tailor the question to the finding you're trying to confirm
 or rule out. Fold what comes back into your findings below like any other
 evidence. If no screenshots were provided, say so in "Review basis" and rely on
 code alone (DOM structure, CSS, layout logic) — you can still catch real issues
-this way, just say what you couldn't check.
+this way, just say what you couldn't check. If for any reason you could not run
+an analysis on a provided screenshot, say so explicitly — never claim you saw
+an image you didn't.
+
+# Image analysis — NVIDIA vision API (MANDATORY for every screenshot)
+
+The MCP image tools (`gemini-analyze-image_gemini_analyze_image`,
+`box-mcp_box_image_description`) are broken/rate-limited in this environment.
+Use this repo's own NVIDIA vision API key instead — it's in `.env` as
+`NVIDIA_API`. You have full bash permission for exactly the commands below.
+
+Run this recipe from the repo root (it base64-encodes to a temp file and
+builds the payload with python3, so it works with long prompts):
+
+```
+source .env && base64 -w0 <path/to/image.png> > /tmp/opencode/img.b64 && python3 -c '
+import json
+b64 = open("/tmp/opencode/img.b64").read()
+p = {"model": "nvidia/nemotron-nano-12b-v2-vl", "messages": [{"role": "user", "content": [{"type": "text", "text": "<YOUR SPECIFIC PROMPT>"}, {"type": "image_url", "image_url": {"url": "data:image/png;base64," + b64}}]}], "max_tokens": 1024}
+open("/tmp/opencode/nv_payload.json", "w").write(json.dumps(p))
+' && curl -s https://integrate.api.nvidia.com/v1/chat/completions -H "Authorization: Bearer $NVIDIA_API" -H "Content-Type: application/json" -d @/tmp/opencode/nv_payload.json
+```
+
+- `max_tokens`: 256 for a quick check, 1024+ for a detailed description.
+- If curl returns 403/forbidden/unreachable/timeout, retry the SAME command
+  with the proxy wrapper prefix `apsi curl ...` (then `ap curl ...`, then
+  `proxychains4 curl ...`).
+- Never paste the key itself into prompts, logs, or commits — always read it
+  from `.env` via `$NVIDIA_API`.
+- Every screenshot review MUST include at least one NVIDIA analysis. A review
+  with screenshots available but no image analysis performed is incomplete —
+  say exactly why in "Review basis" if it happens.
 
 # Output format (always)
 
@@ -87,7 +129,7 @@ this way, just say what you couldn't check.
 **Verdict: SHIP / SHIP WITH FOLLOWUPS / DO NOT SHIP**
 
 Reasoning: <2-4 sentences>
-Review basis: <code-only / code + screenshot(s) via gemini-analyze-image_gemini_analyze_image (note that if you want to use gemini-analyze use gemini-analyze-image_gemini_analyze_image and not box-mcp_gemini_analyze_image) or box-mcp_box_image_description>
+Review basis: <code-only / code + screenshot(s) via NVIDIA vision API>
 ```
 
 A missing or broken core interaction (can't close a menu, no way to know an

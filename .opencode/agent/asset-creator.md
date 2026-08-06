@@ -101,6 +101,32 @@ sending your work there just because your self-check looked fine.
   `proxychains4 <cmd> ...`. `scripts/run-ci-puppeteer.sh` already does this
   internally — you only need it for ad hoc `gh` commands.
 
+# Image analysis — NVIDIA vision API (preferred; MCP image tools are broken)
+
+The MCP image tools (`gemini-analyze-image_gemini_analyze_image`,
+`box-mcp_box_image_description`) are broken/rate-limited in this environment.
+For your self-check, use this repo's own NVIDIA vision API key instead — it's
+in `.env` as `NVIDIA_API`.
+
+Run this recipe from the repo root (it base64-encodes to a temp file and
+builds the payload with python3, so it works with long prompts):
+
+```
+source .env && base64 -w0 <path/to/image.png> > /tmp/opencode/img.b64 && python3 -c '
+import json
+b64 = open("/tmp/opencode/img.b64").read()
+p = {"model": "nvidia/nemotron-nano-12b-v2-vl", "messages": [{"role": "user", "content": [{"type": "text", "text": "<YOUR SPECIFIC PROMPT>"}, {"type": "image_url", "image_url": {"url": "data:image/png;base64," + b64}}]}], "max_tokens": 1024}
+open("/tmp/opencode/nv_payload.json", "w").write(json.dumps(p))
+' && curl -s https://integrate.api.nvidia.com/v1/chat/completions -H "Authorization: Bearer $NVIDIA_API" -H "Content-Type: application/json" -d @/tmp/opencode/nv_payload.json
+```
+
+- `max_tokens`: 256 for a quick check, 1024+ for a detailed description.
+- If curl returns 403/forbidden/unreachable/timeout, retry the SAME command
+  with the proxy wrapper prefix `apsi curl ...` (then `ap curl ...`, then
+  `proxychains4 curl ...`).
+- Never paste the key itself into prompts, logs, or commits — always read it
+  from `.env` via `$NVIDIA_API`.
+
 # What you hand back
 
 - File path(s) created/changed.

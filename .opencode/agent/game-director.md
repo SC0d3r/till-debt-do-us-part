@@ -122,21 +122,47 @@ Whenever a step is slow:
 - Keep the one-feature-per-cycle rule — multitasking is about using wait time,
   not about shipping multiple features in one cycle.
 
-## If a subagent call fails, times out, or returns nothing usable
+## SILENT-FAILURE PROTOCOL — VERY STRICT, MUST-FOLLOW, NON-NEGOTIABLE
 
-1. Retry the SAME subagent with the SAME brief, but add this line to the
-   prompt: "A previous attempt at this may have been interrupted (e.g. network
-   outage) before finishing. Check the actual current repo/branch state first —
-   don't assume nothing happened, and don't redo work that's already correctly
-   in place. Pick up only what's still missing."
-2. Allow up to 2 retries (3 attempts total) per subagent call, with a short
-   pause between attempts if the failure looks network-related.
-3. If it's still failing after 3 attempts, treat it exactly like a failed eval
-   cycle (step 6): mark the backlog item `blocked` with reason "subagent failed
-   3x — likely infra/network, not a content problem", append a line to
-   `docs/dev-log/INCIDENTS.md` (timestamp, feature, which subagent, what you
-   observed), reset `CYCLE_STATE.json` to idle (see below), and move on to a
-   different backlog item rather than stalling this cycle.
+**Definition of a silent failure**: a subagent returns NO output at all —
+empty, blank, garbled, or a bare error with no usable content. This almost
+always means the agent died mid-run (network outage, provider error, timeout,
+crash), NOT that it finished with nothing to say.
+
+**The rule (never break it):**
+
+1. **Always keep the session id.** Every time you delegate to a subagent via
+   `task`, that call returns a `task_id` (session id). Record it immediately —
+   in `CYCLE_STATE.json` under `"subagent_sessions"` (see below) and in your
+   own notes. You must be able to resume the exact same session later.
+2. **A silent failure is a resume, never a restart.** If an agent returns no
+   output, DO NOT start a fresh agent of the same type. A fresh agent starts
+   building its context from zero — it loses everything the failed run already
+   learned, read, and decided. Instead, RESUME THE SAME SESSION (same
+   `task_id`) with a short "continue" nudge, e.g. "Your previous attempt
+   returned no output (likely a network interruption). Continue where you left
+   off: check the actual current repo state first, then finish the task."
+3. **Resume again and again until you get real output.** Keep resuming the
+   same session — with the same "continue" nudge, adding any new context you
+   have — until it returns a usable result. Do not proceed to the next step of
+   the cycle until you have that output. This is the default path; giving up
+   early is a violation.
+4. **Only after many consecutive resume attempts** (at least 3) still return
+   nothing may you treat it as a hard failure: mark the backlog item `blocked`
+   with reason "subagent silent-failed 3x — likely infra/network, not a
+   content problem", append a line to `docs/dev-log/INCIDENTS.md` (timestamp,
+   feature, which subagent, what you observed), reset `CYCLE_STATE.json` to
+   idle, and move on to a different backlog item rather than stalling this
+   cycle. Even then, prefer re-dispatching the same session later over a fresh
+   agent if the session id is still valid.
+5. **Never silently proceed on an empty result.** An agent that returned
+   nothing is NOT "done" and its work is NOT verified. If you cannot resume it
+   (session id lost), say so in the cycle summary and in `INCIDENTS.md` — do
+   not pretend the step completed.
+
+This protocol takes priority over any "retry with the same brief" shortcut.
+The whole point is that the agent's accumulated context is valuable and must
+be preserved across interruptions.
 
 ## If you yourself were interrupted (this invocation is a resume)
 
@@ -157,6 +183,11 @@ Write `CYCLE_STATE.json` yourself, every time, right before an action that
 could be interrupted:
 - On selecting a feature (step 2): write
   `{"status":"in-progress","feature":"<name>","category":"<category>","current_step":2,"last_updated":"<ISO timestamp>"}`.
+- **Record every subagent session id** you dispatch in the same file under
+  `"subagent_sessions": {"<agent-type>": "<task_id>", ...}` — this is how you
+  satisfy the SILENT-FAILURE PROTOCOL if you are killed mid-delegation: the
+  next invocation can resume the exact same session instead of starting fresh.
+  Clear the entry for an agent once its work is confirmed complete.
 - Update `current_step` and `last_updated` right before invoking
   `design-critic` (step 3), `feature-writer` (step 4 or a step-6 fix round),
   `scene-capture`/the eval agents (step 6), or the milestone regression
@@ -359,6 +390,12 @@ not start a second feature in the same invocation — that's next cycle's job.
 - Never force-push, ever, to any branch.
 - Never bypass the eval agents "to save time." A feature with no critic verdicts
   is not shippable, full stop.
+- **Never start a fresh agent of the same type to recover from a silent
+  failure (no output). Resume the SAME session via its recorded `task_id`
+  with a "continue" nudge, again and again until you get real output — the
+  SILENT-FAILURE PROTOCOL above is the only correct recovery path. Starting a
+  fresh agent discards the failed run's accumulated context and is a
+  violation.**
 - Never let `feature-writer` touch `.opencode/**` or `docs/dev-log/**` — those
   are yours.
 - Never let `feature-writer` build ad hoc, one-off asset geometry as a
