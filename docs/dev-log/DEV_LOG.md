@@ -16,6 +16,51 @@ Follow-ups queued: <backlog items added as a result, or "none">
 
 ---
 
+## TileMapComposer + showcase map (slice A) — Tech & Performance — 2026-08-06
+Commit: d78dc8c
+Summary: Generic data-driven tile-map composer (`src/world/TileMapComposer.js`,
+{ x, y, variant, rotation?, elevation?, outline?, outlineColor? } records →
+one InstancedMesh per variant string + per-outline-mask frames; hover contract
+via pointermove-only raycast with instanceColor 0.88↔1.0; mid-build
+factory-throw cleanup; owned+disposed outline geometry/material). Three
+user-driven revisions landed during the cycle: (1) DIAGONAL LATTICE packing
+((x−y)*0.5, 0, (x+y)*0.5) — diamonds share full edges, solid ground, zero
+holes (the initial axis-aligned corner-touching placement had star holes
+between every four tiles); (2) per-record rotation 0/90/180/270 (clockwise
+from above) via instanceMatrix — one baked edge variant + rotation builds
+boundaries in every lattice direction (showcase rows y=0..2 prove it with
+grass-dirt-n @90/270); (3) TILE OUTLINES — crisp gamey lines, per-record
+masks (all/none/interior/exterior/side-lists) with seam resolution so each
+shared edge renders EXACTLY ONE ribbon: owner = biome-matched tile (resolved
+color == biome palette color; edges use fromBiome), tie-break lexicographic
+(x, then y) — the user picked this rule over darker-wins and data-order.
+Outline colors are per-instance (white material + instanceColor; record >
+biome palette [grass #4e3d2e, dirt #6b4a2e, tilled #4a3a26] > map-level >
+default), hover-synced. Showcase 9x9 map + green-vs-brown outline A/B on
+grass (21 green-override cells) for the user's comparison. validateShowcaseMap
+rotation-aware + exact-once boundary coverage + ghost-edge gate. devHarness:
+beginPreviewState/teardownPreview, showcaseTileMap(data, opts), tile-showcase
+fixture, lattice projectTile. grass.js: OUTLINE_COLORS, manifest, userData
+outlineTop/outlineBase/outlineColor. Convention doc pinned through 4 revision
+rounds (lattice, rotation, outlines, seam owner, selection/color caveats).
+Verdicts: design=SHIP w/followups (3 rounds: pre-build, post-build, rev2/3/4;
+corner-cell gap Major logged as follow-up) ui=SHIP (2 rounds; rev-2/4 hover
+sync verified gapless) visual=SHIP w/followups (2 rounds; pixel-verified
+ownership at every boundary type; recommends keeping BROWN biome defaults —
+green is a near-tie at 2px and should be brightened (~0x3d8a2e) if used as a
+regional tint) performance=SHIP (2 rounds; outline draw calls bounded ≤16
+masks, dispose complete incl. mid-build) qa=SHIP w/followups (78/78 composer +
+51/51 tile-kit + 31/31 new exploratory + 120/124 harness [4 known probes] +
+23/23 fixture captures; extended prod-bundle gate CI-enforced)
+Follow-ups queued: tile-kit corner/elbow variants (design-critic Major);
+45-deg diagonal seam variants; tile-kit selection slice B incl. selection ring
+vs dropped-seam ownership pin (design-critic); elevation slice incl.
+height-tuple outline cache key (performance-critic); zipper canonical
+pixel-rotation (visual-critic Major); swap-initiative data-coord note
+(design-critic); dev assert bbox-vs-userData (performance-critic); composer
+duplicate/integer record guards + outline-absent harness path (qa-tester);
+per-record outline width (design-critic nit); hover cursor styling.
+
 ## Tile-kit: grass family (Modular Isometric Biome Tile System) — Assets & Art — 2026-08-06
 Commit: 3599808
 Summary: FIRST biome family of the tile-system initiative: 13 distinct variants

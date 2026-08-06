@@ -9,6 +9,14 @@ CPU until killed by PID; /tmp/opencode reads were permission-denied, so temp
 logs moved to tests/.tmp-baseline/ (now gitignored).
 Retries: ui-critic 2 attempts (1 retry); pkill/process checks repeated
 
+---
+
+## 2026-08-06 — TileMapComposer slice A cycle (user revisions)
+Subagent: feature-writer (rev-2 outline round), design-critic (rev-2 + rev-3/4 re-checks), performance-critic (rev-1 re-check), plus infra notes
+Observed: feature-writer rev-2 round returned EMPTY (completed with no output); design-critic returned EMPTY twice (rev-2 re-check, rev-3/4 re-check); performance-critic returned EMPTY once (rev-1 re-check). All four resumed the SAME session with a continue nudge and completed on the next attempt — no fresh agents were started. Also: one CI capture run failed with "Timed out after 30000 ms while waiting for the WS endpoint URL to appear in stdout" (Chrome startup flake on the runner); retried the same dispatch once and it succeeded. Also: `git push origin dev` timed out at 60s once; a second attempt with a 180s timeout succeeded (lesson: use long timeouts for pushes, they can take minutes).
+Retries: 4 subagent resumes (all successful); 1 capture re-dispatch (successful); 1 push retry (successful)
+Resolution: all resumed successfully on the same-session path
+
 # Incidents
 
 Append-only. `game-director` writes here whenever a subagent fails 3 retries

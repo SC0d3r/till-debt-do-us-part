@@ -2,7 +2,6 @@
   "status": "idle",
   "feature": null,
   "current_step": null,
-  "last_updated": "2026-08-06T13:20:00Z",
-  "notes": "tile-kit grass family shipped (all critics green). Next cycle: TileMapComposer + showcase map per brief section 6.",
-  "subagent_sessions": {}
+  "last_updated": "2026-08-06T20:10:00Z",
+  "notes": "TileMapComposer slice A SHIPPED as dev d78dc8c (pushed). All revisions landed: diagonal lattice (no holes), per-record rotation, one-line-per-seam outlines with biome-match seam ownership, per-instance colors, green-vs-brown A/B showcase. All critics green (SHIP/SHIP w/followups), qa-tester SHIP w/followups. Docs committed next. Milestone check: default cadence met (6 features since v0.1, 2 categories) — milestone regression dispatched; merge to master + tag v0.2 if green."
 }
