@@ -26,7 +26,8 @@ import { PlayerState, type InventoryItem } from '../player/PlayerState'
 import { TileType, type FarmGrid } from '../farm/FarmGrid'
 import { CROPS, TOOLS, GAME_CONFIG } from '../data/gameData'
 import { sound } from '../core/SoundManager'
-import { disposeObject } from '../core/disposeObject'
+import type { MineTile } from '../mine/MineSystem'
+import * as THREE from 'three'
 import fixtures from '../../tests/scene-fixtures.json'
 
 interface FixtureDef {
@@ -63,11 +64,69 @@ const registry = fixtures as FixtureDef[]
 const SETTLE_MS = 600
 const FIXED_SEED = 42
 
-export function initDevHarness(game: unknown): void {
+// ─── Composition graph ───
+// The harness reaches into the game through this graph of subsystem handles
+// (grown as src/main.ts modularizes) plus a handful of Game fields that stay
+// in the composition root (`game as any`): started/paused/slotOpen, the fast
+// mode fields, setFastMode and debugDispatch. Every private member the harness
+// used to poke via (game as any) routes through here instead.
+export interface DevHarnessGraph {
+  world: { scene: THREE.Scene; playerModel: THREE.Group }
+  player: PlayerState
+  playerController: {
+    getFacingTile: () => { x: number; z: number }
+    useUnstuck: () => void
+  }
+  playerActions: {
+    updateHeldVisual: () => void
+  }
+  mine: {
+    inMine: boolean
+    updateMineHUD: () => void
+  }
+  mineSystem: {
+    currentFloor: number
+    digsLeft: number
+    floors: MineTile[][][]
+    descend: () => void
+  }
+  buyer: {
+    reset: () => void
+  }
+  ui: {
+    shopOpen: boolean
+    inventoryOpen: boolean
+    updateHUD: (player: PlayerState) => void
+    invalidateHotbarCache: () => void
+    openInventory: (player: PlayerState) => void
+    closeShop: () => void
+    closeInventory: () => void
+  }
+  dialogue: {
+    active: boolean
+    close: () => void
+    show: (id: string, onChoice?: (action: string) => void, labelOverrides?: Record<string, string>) => void
+    showRaw: (speaker: string, text: string, onChoice?: (action: string) => void) => void
+  }
+  farm: {
+    get: () => FarmGrid | null
+  }
+}
+
+export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
   const params = new URLSearchParams(window.location.search)
   if (!params.has('debug')) return
 
   const g = game as any
+  const world = graph.world
+  const player = graph.player
+  const playerActions = graph.playerActions
+  const mineCtrl = graph.mine
+  const mineSys = graph.mineSystem
+  const buyer = graph.buyer
+  const ui = graph.ui
+  const dialogue = graph.dialogue
+  const farm = graph.farm
   const freshPlayer = new PlayerState()
 
   let dirtyAt = 0
@@ -196,10 +255,10 @@ export function initDevHarness(game: unknown): void {
       }
     }
     // Refresh visuals after any mutation.
-    g.ui.updateHUD(g.player)
-    g.updateHeldVisual()
-    if (playerChanged) g.ui.invalidateHotbarCache()
-    if (mineChanged) g.updateMineHUD()
+    ui.updateHUD(player)
+    playerActions.updateHeldVisual()
+    if (playerChanged) ui.invalidateHotbarCache()
+    if (mineChanged) mineCtrl.updateMineHUD()
     markDirty()
     await waitForSettle()
   }
@@ -208,7 +267,7 @@ export function initDevHarness(game: unknown): void {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
       throw new Error('setState: player must be an object')
     }
-    const p = g.player as PlayerState
+    const p = player
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
       switch (k) {
         case 'gold': p.gold = requireNum(v, 'player.gold'); break
@@ -254,11 +313,11 @@ export function initDevHarness(game: unknown): void {
     let z: number | undefined
     if (v.x !== undefined) x = requireNum(v.x, 'position.x')
     if (v.z !== undefined) z = requireNum(v.z, 'position.z')
-    const pos = g.playerModel.position
+    const pos = world.playerModel.position
     let minX = 0.2, maxX = GAME_CONFIG.farmWidth - 0.8
     let minZ = 0.2, maxZ = GAME_CONFIG.farmHeight - 0.8
-    if (g.inMine) {
-      const fl = g.mine.floors[g.mine.currentFloor]
+    if (mineCtrl.inMine) {
+      const fl = mineSys.floors[mineSys.currentFloor]
       const sz = fl?.length || 10
       minX = 0.3; maxX = sz - 0.3
       minZ = 0.3; maxZ = sz - 0.3
@@ -272,11 +331,11 @@ export function initDevHarness(game: unknown): void {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
       throw new Error('setState: farm must be an object')
     }
-    const farm = g.farm
-    if (!farm) throw new Error('setState: farm is not created yet (start the game first)')
+    const farmGrid = farm.get()
+    if (!farmGrid) throw new Error('setState: farm is not created yet (start the game first)')
     for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-      if (key === 'tiles') applyFarmTiles(farm, val)
-      else if (key === 'binItems') farm.binItems = copyBinItems(val, 'farm.binItems')
+      if (key === 'tiles') applyFarmTiles(farmGrid, val)
+      else if (key === 'binItems') farmGrid.binItems = copyBinItems(val, 'farm.binItems')
       else throw new Error(`setState: unknown farm key "${key}" (supported: tiles, binItems)`)
     }
   }
@@ -328,10 +387,10 @@ export function initDevHarness(game: unknown): void {
       throw new Error('setState: mine must be an object')
     }
     const v = value as Record<string, unknown>
-    const wantsIn = v.inMine === undefined ? g.inMine : requireBool(v.inMine, 'mine.inMine')
-    if (wantsIn && !g.inMine) {
+    const wantsIn = v.inMine === undefined ? mineCtrl.inMine : requireBool(v.inMine, 'mine.inMine')
+    if (wantsIn && !mineCtrl.inMine) {
       g.debugDispatch('enterMine')
-    } else if (!wantsIn && g.inMine) {
+    } else if (!wantsIn && mineCtrl.inMine) {
       g.debugDispatch('exitMine')
     }
     if (v.floor !== undefined) {
@@ -339,11 +398,11 @@ export function initDevHarness(game: unknown): void {
       if (floor < 0 || floor >= GAME_CONFIG.mineFloors) {
         throw new Error(`setState: mine.floor ${floor} out of range 0..${GAME_CONFIG.mineFloors - 1}`)
       }
-      if (g.inMine) {
-        while (g.mine.currentFloor < floor) g.mine.descend()
+      if (mineCtrl.inMine) {
+        while (mineSys.currentFloor < floor) mineSys.descend()
       }
     }
-    if (v.digsLeft !== undefined) g.mine.digsLeft = requireNum(v.digsLeft, 'mine.digsLeft')
+    if (v.digsLeft !== undefined) mineSys.digsLeft = requireNum(v.digsLeft, 'mine.digsLeft')
   }
 
   function applyUi(value: unknown) {
@@ -353,22 +412,22 @@ export function initDevHarness(game: unknown): void {
     for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
       switch (key) {
         case 'shopOpen':
-          if (requireBool(val, 'ui.shopOpen')) { if (!g.ui.shopOpen) g.debugDispatch('openShop') }
-          else { if (g.ui.shopOpen) g.debugDispatch('closeShop') }
+          if (requireBool(val, 'ui.shopOpen')) { if (!ui.shopOpen) g.debugDispatch('openShop') }
+          else { if (ui.shopOpen) g.debugDispatch('closeShop') }
           break
         case 'inventoryOpen':
-          if (requireBool(val, 'ui.inventoryOpen')) { if (!g.ui.inventoryOpen) g.debugDispatch('openInventory') }
-          else { if (g.ui.inventoryOpen) g.debugDispatch('closeInventory') }
+          if (requireBool(val, 'ui.inventoryOpen')) { if (!ui.inventoryOpen) g.debugDispatch('openInventory') }
+          else { if (ui.inventoryOpen) g.debugDispatch('closeInventory') }
           break
         case 'dialogue':
           if (val === null) {
-            if (g.dialogue.active) g.dialogue.close()
+            if (dialogue.active) dialogue.close()
           } else {
             if (typeof val !== 'object' || val === null) throw new Error('setState: ui.dialogue must be {speaker, text} or null')
             const d = val as Record<string, unknown>
             const speaker = requireString(d.speaker, 'ui.dialogue.speaker')
             const text = requireString(d.text, 'ui.dialogue.text')
-            g.dialogue.showRaw(speaker, text)
+            dialogue.showRaw(speaker, text)
           }
           break
         case 'slotOpen':
@@ -390,9 +449,8 @@ export function initDevHarness(game: unknown): void {
 
   // ── getState ──
   function getState(): Record<string, unknown> {
-    const p = g.player as PlayerState
-    const farm = g.farm as FarmGrid | null
-    const mine = g.mine
+    const p = player
+    const farmGrid = farm.get()
     const startOverlay = document.getElementById('start-overlay')
     const pauseOverlay = document.getElementById('pause-overlay')
     const paymentOverlay = document.getElementById('payment-overlay')
@@ -403,9 +461,9 @@ export function initDevHarness(game: unknown): void {
       ready: api.ready,
       started: g.started,
       paused: g.paused,
-      inMine: g.inMine,
+      inMine: mineCtrl.inMine,
       slotOpen: g.slotOpen,
-      scene: g.slotOpen ? 'slot' : g.inMine ? 'mine' : g.started ? 'farm' : 'menu',
+      scene: g.slotOpen ? 'slot' : mineCtrl.inMine ? 'mine' : g.started ? 'farm' : 'menu',
       player: {
         gold: p.gold, debt: p.debt, day: p.day, timeOfDay: p.timeOfDay, stamina: p.stamina, maxStamina: p.maxStamina,
         waterLevel: p.waterLevel, maxWater: p.maxWater, selectedSlot: p.selectedSlot,
@@ -418,26 +476,26 @@ export function initDevHarness(game: unknown): void {
         dogPettedToday: p.dogPettedToday, daysWithoutPettingDog: p.daysWithoutPettingDog,
         debtDeadlineBonus: p.debtDeadlineBonus,
       },
-      position: { x: g.playerModel.position.x, y: g.playerModel.position.y, z: g.playerModel.position.z },
-      farm: farm ? {
-        width: farm.width, height: farm.height,
-        binItems: farm.binItems.map(b => ({ id: b.id, count: b.count })),
-        tiles: farm.tiles.map(row => row.map(t => ({
+      position: { x: world.playerModel.position.x, y: world.playerModel.position.y, z: world.playerModel.position.z },
+      farm: farmGrid ? {
+        width: farmGrid.width, height: farmGrid.height,
+        binItems: farmGrid.binItems.map(b => ({ id: b.id, count: b.count })),
+        tiles: farmGrid.tiles.map(row => row.map(t => ({
           type: t.type, cropId: t.cropId, growthDay: t.growthDay, watered: t.watered, treeAge: t.treeAge,
         }))),
       } : null,
-      mine: { currentFloor: mine.currentFloor, digsLeft: mine.digsLeft },
+      mine: { currentFloor: mineSys.currentFloor, digsLeft: mineSys.digsLeft },
       ui: {
-        shopOpen: g.ui.shopOpen,
-        inventoryOpen: g.ui.inventoryOpen,
-        dialogueActive: g.dialogue.active,
+        shopOpen: ui.shopOpen,
+        inventoryOpen: ui.inventoryOpen,
+        dialogueActive: dialogue.active,
         startOverlayVisible: !!startOverlay && startOverlay.style.display !== 'none',
         pauseOverlayVisible: !!pauseOverlay && pauseOverlay.style.display !== 'none',
         paymentOverlayVisible: !!paymentOverlay && paymentOverlay.style.display !== 'none',
         slotScreenVisible: !!slotScreen && slotScreen.classList.contains('show'),
       },
       dialogue: {
-        active: g.dialogue.active,
+        active: dialogue.active,
         speaker: dialogSpeaker ? dialogSpeaker.textContent : '',
         text: dialogText ? dialogText.textContent : '',
       },
@@ -474,14 +532,14 @@ export function initDevHarness(game: unknown): void {
     if (typeof days !== 'number' || !Number.isFinite(days) || days < 0) {
       throw new Error(`fastForward: days must be a non-negative number, got ${String(days)}`)
     }
-    const farm = g.farm
-    if (!farm) throw new Error('fastForward: game not started')
+    const farmGrid = farm.get()
+    if (!farmGrid) throw new Error('fastForward: game not started')
     // Exit the mine and close every overlay first, mirroring what a sleeping
     // player would do, so advancing days can't interact with an open panel.
-    if (g.inMine) g.debugDispatch('exitMine')
-    if (g.ui.shopOpen) g.debugDispatch('closeShop')
-    if (g.ui.inventoryOpen) g.debugDispatch('closeInventory')
-    if (g.dialogue.active) g.dialogue.close()
+    if (mineCtrl.inMine) g.debugDispatch('exitMine')
+    if (ui.shopOpen) g.debugDispatch('closeShop')
+    if (ui.inventoryOpen) g.debugDispatch('closeInventory')
+    if (dialogue.active) dialogue.close()
     if (g.slotOpen) g.debugDispatch('closeSlot')
     if (g.paused) {
       g.paused = false
@@ -490,13 +548,13 @@ export function initDevHarness(game: unknown): void {
       sound.resumeMusic()
     }
     for (let i = 0; i < days; i++) {
-      g.player.advanceDay()
-      farm.advanceDay()
+      player.advanceDay()
+      farmGrid.advanceDay()
     }
-    g.ui.updateHUD(g.player)
-    g.updateHeldVisual()
-    g.ui.invalidateHotbarCache()
-    g.updateMineHUD()
+    ui.updateHUD(player)
+    playerActions.updateHeldVisual()
+    ui.invalidateHotbarCache()
+    mineCtrl.updateMineHUD()
     markDirty()
     await waitForSettle()
   }
@@ -506,41 +564,41 @@ export function initDevHarness(game: unknown): void {
     switch (name) {
       case 'cropMatured': {
         const { x, z } = requireXZ(payload, 'cropMatured')
-        const farm = g.farm
-        if (!farm) throw new Error('triggerEvent cropMatured: game not started')
-        const tile = farm.getTile(x, z)
+        const farmGrid = farm.get()
+        if (!farmGrid) throw new Error('triggerEvent cropMatured: game not started')
+        const tile = farmGrid.getTile(x, z)
         if (!tile) throw new Error(`triggerEvent cropMatured: no tile at ${x},${z}`)
         if (!tile.cropId) throw new Error(`triggerEvent cropMatured: no crop planted at ${x},${z}`)
         const crop = CROPS[tile.cropId]
         if (!crop) throw new Error(`triggerEvent cropMatured: unknown crop "${tile.cropId}"`)
         tile.growthDay = crop.growthDays
-        farm.updateTileVisual(x, z)
+        farmGrid.updateTileVisual(x, z)
         break
       }
       case 'toolBroke': {
         const payloadObj = (payload ?? {}) as Record<string, unknown>
         const toolId = requireString(payloadObj.toolId, 'toolBroke.toolId')
         if (!TOOLS[toolId]) throw new Error(`triggerEvent toolBroke: unknown tool "${toolId}"`)
-        g.player.toolDurability[toolId] = 0
+        player.toolDurability[toolId] = 0
         sound.error()
-        g.dialogue.show('tool_broken')
+        dialogue.show('tool_broken')
         break
       }
       case 'buyerArrives': {
         const payloadObj = (payload ?? {}) as Record<string, unknown>
         const items = copyBinItems(payloadObj.items, 'buyerArrives.items')
-        const farm = g.farm
-        if (!farm) throw new Error('triggerEvent buyerArrives: game not started')
-        farm.binItems = items
+        const farmGrid = farm.get()
+        if (!farmGrid) throw new Error('triggerEvent buyerArrives: game not started')
+        farmGrid.binItems = items
         g.debugDispatch('triggerMorningBuyer')
         break
       }
       default:
         throw new Error(`triggerEvent: unknown event "${name}" (supported: cropMatured, toolBroke, buyerArrives)`)
     }
-    g.ui.updateHUD(g.player)
-    g.updateHeldVisual()
-    g.ui.invalidateHotbarCache()
+    ui.updateHUD(player)
+    playerActions.updateHeldVisual()
+    ui.invalidateHotbarCache()
     markDirty()
     await waitForSettle()
   }
@@ -560,9 +618,9 @@ export function initDevHarness(game: unknown): void {
   // ── Reset / leak prevention ──
   async function reset(): Promise<void> {
     // Close every open panel/overlay so nothing leaks into the next fixture.
-    if (g.dialogue?.active) g.dialogue.close()
-    if (g.ui?.shopOpen) g.ui.closeShop()
-    if (g.ui?.inventoryOpen) g.ui.closeInventory()
+    if (dialogue?.active) dialogue.close()
+    if (ui?.shopOpen) ui.closeShop()
+    if (ui?.inventoryOpen) ui.closeInventory()
     if (g.paused) {
       g.paused = false
       const pauseOverlay = document.getElementById('pause-overlay')
@@ -570,20 +628,15 @@ export function initDevHarness(game: unknown): void {
       sound.resumeMusic()
     }
     if (g.slotOpen) g.debugDispatch('closeSlot')
-    if (g.inMine) g.debugDispatch('exitMine')
+    if (mineCtrl.inMine) g.debugDispatch('exitMine')
     const paymentOverlay = document.getElementById('payment-overlay')
     if (paymentOverlay) paymentOverlay.style.display = 'none'
     const deleteOverlay = document.getElementById('delete-confirm-overlay')
     if (deleteOverlay) deleteOverlay.style.display = 'none'
     // Remove the morning-buyer NPC if a previous triggerEvent left one walking.
-    if (g.npcModel) {
-      g.scene.remove(g.npcModel)
-      disposeObject(g.npcModel)
-      g.npcModel = null
-    }
-    g.morningBuyerActive = false
-    g.morningBuyerPhase = 'idle'
-    if (g.farm) g.farm.binItems = []
+    buyer.reset()
+    const farmGrid = farm.get()
+    if (farmGrid) farmGrid.binItems = []
     // Fresh player state: Game constructs PlayerState once in its constructor,
     // so overwrite every field from a pristine template instead of trying to
     // re-instantiate it.
@@ -591,7 +644,7 @@ export function initDevHarness(game: unknown): void {
     // The game loop runs during the 600ms settle window and checkStoryTriggers()
     // (src/main.ts) fires intro_1 every frame while introSeen is false — force
     // both story flags so no dialogue can pop over a fixture mid-settle.
-    const freshP = g.player as PlayerState
+    const freshP = player
     freshP.introSeen = true
     freshP.grimesFirstSeen = true
     // Saves written by previous fixture runs must not leak into the next one.
@@ -602,7 +655,7 @@ export function initDevHarness(game: unknown): void {
   }
 
   function copyFreshPlayer() {
-    const p = g.player as PlayerState
+    const p = player
     const f = freshPlayer
     p.gold = f.gold
     p.debt = f.debt
@@ -665,7 +718,7 @@ export function initDevHarness(game: unknown): void {
         position: { x: 8, z: 8.5 },
       })
       // Face the ripe patch (patch at z=5..6, player at z=8.5 → facing -z).
-      g.playerModel.rotation.y = Math.PI
+      world.playerModel.rotation.y = Math.PI
     },
 
     'farm-night': async () => {
@@ -687,7 +740,7 @@ export function initDevHarness(game: unknown): void {
         position: { x: 8, z: 8.5 },
       })
       // Face the ripe patch (patch at z=5..6, player at z=8.5 → facing -z).
-      g.playerModel.rotation.y = Math.PI
+      world.playerModel.rotation.y = Math.PI
     },
 
     'shop-open': async () => {
@@ -716,7 +769,7 @@ export function initDevHarness(game: unknown): void {
       // it clears the typewriter interval, renders the full text and calls
       // showChoices() synchronously. The settle then captures the complete intro
       // with its real choice button visible (typewriter skipped).
-      g.dialogue.show('intro_1')
+      dialogue.show('intro_1')
       const dialogBox = document.getElementById('dialog-box')
       if (dialogBox) dialogBox.click()
       markDirty()

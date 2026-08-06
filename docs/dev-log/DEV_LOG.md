@@ -16,6 +16,35 @@ Follow-ups queued: <backlog items added as a result, or "none">
 
 ---
 
+## Modularize main.ts — Tech & Performance — 2026-08-05
+Commit: <pending>
+Summary: 1946-line Game monolith split into 14 subsystem modules under src/
+(WorldBuilder, DayNightDriver, PlayerController, PlayerActionsController,
+DogController, ShopNpcController, MorningBuyerController, ShipmentController,
+PaymentOverlay, CoinFx, RootEvents, MineController, StoryController,
+SaveController) + a DebugActionRegistry for debugDispatch. main.ts is now a
+548-line composition root: construction, wiring, loop choreography, pause,
+fast-mode, and per-subsystem update() calls in the exact original order.
+Narrow context interfaces throughout — no subsystem imports the Game type, no
+circular imports (madge-clean, wired as npm run check:cycles). devHarness
+migrated to a devGraph (initDevHarness(game, graph)) with the observable
+__debug API pinned byte-for-byte (getState shape, setState error strings,
+fixture setups, unknown-action throw). Quirk checklist preserved verbatim:
+the 'this.pRightArm'/'this.pLeftArm' bone lookups (player AND shop) and the
+unreachable updateUnstuckBtn call stay exactly as they were. The (this as any)
+_buyerLines/_buyerTotal hacks became real fields in MorningBuyerController.
+Zero-behavior-change: qa-harness 120/124 (same 4 pinned gap probes A27/A28/
+A29/E-H1), probe-daynight 57/57, e2e-full-loop 57/57, prod gate clean, prod
+bundle byte-identical to pre-refactor (631 kB, same hash), 9/9 fixture
+screenshots re-captured and visually verified. Two pre-existing flakes
+confirmed NOT regressions: H7b (unseeded Math.random in MineSystem
+.generateFloor can put a rock on the spawn-facing tile) and L9b (slot SPIN
+click can land on #slot-fade overlay within 450ms of open).
+Verdicts: design=SHIP WITH FOLLOWUPS ui=SHIP visual=SHIP performance=SHIP qa=SHIP WITH FOLLOWUPS
+Follow-ups queued: dead-getLang-export, shared-cooldowns-seam, h7b-mine-dig-flake-root-fix, unstuck-button-cooldown-feedback, morningbuyer-vector3-allocations
+
+---
+
 ## CI pipeline verification — Tech & Performance — 2026-08-05
 Commit: 9bbe43e (range 7942df8..9bbe43e, 12 commits)
 Summary: Moved the puppeteer test/capture pipeline from local Chrome to

@@ -28,6 +28,14 @@ the next cycle's Ideate step will top it back up.
 
 ## Shipped
 
+- [shipped] (Tech & Performance, L) Modularize main.ts — 1946-line Game
+  monolith split into 14 subsystem modules (WorldBuilder, DayNightDriver,
+  PlayerController, PlayerActionsController, Dog/ShopNpc/MorningBuyer
+  controllers, ShipmentController, PaymentOverlay, CoinFx, RootEvents,
+  MineController, StoryController, SaveController) + DebugActionRegistry;
+  main.ts is now a 548-line composition root. Zero-behavior-change; quirk
+  checklist preserved (bone-name lookups, unreachable updateUnstuckBtn);
+  devHarness migrated to devGraph with pinned __debug API. (dev, 2026-08-05)
 - [shipped] (Tech & Performance, M) CI pipeline verification — moved the
   puppeteer test/capture pipeline to GitHub Actions: `puppeteer-tests.yml`
   workflow (dev-mode build so the harness survives, `test:e2e` script,
@@ -56,15 +64,30 @@ the next cycle's Ideate step will top it back up.
   runtimes after fix round: qa-harness 120/124 @ 4m42s, probe-daynight 57/57 @
   1m38s, e2e-full-loop 57/57 @ 3m13s. (dev, 2026-08-05)
 
+## Follow-ups from modularize-main-ts review (2026-08-05)
+
+- [idea] (Tech & Performance, XS) Dead getLang export — src/core/i18n.ts still
+  exports getLang but nothing imports it since the refactor; remove or it reads
+  as a live API. design-critic Minor.
+- [idea] (Tech & Performance, XS) Shared cooldowns seam — `{ actionCooldown }`
+  is handed to both PlayerActionsController and MineController and decremented
+  by the root; faithful to the original but a seam in the narrow-interfaces
+  story. Give it a single owner or a portal. design-critic Minor.
+- [idea] (Tech & Performance, S) H7b mine-dig flake root fix — seed
+  MineSystem.generateFloor with worldSeed (or exclude the spawn-facing tile
+  from rocks) so the dig probe is deterministic; ~15% of runs the spawn-facing
+  tile is a rock and digsLeft stays 15. qa-tester Minor (pre-existing).
+- [idea] (Polish & Game Feel, XS) Unstuck button cooldown feedback — the
+  updateUnstuckBtn call is unconditionally unreachable (after the paused
+  early-return), so the player gets no visual cooldown state on UNSTUCK beyond
+  an error beep. Pre-existing; now that the quirk is documented, decide
+  whether to fix deliberately. ui-critic Minor.
+- [idea] (Tech & Performance, XS) MorningBuyer Vector3 allocations — 3 new
+  THREE.Vector3 per tick while the buyer is active (~5s/day); pre-existing,
+  pool them. performance-critic Minor.
+
 ## Follow-ups from fast-QA review (2026-08-05)
 
-- [idea] (Tech & Performance, L) Modularize main.ts — 1946-line monolith Game
-  class; extract subsystems (player/actions, farm, mine, slot, shop/buyer,
-  dog, day-cycle driving, save, story) into modules under src/, leaving
-  main.ts a thin composition root. Owner directive (2026-08-05): modular code
-  is mandatory for all future features; this refactor is the enabler.
-  Zero-behavior-change refactor — gate on full test suite + screenshot
-  parity.
 - [idea] (Core Loop, M) Slot machine SPIN click populates 0 reel cells — real
   game bug surfaced by CI e2e (L9b, runs 30996286294/31006867682/31008271519/
   31008271710, all 56/57). Clicking the real SPIN button via puppeteer leaves

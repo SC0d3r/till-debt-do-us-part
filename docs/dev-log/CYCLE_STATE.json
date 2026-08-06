@@ -1,6 +1,7 @@
 {
-  "status": "idle",
-  "feature": null,
-  "current_step": null,
-  "last_updated": "2026-08-05T15:00:00Z"
+  "status": "in-progress",
+  "feature": "modularize-main-ts",
+  "category": "Tech & Performance",
+  "current_step": 6,
+  "last_updated": "2026-08-05T16:00:00Z"
 }
