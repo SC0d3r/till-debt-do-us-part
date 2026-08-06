@@ -1,112 +1,117 @@
 {
   "main-menu": {
     "path": "tests/screenshots/main-menu.png",
-    "capturedAt": "2026-08-06T10:44:47.557Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.821Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "farm-day": {
     "path": "tests/screenshots/farm-day.png",
-    "capturedAt": "2026-08-06T10:44:47.557Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.821Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "farm-crops-grown": {
     "path": "tests/screenshots/farm-crops-grown.png",
-    "capturedAt": "2026-08-06T10:44:47.557Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.821Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "shop-open": {
     "path": "tests/screenshots/shop-open.png",
-    "capturedAt": "2026-08-06T10:44:47.557Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.821Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "inventory-open": {
     "path": "tests/screenshots/inventory-open.png",
-    "capturedAt": "2026-08-06T10:44:47.557Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.821Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "dialogue-open": {
     "path": "tests/screenshots/dialogue-open.png",
-    "capturedAt": "2026-08-06T10:44:47.557Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.821Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "mine-floor-1": {
     "path": "tests/screenshots/mine-floor-1.png",
-    "capturedAt": "2026-08-06T10:44:47.557Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.821Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "slot-machine": {
     "path": "tests/screenshots/slot-machine.png",
-    "capturedAt": "2026-08-06T10:44:47.558Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.821Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "farm-night": {
     "path": "tests/screenshots/farm-night.png",
-    "capturedAt": "2026-08-06T10:44:47.557Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.821Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "grass-plain": {
     "path": "tests/screenshots/grass-plain.png",
-    "capturedAt": "2026-08-06T10:44:47.558Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.822Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "grass-flowers": {
     "path": "tests/screenshots/grass-flowers.png",
-    "capturedAt": "2026-08-06T10:44:47.558Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.822Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "grass-bushes": {
     "path": "tests/screenshots/grass-bushes.png",
-    "capturedAt": "2026-08-06T10:44:47.558Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.822Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "grass-dirt-n": {
     "path": "tests/screenshots/grass-dirt-n.png",
-    "capturedAt": "2026-08-06T10:44:47.558Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.822Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "grass-dirt-e": {
     "path": "tests/screenshots/grass-dirt-e.png",
-    "capturedAt": "2026-08-06T10:44:47.558Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.822Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "grass-dirt-s": {
     "path": "tests/screenshots/grass-dirt-s.png",
-    "capturedAt": "2026-08-06T10:44:47.558Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.822Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "grass-dirt-w": {
     "path": "tests/screenshots/grass-dirt-w.png",
-    "capturedAt": "2026-08-06T10:44:47.558Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.822Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "grass-tilled": {
     "path": "tests/screenshots/grass-tilled.png",
-    "capturedAt": "2026-08-06T10:44:47.558Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.822Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "dirt-plain": {
     "path": "tests/screenshots/dirt-plain.png",
-    "capturedAt": "2026-08-06T10:44:47.558Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.822Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "grass-tilled-e": {
     "path": "tests/screenshots/grass-tilled-e.png",
-    "capturedAt": "2026-08-06T10:44:47.558Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.822Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "grass-tilled-s": {
     "path": "tests/screenshots/grass-tilled-s.png",
-    "capturedAt": "2026-08-06T10:44:47.558Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.822Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "grass-tilled-w": {
     "path": "tests/screenshots/grass-tilled-w.png",
-    "capturedAt": "2026-08-06T10:44:47.558Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.822Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
   },
   "grass-tilled-n": {
     "path": "tests/screenshots/grass-tilled-n.png",
-    "capturedAt": "2026-08-06T10:44:47.558Z",
-    "commit": "91e8b08cc838f7a4e0630e80bedf32fde0bb9333"
+    "capturedAt": "2026-08-06T23:22:22.822Z",
+    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
+  },
+  "tile-showcase": {
+    "path": "tests/screenshots/tile-showcase.png",
+    "capturedAt": "2026-08-06T23:35:05.855Z",
+    "commit": "f085fdb66ba10d30d79a0d781ffd0279c9ee21b7"
   }
 }

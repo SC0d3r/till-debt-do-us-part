@@ -80,6 +80,22 @@ export const DIRT_ROOT = 0x6e4a24
  *  from both GRASS_ROOT (r+g) and DIRT_ROOT (saturation). */
 export const TILLED_ROOT = 0x4e4832
 
+// ─── Outline palette (convention §3, pinned 2026-08-06) ───
+// Biome default outline colors — one named const, referenced from the
+// VARIANTS manifest so the composer reads them from manifest metadata (via
+// the factory mesh's userData), never from family code. Edge variants use
+// their fromBiome (owner) color. Tunable; the showcase also demonstrates a
+// GREEN alternative on part of the grass field (record-level outlineColor).
+export const OUTLINE_COLORS = {
+  /** Slight brown — the grass baseline outline (demoed against the green
+   *  alternative in the showcase). */
+  grass: 0x4e3d2e,
+  /** Warm earth brown for dirt. */
+  dirt: 0x6b4a2e,
+  /** Dark worked-loam brown for tilled. */
+  tilled: 0x4a3a26,
+}
+
 // ─── Tile anatomy constants ───
 const TOP_Y = 0.45 // top face
 const MID_Y = 0.20 // band split point: top band bottom / root band top
@@ -513,6 +529,7 @@ export const VARIANTS = {
     kind: 'plain',
     topColor: GRASS_TOP,
     baseColor: GRASS_ROOT,
+    outlineColor: OUTLINE_COLORS.grass,
   },
   'grass-flowers': {
     name: 'grass-flowers',
@@ -520,6 +537,7 @@ export const VARIANTS = {
     kind: 'decorated',
     topColor: GRASS_TOP,
     baseColor: GRASS_ROOT,
+    outlineColor: OUTLINE_COLORS.grass,
   },
   'grass-bushes': {
     name: 'grass-bushes',
@@ -527,6 +545,7 @@ export const VARIANTS = {
     kind: 'decorated',
     topColor: GRASS_TOP,
     baseColor: GRASS_ROOT,
+    outlineColor: OUTLINE_COLORS.grass,
   },
   'grass-dirt-n': {
     name: 'grass-dirt-n',
@@ -537,6 +556,7 @@ export const VARIANTS = {
     orientation: 'n',
     topColors: { grass: GRASS_TOP, dirt: COLORS.dirt },
     baseColors: { grass: GRASS_ROOT, dirt: DIRT_ROOT },
+    outlineColor: OUTLINE_COLORS.grass, // edges use their fromBiome (owner) color
   },
   'grass-dirt-e': {
     name: 'grass-dirt-e',
@@ -547,6 +567,7 @@ export const VARIANTS = {
     orientation: 'e',
     topColors: { grass: GRASS_TOP, dirt: COLORS.dirt },
     baseColors: { grass: GRASS_ROOT, dirt: DIRT_ROOT },
+    outlineColor: OUTLINE_COLORS.grass, // edges use their fromBiome (owner) color
   },
   'grass-dirt-s': {
     name: 'grass-dirt-s',
@@ -557,6 +578,7 @@ export const VARIANTS = {
     orientation: 's',
     topColors: { grass: GRASS_TOP, dirt: COLORS.dirt },
     baseColors: { grass: GRASS_ROOT, dirt: DIRT_ROOT },
+    outlineColor: OUTLINE_COLORS.grass, // edges use their fromBiome (owner) color
   },
   'grass-dirt-w': {
     name: 'grass-dirt-w',
@@ -567,6 +589,7 @@ export const VARIANTS = {
     orientation: 'w',
     topColors: { grass: GRASS_TOP, dirt: COLORS.dirt },
     baseColors: { grass: GRASS_ROOT, dirt: DIRT_ROOT },
+    outlineColor: OUTLINE_COLORS.grass, // edges use their fromBiome (owner) color
   },
   'grass-tilled': {
     name: 'grass-tilled',
@@ -574,6 +597,7 @@ export const VARIANTS = {
     kind: 'plain',
     topColor: COLORS.tilled,
     baseColor: TILLED_ROOT,
+    outlineColor: OUTLINE_COLORS.tilled,
   },
   'grass-tilled-n': {
     name: 'grass-tilled-n',
@@ -584,6 +608,7 @@ export const VARIANTS = {
     orientation: 'n',
     topColors: { grass: GRASS_TOP, tilled: COLORS.tilled },
     baseColors: { grass: GRASS_ROOT, tilled: TILLED_ROOT },
+    outlineColor: OUTLINE_COLORS.grass, // edges use their fromBiome (owner) color
   },
   'grass-tilled-e': {
     name: 'grass-tilled-e',
@@ -594,6 +619,7 @@ export const VARIANTS = {
     orientation: 'e',
     topColors: { grass: GRASS_TOP, tilled: COLORS.tilled },
     baseColors: { grass: GRASS_ROOT, tilled: TILLED_ROOT },
+    outlineColor: OUTLINE_COLORS.grass, // edges use their fromBiome (owner) color
   },
   'grass-tilled-s': {
     name: 'grass-tilled-s',
@@ -604,6 +630,7 @@ export const VARIANTS = {
     orientation: 's',
     topColors: { grass: GRASS_TOP, tilled: COLORS.tilled },
     baseColors: { grass: GRASS_ROOT, tilled: TILLED_ROOT },
+    outlineColor: OUTLINE_COLORS.grass, // edges use their fromBiome (owner) color
   },
   'grass-tilled-w': {
     name: 'grass-tilled-w',
@@ -614,6 +641,7 @@ export const VARIANTS = {
     orientation: 'w',
     topColors: { grass: GRASS_TOP, tilled: COLORS.tilled },
     baseColors: { grass: GRASS_ROOT, tilled: TILLED_ROOT },
+    outlineColor: OUTLINE_COLORS.grass, // edges use their fromBiome (owner) color
   },
   'dirt-plain': {
     name: 'dirt-plain',
@@ -621,6 +649,7 @@ export const VARIANTS = {
     kind: 'plain',
     topColor: COLORS.dirt,
     baseColor: DIRT_ROOT,
+    outlineColor: OUTLINE_COLORS.dirt,
   },
 }
 
@@ -640,6 +669,14 @@ export function createGrassTile(variant = 'grass-plain') {
   mesh.userData.variant = variant
   mesh.userData.biome = VARIANTS[variant].biome
   mesh.userData.kind = VARIANTS[variant].kind
+  // Outline frame metadata (convention §3): the composer derives outline
+  // frame heights from these family constants — NOT from the geometry's
+  // bounding box (the bush blobs would inflate it) — and the biome default
+  // outline color from the manifest. `outlineColor` is the fromBiome (owner)
+  // color for edge variants, the biome color for plains/decorated.
+  mesh.userData.outlineTop = TOP_Y
+  mesh.userData.outlineBase = BASE_BOT_Y
+  mesh.userData.outlineColor = VARIANTS[variant].outlineColor
   mesh.castShadow = true
   mesh.receiveShadow = true
   return mesh

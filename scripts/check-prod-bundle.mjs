@@ -15,7 +15,14 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const DIST = join(process.cwd(), 'dist')
-const GATES = ['__debug', 'devHarness']
+const GATES = [
+  '__debug', 'devHarness',
+  // TileMapComposer slice A (2026-08-06): the composer + showcase map are
+  // debug-harness-only this slice (no game module imports them), so the whole
+  // tile-kit must stay tree-shaken out of prod. Strings unique to the kit:
+  'TileMapComposer', 'showcaseMap', 'SHOWCASE_MAP', 'tile-showcase',
+  'showcaseTileMap', 'createGrassTile', 'OUTLINE_COLORS', 'grass-dirt', 'grass-tilled',
+]
 
 function walk(dir) {
   const out = []
