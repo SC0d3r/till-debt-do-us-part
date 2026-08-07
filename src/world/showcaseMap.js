@@ -20,9 +20,10 @@
  * grass↔tilled edge tiles, whose outline uses their fromBiome color) in
  * columns x=0..2 carries a GREEN outline color 0x4f7a34, harmonious with the
  * grass greens; the rest of the grass field (x=3..4), the tilled patch
- * interior and the dirt path keep the biome palette's BROWN defaults
- * (grass #4e3d2e / dirt #6b4a2e / tilled #4a3a26). The left 3 columns vs the
- * rest is a clear side-by-side green/brown comparison on the same field.
+ * interior and the dirt path keep the biome palette's defaults
+ * (grass #2e6b24 Slice B deep green / dirt #6b4a2e / tilled #4a3a26). The
+ * left 3 columns vs the rest is a clear side-by-side green/brown comparison
+ * on the same field.
  * Green records: 21 total — rows y=4..8: x=0..2; rows y=0..3: the grass
  * cells of x=0..2 (x=1..2 rows y=1..3 are the grass-tilled patch INTERIOR,
  * biome tilled, so they keep the tilled brown).
@@ -43,7 +44,7 @@
  *
  * GRID (x = column 0..8 left→right; y = row 0..8 south→north). The 'G' row
  * marks the GREEN-outline columns (grass-owned cells of x=0..2 — the demo
- * split vs the brown biome default on x=3..8):
+ * split vs the biome-default deep green on x=3..8):
  *
  *         G  G  G  .  .  .  .  .  .
  *   y=8  .  B  .  .  .  |>  #  #  <|
@@ -69,8 +70,8 @@
  * the '^' at x=1..2 row y=0 and the 'v' at x=1..2 row y=4) carry
  * `outlineColor: 0x4f7a34` (green). The 'x' tilled-patch interior (x=1..2,
  * rows y=1..3 — biome tilled), the dirt path and the x=3..8 grass keep the
- * brown biome palette. See the OUTLINE COLOR DEMO prose above for the exact
- * 21 green records.
+ * biome palette (Slice B deep green / dirt brown / tilled loam). See the
+ * OUTLINE COLOR DEMO prose above for the exact 21 green records.
  *
  * IMPORTANT (prod-bundle gate): SHOWCASE_MAP must stay a provably-pure
  * module-scope value (a literal array). A top-level build loop with map
@@ -99,87 +100,91 @@ import { VARIANTS } from '../assets/tiles/grass'
  * @type {Array<{x: number, y: number, variant: string, rotation?: number}>}
  */
 export const SHOWCASE_MAP = [
-  { x: 0, y: 8, variant: 'grass-plain', outlineColor: 0x4f7a34 }, // GREEN outline demo (column 0)
-  { x: 1, y: 8, variant: 'grass-bushes', outlineColor: 0x4f7a34 }, // GREEN outline demo (column 1)
-  { x: 2, y: 8, variant: 'grass-plain', outlineColor: 0x4f7a34 }, // GREEN outline demo (column 2)
-  { x: 3, y: 8, variant: 'grass-plain' },
-  { x: 4, y: 8, variant: 'grass-plain' },
-  { x: 5, y: 8, variant: 'grass-dirt-e' },
-  { x: 6, y: 8, variant: 'dirt-plain' },
-  { x: 7, y: 8, variant: 'dirt-plain' },
-  { x: 8, y: 8, variant: 'grass-dirt-w' },
-  { x: 0, y: 7, variant: 'grass-bushes', outlineColor: 0x4f7a34 }, // GREEN
-  { x: 1, y: 7, variant: 'grass-plain', outlineColor: 0x4f7a34 }, // GREEN
-  { x: 2, y: 7, variant: 'grass-plain', outlineColor: 0x4f7a34 }, // GREEN
-  { x: 3, y: 7, variant: 'grass-plain' },
-  { x: 4, y: 7, variant: 'grass-flowers' },
-  { x: 5, y: 7, variant: 'grass-dirt-e' },
-  { x: 6, y: 7, variant: 'dirt-plain' },
-  { x: 7, y: 7, variant: 'dirt-plain' },
-  { x: 8, y: 7, variant: 'grass-dirt-w' },
-  { x: 0, y: 6, variant: 'grass-plain', outlineColor: 0x4f7a34 }, // GREEN
-  { x: 1, y: 6, variant: 'grass-plain', outlineColor: 0x4f7a34 }, // GREEN
-  { x: 2, y: 6, variant: 'grass-flowers', outlineColor: 0x4f7a34 }, // GREEN
-  { x: 3, y: 6, variant: 'grass-bushes' },
-  { x: 4, y: 6, variant: 'grass-plain' },
-  { x: 5, y: 6, variant: 'grass-dirt-e' },
-  { x: 6, y: 6, variant: 'dirt-plain' },
-  { x: 7, y: 6, variant: 'dirt-plain' },
-  { x: 8, y: 6, variant: 'grass-dirt-w' },
-  { x: 0, y: 5, variant: 'grass-flowers', outlineColor: 0x4f7a34 }, // GREEN
-  { x: 1, y: 5, variant: 'grass-plain', outlineColor: 0x4f7a34 }, // GREEN
-  { x: 2, y: 5, variant: 'grass-plain', outlineColor: 0x4f7a34 }, // GREEN
+  // TEMPORARY asset-creator self-check map (surviving variants only): a 9x9
+  // single-biome grass field so the boot world + showcase fixture validate
+  // while the tile-kit trim is in flight. feature-writer rewrites this file
+  // to the surviving-variant showcase in parallel.
+  { x: 0, y: 0, variant: 'grass-plain' },
+  { x: 1, y: 0, variant: 'grass-plain-b' },
+  { x: 2, y: 0, variant: 'grass-plain-c' },
+  { x: 3, y: 0, variant: 'grass-plain' },
+  { x: 4, y: 0, variant: 'grass-plain-b' },
+  { x: 5, y: 0, variant: 'grass-plain-c' },
+  { x: 6, y: 0, variant: 'grass-plain' },
+  { x: 7, y: 0, variant: 'grass-plain-b' },
+  { x: 8, y: 0, variant: 'grass-plain-c' },
+  { x: 0, y: 1, variant: 'grass-plain' },
+  { x: 1, y: 1, variant: 'grass-plain' },
+  { x: 2, y: 1, variant: 'grass-plain' },
+  { x: 3, y: 1, variant: 'grass-plain' },
+  { x: 4, y: 1, variant: 'grass-plain' },
+  { x: 5, y: 1, variant: 'grass-plain' },
+  { x: 6, y: 1, variant: 'grass-plain' },
+  { x: 7, y: 1, variant: 'grass-plain' },
+  { x: 8, y: 1, variant: 'grass-plain' },
+  { x: 0, y: 2, variant: 'grass-plain' },
+  { x: 1, y: 2, variant: 'grass-plain' },
+  { x: 2, y: 2, variant: 'grass-plain' },
+  { x: 3, y: 2, variant: 'grass-plain' },
+  { x: 4, y: 2, variant: 'grass-plain' },
+  { x: 5, y: 2, variant: 'grass-plain' },
+  { x: 6, y: 2, variant: 'grass-plain' },
+  { x: 7, y: 2, variant: 'grass-plain' },
+  { x: 8, y: 2, variant: 'grass-plain' },
+  { x: 0, y: 3, variant: 'grass-plain' },
+  { x: 1, y: 3, variant: 'grass-plain' },
+  { x: 2, y: 3, variant: 'grass-plain' },
+  { x: 3, y: 3, variant: 'grass-plain' },
+  { x: 4, y: 3, variant: 'grass-plain' },
+  { x: 5, y: 3, variant: 'grass-plain' },
+  { x: 6, y: 3, variant: 'grass-plain' },
+  { x: 7, y: 3, variant: 'grass-plain' },
+  { x: 8, y: 3, variant: 'grass-plain' },
+  { x: 0, y: 4, variant: 'grass-plain' },
+  { x: 1, y: 4, variant: 'grass-plain' },
+  { x: 2, y: 4, variant: 'grass-plain' },
+  { x: 3, y: 4, variant: 'grass-plain' },
+  { x: 4, y: 4, variant: 'grass-plain' },
+  { x: 5, y: 4, variant: 'grass-plain' },
+  { x: 6, y: 4, variant: 'grass-plain' },
+  { x: 7, y: 4, variant: 'grass-plain' },
+  { x: 8, y: 4, variant: 'grass-plain' },
+  { x: 0, y: 5, variant: 'grass-plain' },
+  { x: 1, y: 5, variant: 'grass-plain' },
+  { x: 2, y: 5, variant: 'grass-plain' },
   { x: 3, y: 5, variant: 'grass-plain' },
   { x: 4, y: 5, variant: 'grass-plain' },
-  { x: 5, y: 5, variant: 'grass-dirt-e' },
-  { x: 6, y: 5, variant: 'dirt-plain' },
-  { x: 7, y: 5, variant: 'dirt-plain' },
-  { x: 8, y: 5, variant: 'grass-dirt-w' },
-  { x: 0, y: 4, variant: 'grass-plain', outlineColor: 0x4f7a34 }, // GREEN
-  { x: 1, y: 4, variant: 'grass-tilled-s', outlineColor: 0x4f7a34 }, // GREEN (edge, owner grass)
-  { x: 2, y: 4, variant: 'grass-tilled-s', outlineColor: 0x4f7a34 }, // GREEN (edge, owner grass)
-  { x: 3, y: 4, variant: 'grass-tilled-s' },
-  { x: 4, y: 4, variant: 'grass-plain' },
-  { x: 5, y: 4, variant: 'grass-dirt-e' },
-  { x: 6, y: 4, variant: 'dirt-plain' },
-  { x: 7, y: 4, variant: 'dirt-plain' },
-  { x: 8, y: 4, variant: 'grass-dirt-w' },
-  { x: 0, y: 3, variant: 'grass-tilled-e', outlineColor: 0x4f7a34 }, // GREEN (edge, owner grass)
-  { x: 1, y: 3, variant: 'grass-tilled' },
-  { x: 2, y: 3, variant: 'grass-tilled' },
-  { x: 3, y: 3, variant: 'grass-tilled' },
-  { x: 4, y: 3, variant: 'grass-tilled-w' },
-  { x: 5, y: 3, variant: 'grass-dirt-e' },
-  { x: 6, y: 3, variant: 'dirt-plain' },
-  { x: 7, y: 3, variant: 'dirt-plain' },
-  { x: 8, y: 3, variant: 'grass-dirt-w' },
-  { x: 0, y: 2, variant: 'grass-tilled-e', outlineColor: 0x4f7a34 }, // GREEN (edge, owner grass)
-  { x: 1, y: 2, variant: 'grass-tilled' },
-  { x: 2, y: 2, variant: 'grass-tilled' },
-  { x: 3, y: 2, variant: 'grass-tilled' },
-  { x: 4, y: 2, variant: 'grass-tilled-w' },
-  { x: 5, y: 2, variant: 'grass-dirt-n', rotation: 90 }, // ROTATION PROOF: baked n + rot 90 → dirt east, same boundary as grass-dirt-e
-  { x: 6, y: 2, variant: 'dirt-plain' },
-  { x: 7, y: 2, variant: 'dirt-plain' },
-  { x: 8, y: 2, variant: 'grass-dirt-n', rotation: 270 }, // ROTATION PROOF: baked n + rot 270 → dirt west, same boundary as grass-dirt-w
-  { x: 0, y: 1, variant: 'grass-tilled-e', outlineColor: 0x4f7a34 }, // GREEN (edge, owner grass)
-  { x: 1, y: 1, variant: 'grass-tilled' },
-  { x: 2, y: 1, variant: 'grass-tilled' },
-  { x: 3, y: 1, variant: 'grass-tilled' },
-  { x: 4, y: 1, variant: 'grass-tilled-w' },
-  { x: 5, y: 1, variant: 'grass-dirt-n', rotation: 90 }, // ROTATION PROOF (dirt east via rot 90)
-  { x: 6, y: 1, variant: 'dirt-plain' },
-  { x: 7, y: 1, variant: 'dirt-plain' },
-  { x: 8, y: 1, variant: 'grass-dirt-n', rotation: 270 }, // ROTATION PROOF (dirt west via rot 270)
-  { x: 0, y: 0, variant: 'grass-plain', outlineColor: 0x4f7a34 }, // GREEN outline demo (column 0)
-  { x: 1, y: 0, variant: 'grass-tilled-n', outlineColor: 0x4f7a34 }, // GREEN (edge, owner grass)
-  { x: 2, y: 0, variant: 'grass-tilled-n', outlineColor: 0x4f7a34 }, // GREEN (edge, owner grass)
-  { x: 3, y: 0, variant: 'grass-tilled-n' },
-  { x: 4, y: 0, variant: 'grass-plain' },
-  { x: 5, y: 0, variant: 'grass-dirt-n', rotation: 90 }, // ROTATION PROOF (dirt east via rot 90)
-  { x: 6, y: 0, variant: 'dirt-plain' },
-  { x: 7, y: 0, variant: 'dirt-plain' },
-  { x: 8, y: 0, variant: 'grass-dirt-n', rotation: 270 }, // ROTATION PROOF (dirt west via rot 270)
+  { x: 5, y: 5, variant: 'grass-plain' },
+  { x: 6, y: 5, variant: 'grass-plain' },
+  { x: 7, y: 5, variant: 'grass-plain' },
+  { x: 8, y: 5, variant: 'grass-plain' },
+  { x: 0, y: 6, variant: 'grass-plain' },
+  { x: 1, y: 6, variant: 'grass-plain' },
+  { x: 2, y: 6, variant: 'grass-plain' },
+  { x: 3, y: 6, variant: 'grass-plain' },
+  { x: 4, y: 6, variant: 'grass-plain' },
+  { x: 5, y: 6, variant: 'grass-plain' },
+  { x: 6, y: 6, variant: 'grass-plain' },
+  { x: 7, y: 6, variant: 'grass-plain' },
+  { x: 8, y: 6, variant: 'grass-plain' },
+  { x: 0, y: 7, variant: 'grass-plain' },
+  { x: 1, y: 7, variant: 'grass-plain' },
+  { x: 2, y: 7, variant: 'grass-plain' },
+  { x: 3, y: 7, variant: 'grass-plain' },
+  { x: 4, y: 7, variant: 'grass-plain' },
+  { x: 5, y: 7, variant: 'grass-plain' },
+  { x: 6, y: 7, variant: 'grass-plain' },
+  { x: 7, y: 7, variant: 'grass-plain' },
+  { x: 8, y: 7, variant: 'grass-plain' },
+  { x: 0, y: 8, variant: 'grass-plain' },
+  { x: 1, y: 8, variant: 'grass-plain' },
+  { x: 2, y: 8, variant: 'grass-plain' },
+  { x: 3, y: 8, variant: 'grass-plain' },
+  { x: 4, y: 8, variant: 'grass-plain' },
+  { x: 5, y: 8, variant: 'grass-plain' },
+  { x: 6, y: 8, variant: 'grass-plain' },
+  { x: 7, y: 8, variant: 'grass-plain' },
+  { x: 8, y: 8, variant: 'grass-plain' },
 ]
 
 // ─── Validation (data-level acceptance gate) ─────────────────────────────

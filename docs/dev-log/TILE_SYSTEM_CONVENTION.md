@@ -7,6 +7,13 @@ the Modular Isometric Biome Tile System initiative
 against it. If this doc and the code disagree, the code wins and this doc
 needs fixing.
 
+**Slice B (2026-08-07) replaced the coloring/anatomy rules below.** The old
+two-band (top-strip + base-strip) tile shape and the flat per-face
+vertex-tint coloring approach are VOID. The authoritative shape + coloring
+spec is `docs/dev-log/SLICE_B_PIXEL_ART_TILES_AND_PROPS.md` and its two
+reference documents; this section is the in-place replacement of the old
+coloring rule. Do not reintroduce a second band or a flat per-face tint.
+
 ## 1. Tile anatomy (every tile, every biome, no exceptions)
 
 - Footprint: a diamond **inscribed in a 1.0×1.0 grid cell** — vertices at
@@ -22,41 +29,76 @@ needs fixing.
   share FULL edges — solid ground, zero holes, zero overlap. (Zero overlap
   also keeps raycast picking unambiguous.) Data coordinates stay
   axis-aligned integers; only the world transform is the lattice.
-- **Two layers, not three (pinned 2026-08-06, user decision):** every tile has
-  exactly TWO vertical bands, bottom to top, of a total height ~0.45:
-  1. **Root band** — bottom ~45% (the bottom is the SAME height as the top
-     or slightly SHORTER — pinned: top band slightly taller, ~55/45): the
-     floating block's body. Its color is
-     **BIOME-SPECIFIC** and must read as that biome's earth at a glance —
-     grass: dark soil; dirt: dark rich earth; tilled: dark tilled loam. It
-     must be darker and more desaturated than the top material, must stand
-     out, and must never read as near-black. (The old middle side-wall band
-     was removed; its height merged into the root band.)
-  2. **Top face** — top ~55%: the visible/playable surface; flat or very
-     slightly varied. The top slab's side thickness (riser) carries the
-     top-face color per side.
-- **Straight-sided prism (pinned 2026-08-06, user decision):** all bands
-  share the SAME diamond footprint (vertices at ±0.5) — the tile is a
-  straight-sided diamond prism, and the bands are distinguished by COLOR, not
-  by inset geometry. There are NO stepped ledges/overhangs between bands; the
-  side walls drop straight from the top cap to the base. (Reference image 3
-  shows a terraced silhouette; the user chose straight-sided so composed maps
-  read as clean floating blocks against sky/void.) The band boundary is the
-  horizontal color change on the continuous wall.
-- On transition tiles, the root band is split PER SIDE to match the top
-  halves: the side under the dirt half gets the dirt root color, the side
-  under the grass half gets the grass root color, etc.
+- **One section, not two (Slice B, 2026-07-07):** every tile is a SINGLE
+  solid prism from its top face to its base — no separate top band and no
+  darker base band, no internal color-band split. Total height is reduced
+  vs. the old two-band tiles: top face at ~0.34, base at 0 (slightly
+  lower/flatter than the old 0.45 two-band prism). The top-vs-side visual
+  difference comes from the TEXTURE (detailed noisy top vs. simpler banded
+  sides), never from a second geometry section.
+- **Geometry silhouette stays EXACTLY precise (Slice B, non-negotiable).**
+  Same clean diamond footprint, same straight vertical sides, same corner
+  positions as before. `TileMapComposer`'s diagonal-lattice placement math
+  depends on tiles sharing exact edges (zero holes, zero overlap,
+  unambiguous raycast picking), and the outline ribbon system depends on
+  precise corner/edge geometry. All of the "organic, jagged, hand-drawn"
+  quality comes from TEXTURE CONTENT — never from moving real vertices.
+  Don't deform the mesh to fake raggedness — paint it.
+- **Pixel-art texture rules (Slice B, every tile/prop, no exceptions):**
+  - `texture.magFilter = THREE.NearestFilter`, `texture.minFilter =
+    THREE.NearestFilter` on every tile/prop texture. Three.js's default
+    linear filtering blurs pixel art into mush — this single setting is the
+    difference between "pixel art" and "blurry mess".
+  - Draw with `ctx.imageSmoothingEnabled = false` and integer pixel
+    coordinates — no canvas gradients, no anti-aliased strokes. Hard pixel
+    steps only.
+  - **Palette discipline:** very limited colors per tile (usually 4-7
+    including the outline). No smooth gradients — only hard pixel steps.
+  - **Shading model (supersedes the old flat per-face tint):** light from
+    above-left. A thin highlight row of lighter pixels sits just inside the
+    top edge; shadows pool toward the lower-right of the top face and the
+    lower half of side faces. Side faces are 1-2 full steps darker than the
+    top. Build this into the texture itself — real within-face shading, not
+    a single flat tint per face.
+  - **Noise character:** organic and directional — grass blades 1-3 pixels
+    tall and irregular, dirt clumps with meandering 1-pixel cracks, sand
+    grain that clusters rather than scatters uniformly, water sparkle that
+    pools rather than dots evenly. A checkerboard of random color squares is
+    a rejection, not a style choice.
+  - **Baked-in jagged outline:** a jagged, broken, NON-black,
+    dark-hue-of-the-material line drawn near the texture's own edges, giving
+    each tile its hand-drawn character even in isolation. It thickens or
+    thins, skips pixels, and follows the surface noise. This is a property
+    of the texture content, completely independent of (and compatible with)
+    the composer's optional map-level ribbon outline system — build both.
+  - **Top vs. side texture treatment:** the top face gets the
+    detailed/noisy texture; the side face(s) get a simpler, less-noisy
+    banded texture (1-2 steps darker). This is a property of the texture,
+    not a second geometry section.
+- **Shared noise-painting utility (Slice B):** all noise/pattern generation
+  goes through a small shared utility under `src/assets/pixelart/` that any
+  tile or prop texture-generator calls with parameters — base color, accent
+  colors, density, clump size, seed. Every biome's texture generator is a
+  thin wrapper around this same shared painter, the same way tile geometry
+  factories share conventions.
+- **Texture variants (Slice B):** keep 2-3 slightly different texture
+  variants of each common material (e.g. `grass-plain-a`, `grass-plain-b`,
+  `grass-plain-c`) as distinct variant strings in the composer's grouping
+  system — NOT a runtime color-jitter shader trick. The composer already
+  groups instances by variant string, so a later map-generation step can
+  pseudo-randomly distribute the variants with no composer changes.
 - Flat/faceted shading everywhere (`flatShading: true` or equivalent flat
   normals). Crisp edges, no bevels, no smooth gradients.
 - A subtle soft shadow/AO directly under the tile so it separates from the
-  background (the dark root band carries most of this; the composer may add a
-  shared under-shadow layer for whole maps).
+  background (the composer may add a shared under-shadow layer for whole
+  maps).
 
 ## 2. Module convention (asset-creator)
 
 - One module per biome family under `src/assets/tiles/` (e.g.
   `src/assets/tiles/grass.js`), plus one module per prop under
-  `src/assets/props/`.
+  `src/assets/props/`. A shared painter utility lives under
+  `src/assets/pixelart/`.
 - Each tile factory follows the standing convention: self-contained factory
   function returning a `THREE.Group`/`THREE.Object3D`; shared geometry and
   material at MODULE scope, never rebuilt per instance; disposal-safe (a
@@ -106,10 +148,10 @@ needs fixing.
   the family's VARIANTS manifest; the composer reads it from the manifest,
   never from family code.
 - **Module ownership:** one module per biome family (`src/assets/tiles/grass.js`,
-  later `dirt.js`, ...). Until a family's own module ships, its placeholder
-  variants live in the nearest shipped family module (dirt-plain currently
-  lives in grass.js) — the composer keys variants by STRING, never by module,
-  so this stays invisible to it.
+  `water.js`, `sand.js`, `lava.js`, `snow.js`, ...). Until a family's own
+  module ships, its placeholder variants live in the nearest shipped family
+  module — the composer keys variants by STRING, never by module, so this
+  stays invisible to it.
 - **Decorated variants must be InstancedMesh-safe from the start**: a variant
   is a single merged geometry with a single material (e.g. a bush built into
   the tile's own flat-shaded palette and merged into the prism geometry).
@@ -123,6 +165,13 @@ needs fixing.
   define new family colors (e.g. the earthy side-wall band) once in the
   family module and reference them from the manifest so later families
   harmonize.
+- **Outline color per biome (Slice B, pinned):** `mesh.userData.outlineColor`
+  must carry a real per-biome value for the composer's ribbon outline system
+  — grass → deep green, water → deep blue, lava → warm ember orange, snow →
+  cool pale blue, sand/desert → warm brown. This is SEPARATE from the
+  baked-in texture outline color, which follows the per-material rule (a
+  dark hue of that material, e.g. dark forest-green for grass, dark navy for
+  water).
 - **Hover/selection must work on instances**: use per-instance color
   highlighting (`InstancedMesh.setColorAt` + `instanceColor.needsUpdate =
   true`) from the start, never per-object material swaps.
@@ -160,15 +209,14 @@ needs fixing.
   revision):** the outline material is WHITE; each instance's instanceColor =
   resolved outline color × the hover dim factor (0.88 neutral / 1.0 hover),
   initialized at build for every outline instance. Resolution order:
-  per-record `outlineColor` (hex) > biome default palette > map-level
-  `outline.color` > global default. Biome palette (sensible earth tones,
-  tunable, one named const): grass `#4e3d2e` (slight brown — the baseline;
-  the showcase ALSO demonstrates a green alternative on part of the grass
-  field so the user can compare), dirt `#6b4a2e`, tilled `#4a3a26`; edge
-  variants use their fromBiome (owner) color. Width: `outline.width`, default
-  ~0.03. Outline meshes are NOT raycast (hover picks tiles only) and their
-  instanceColor follows the tile's hover brightness. Frame geometry +
-  material are owned and disposed by the composer.
+  per-record `outlineColor` (hex) > biome default palette (per Slice B:
+  grass → deep green, water → deep blue, lava → warm ember orange, snow →
+  cool pale blue, sand → warm brown; dirt/tilled keep warm earth tones) >
+  map-level `outline.color` > global default. Edge variants use their
+  fromBiome (owner) color. Width: `outline.width`, default ~0.03. Outline
+  meshes are NOT raycast (hover picks tiles only) and their instanceColor
+  follows the tile's hover brightness. Frame geometry + material are owned
+  and disposed by the composer.
 - **Outline heights contract (pinned 2026-08-06, performance-critic):** every
   tile factory MUST ship `mesh.userData.outlineTop` / `outlineBase` (cap top /
   prism base heights) — the frame heights are the max/min union over the
