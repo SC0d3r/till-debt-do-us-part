@@ -5,6 +5,12 @@
 Read `docs/dev-log/PROJECT_PIVOT_AND_IDENTITY_OVERRIDE.md` first if you
 haven't already — this slice assumes that pivot is done or in progress.
 
+reference documents for slice B are in address:
+`docs/dev-log/SLICE_B_PIXEL_ART_TILES_AND_PROPS_reference_document_one.md`
+`docs/dev-log/SLICE_B_PIXEL_ART_TILES_AND_PROPS_reference_document_two.md`
+read these reference documents when you want to work on the tile or items these
+documents describe them
+
 **This document replaces `SLICE_B_TILE_FIDELITY_AND_PROPS.md` in its
 entirety.** If that file's work was already started or finished, redo
 whatever conflicts with this spec. If it wasn't started, ignore that file
