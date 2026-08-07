@@ -3,7 +3,7 @@
 // pinned suite doesn't do. This file verifies:
 //   X1  fixture-chain stability: 5× showcase → showcase cycles keep the scene
 //       children count EXACTLY constant (no mesh leaks), then showcase →
-//       farm-day restores the loop, then farm-day → showcase again
+//       showcase again (interrupt) and showcase → preview
 //   X2  hover battery beyond C5/O3: ''-mask records ((2,8),(8,8),(2,0) — zero-
 //       triangle frames) hover + outline-sync without error; rotated (8,0)
 //       rot-270; hover SPAM (100 rapid pointermoves); pointer events outside
@@ -54,8 +54,6 @@ function test(name, pass, detail = '') {
 
 const browser = await puppeteer.launch({ ...(useBundled ? {} : { executablePath: CHROME }), headless: true, args: ARGS,
   defaultViewport: { width: 960, height: 540, deviceScaleFactor: 1 } })
-const sleep = ms => new Promise(r => setTimeout(r, ms))
-const modDist = (a, b) => Math.min((a - b + 1440) % 1440, (b - a + 1440) % 1440)
 
 async function newPage() {
   const page = await browser.newPage()
@@ -102,18 +100,15 @@ section('X1. Fixture-chain stability: 5 showcase cycles + game restore')
   test('X1b each cycle keeps exactly 25 scene children (4 rig lights + 12 tile groups + 9 outline groups)',
     cycleErr === null && counts.every(n => n === 25),
     JSON.stringify(counts))
-  // Showcase → farm-day → showcase: loop resumes with fog, then showcase again.
-  const r2 = await evl(page, () => window.__debug.gotoFixture('farm-day'))
+  // Showcase → showcase (interrupt) → preview: harness stays usable.
+  const r2 = await evl(page, () => window.__debug.gotoFixture('tile-showcase'))
   const s2 = await getState(page)
-  const t2a = s2?.player.timeOfDay
-  await sleep(700)
-  const t2b = (await getState(page))?.player.timeOfDay
-  const r3 = await evl(page, () => window.__debug.gotoFixture('tile-showcase'))
+  const r3 = await evl(page, () => window.__debug.gotoFixture('grass-plain'))
   const s3 = await getState(page)
-  test('X1c showcase → farm-day: started=true, clock resumed, then showcase → ready',
-    r2.ok && s2?.started === true && Number.isFinite(t2a) && Number.isFinite(t2b) && modDist(t2a, t2b) > 1 &&
+  test('X1c showcase → showcase → preview: all resolve, ready',
+    r2.ok && s2?.ready === true && s2?.started === false &&
     r3.ok && s3?.ready === true && s3?.started === false,
-    JSON.stringify({ r2: r2.ok, started: s2?.started, a: t2a, b: t2b, r3: r3.ok, ready3: s3?.ready }))
+    JSON.stringify({ r2: r2.ok, ready2: s2?.ready, r3: r3.ok, ready3: s3?.ready }))
   test('X1d no page errors across the chain', page.__pageErrors.length === 0, JSON.stringify(page.__pageErrors))
   await page.close()
 }
@@ -273,11 +268,11 @@ section('X3. Rejection batteries leave the harness usable (both stages)')
     { x: 0, y: 0, variant: 'grass-plain', rotation: 45 },
   ]))
   const s1 = await getState(page)
-  const r2 = await evl(page, () => window.__debug.gotoFixture('farm-day'))
+  const r2 = await evl(page, () => window.__debug.gotoFixture('tile-showcase'))
   const s2 = await getState(page)
-  test('X3b build-level rejection (rotation 45): throws, harness back to a usable game state',
-    !rot.ok && String(rot.error).includes('rotation') && r2.ok && s2?.started === true && s2?.ready === true,
-    JSON.stringify({ rot: rot.ok ? 'did not throw' : rot.error, r2: r2.ok, started: s2?.started, ready: s2?.ready }))
+  test('X3b build-level rejection (rotation 45): throws, harness back to a usable state',
+    !rot.ok && String(rot.error).includes('rotation') && r2.ok && s2?.ready === true,
+    JSON.stringify({ rot: rot.ok ? 'did not throw' : rot.error, r2: r2.ok, ready: s2?.ready }))
   // And a full recovery chain after all rejections.
   const r3 = await evl(page, () => window.__debug.gotoFixture('tile-showcase'))
   const s3 = await getState(page)

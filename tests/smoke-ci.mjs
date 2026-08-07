@@ -19,10 +19,10 @@ try {
   await page.waitForFunction(() => window.__debug.ready === true, { timeout: 30000 })
   ready = true
 } catch { /* ready never became true */ }
-const hasSetState = await page.evaluate(() => typeof window.__debug.setState === 'function')
-console.log('SMOKE: __debug present, ready =', ready, 'setState =', hasSetState, 'pageErrors =', errs.length)
+const hasListFixtures = await page.evaluate(() => typeof window.__debug.listFixtures === 'function')
+console.log('SMOKE: __debug present, ready =', ready, 'listFixtures =', hasListFixtures, 'pageErrors =', errs.length)
 await browser.close()
-if (!ready || !hasSetState || errs.length) {
+if (!ready || !hasListFixtures || errs.length) {
   console.error('SMOKE FAIL')
   process.exit(1)
 }
