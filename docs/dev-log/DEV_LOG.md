@@ -17,7 +17,7 @@ Follow-ups queued: <backlog items added as a result, or "none">
 ---
 
 ## Slice B: pixel-art tile kit trim + 15-prop library — Assets & Art — 2026-08-08
-Commit: <pending commit>
+Commit: 9529ac6
 Summary: Executed `SLICE_B_PIXEL_ART_TILES_AND_PROPS.md` end to end. Tile kit
 trimmed to plain-only per user revision: six biome families (grass/dirt/
 water/sand/lava/snow) with 12 variants (grass-plain/-b/-c, dirt-plain/-b,
