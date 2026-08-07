@@ -26,7 +26,7 @@ and use `window.__debug` from the console:
   setup (see below). The reset step tears down any active preview — so
   fixtures never leak into each other.
 - **`listFixtures()`** — the fixture registry from `tests/scene-fixtures.json`
-  (13 asset-preview fixtures + the `tile-showcase` map fixture).
+  (23 asset-preview fixtures — one per tile variant across the grass/water/sand/lava/snow families — plus the `tile-showcase` map fixture).
 - **`previewAsset(name)`** — loads exactly one tile asset into a neutral
   studio (plain background, 3-point rig, tight iso framing). Stops the game
   loop for the duration of the preview; teardown restores the world.

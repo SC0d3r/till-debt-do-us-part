@@ -1,12 +1,12 @@
-// QA regression pass — tile-kit grass family (Assets & Art feature, post-pivot).
-// Scope: the tile modules (src/assets/tiles/grass.js, transitionTexture.js)
-// and the dev harness (previewAsset + 13 asset-preview fixtures) must NOT have
+// QA regression pass — tile-kit families (Assets & Art feature, post-pivot).
+// Scope: the tile modules (src/assets/tiles/*.js, transitionTexture.js)
+// and the dev harness (previewAsset + 23 asset-preview fixtures) must NOT have
 // broken anything else. The farming game was deleted (project pivot,
 // 2026-08-07): there are no gameplay fixtures, no clock, no HUD. This file
 // verifies:
-//   T1  registry integrity (14 fixtures: 13 asset-preview + 1 showcase)
+//   T1  registry integrity (24 fixtures: 23 asset-preview + 1 showcase)
 //   T2  boot state: the tile world loads with the loop running (started=true)
-//   T3  all 13 asset-preview fixtures resolve via gotoFixture/previewAsset
+//   T3  all 23 asset-preview fixtures resolve via gotoFixture/previewAsset
 //   T4  previewAsset stops the loop cleanly (started=false during preview,
 //       teardown restores the world, no crash)
 //   T5  leak prevention: preview → preview / preview → showcase / preview → preview
@@ -48,10 +48,15 @@ function test(name, pass, detail = '') {
 }
 
 const PREVIEW_FIXTURES = [
-  'grass-plain', 'grass-flowers', 'grass-bushes',
+  'grass-plain', 'grass-plain-b', 'grass-plain-c',
+  'grass-flowers', 'grass-bushes',
   'grass-dirt-n', 'grass-dirt-e', 'grass-dirt-s', 'grass-dirt-w',
   'grass-tilled', 'grass-tilled-n', 'grass-tilled-e', 'grass-tilled-s', 'grass-tilled-w',
-  'dirt-plain',
+  'dirt-plain', 'dirt-plain-b',
+  'water-plain', 'water-plain-b',
+  'sand-plain', 'sand-plain-b',
+  'lava-plain',
+  'snow-plain', 'snow-plain-b',
 ]
 
 const browser = await puppeteer.launch({ ...(useBundled ? {} : { executablePath: CHROME }), headless: true, args: ARGS,
@@ -84,16 +89,16 @@ section('T1. Registry integrity')
   const lf = await evl(page, () => window.__debug.listFixtures())
   const names = lf.ok ? lf.value.map(f => f.name) : []
   const byCategory = lf.ok ? lf.value.reduce((m, f) => { m[f.category] = (m[f.category] || 0) + 1; return m }, {}) : {}
-  // 14 entries: 13 asset-preview + 1 showcase (tile-showcase). The 9 gameplay
+  // 24 entries: 23 asset-preview + 1 showcase (tile-showcase). The 9 gameplay
   // fixtures were deleted with the farming game (project pivot, 2026-08-07).
-  test('T1a listFixtures returns 14 entries (13 asset-preview + 1 showcase)',
-    lf.ok && names.length === 14 &&
+  test('T1a listFixtures returns 24 entries (23 asset-preview + 1 showcase)',
+    lf.ok && names.length === 24 &&
     PREVIEW_FIXTURES.every(n => names.includes(n)) &&
     names.includes('tile-showcase'),
     lf.ok ? `${names.length} entries; cat=${JSON.stringify(byCategory)}` : lf.error)
-  test('T1b fixture names unique', lf.ok && new Set(names).size === 14, lf.ok ? String(new Set(names).size) : lf.error)
-  test('T1c exactly 13 asset-preview fixtures, all from the grass family manifest',
-    lf.ok && byCategory['asset-preview'] === 13 &&
+  test('T1b fixture names unique', lf.ok && new Set(names).size === 24, lf.ok ? String(new Set(names).size) : lf.error)
+  test('T1c exactly 23 asset-preview fixtures, all from the merged tile registry',
+    lf.ok && byCategory['asset-preview'] === 23 &&
     PREVIEW_FIXTURES.every(n => lf.value.find(f => f.name === n)?.category === 'asset-preview'),
     JSON.stringify(byCategory))
   const surf = await evl(page, () => typeof window.__debug.previewAsset === 'function')
@@ -118,7 +123,7 @@ section('T2. Boot state: tile world loads with the loop running')
 }
 
 // ─────────────────────────────────────────────────────────────
-section('T3. All 13 asset-preview fixtures resolve via gotoFixture')
+section('T3. All 23 asset-preview fixtures resolve via gotoFixture')
 {
   const page = await newPage()
   await loadDebug(page)
@@ -136,7 +141,7 @@ section('T3. All 13 asset-preview fixtures resolve via gotoFixture')
       r.ok ? `failed: ${failed.join(', ')} | state=${JSON.stringify(s)}` : r.error)
     if (!r.ok || failed.length) ok = false
   }
-  test('T3b no page errors across all 13 asset-preview fixtures', ok && page.__pageErrors.length === 0, JSON.stringify(page.__pageErrors))
+  test('T3b no page errors across all 23 asset-preview fixtures', ok && page.__pageErrors.length === 0, JSON.stringify(page.__pageErrors))
   await page.close()
 }
 

@@ -1,9 +1,9 @@
 {
-  "status": "idle",
-  "feature": null,
-  "category": null,
-  "current_step": null,
-  "last_updated": "2026-08-07T10:30:00Z",
-  "notes": "Pivot shipped to dev. Farming game removed; tile world foundation is the product surface. Build 487.69 kB raw / 124.94 kB gzip. qa=SHIP (148/148 + 14/14 fixtures), design/perf/visual = SHIP WITH FOLLOWUPS, follow-ups queued in FEATURE_BACKLOG.md. Next cycle: pick a backlog item (tile-kit batch or pivot follow-ups).",
+  "status": "in-progress",
+  "feature": "Slice B: pixel-art tile & prop redesign",
+  "category": "Assets & Art",
+  "current_step": "3.5",
+  "last_updated": "2026-08-07T11:00:00Z",
+  "notes": "Slice B per docs/dev-log/SLICE_B_PIXEL_ART_TILES_AND_PROPS.md. Convention doc coloring section replaced in place. Now commissioning asset-creator for the pixel-art painter utility + single-section tile families (grass/dirt/water/sand/lava/snow + variants), then the prop library. qa-tester skipped per slice section 5 (pure asset work); asset/ui/visual/performance critics at full strength. Existing variant names must stay valid (showcase + composer tests depend on them); new variants added as distinct strings.",
   "subagent_sessions": {}
 }

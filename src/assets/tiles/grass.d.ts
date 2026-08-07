@@ -1,15 +1,51 @@
 import type * as THREE from 'three'
 
-/** Fresh, saturated grass top (Harvest-Moon palette): top-face texture base
- *  and cap-edge riser color of grass sides. */
+/** Fresh, saturated grass top (Harvest-Moon palette): top-face texture base. */
 export const GRASS_TOP: number
-/** Dark soil under grass — warm dark brown, lifted off black. */
-export const GRASS_ROOT: number
-/** Deep rich earth under dirt — warmer/more saturated than GRASS_ROOT. */
-export const DIRT_ROOT: number
-/** Dark tilled loam under tilled soil — cool/desaturated, darkest of the
- *  three roots. */
-export const TILLED_ROOT: number
+/** Dark grass blade tone. */
+export const GRASS_BLADE_DARK: number
+/** Mid grass blade tone. */
+export const GRASS_BLADE_MID: number
+/** Light grass blade tone. */
+export const GRASS_BLADE_LIT: number
+/** Above-left highlight tone. */
+export const GRASS_LIGHT: number
+/** South-east shadow tone. */
+export const GRASS_SHADOW: number
+/** Baked-in texture outline (deep green — never black). */
+export const GRASS_OUTLINE: number
+/** Side-face base color (1-2 steps darker than the top). */
+export const GRASS_SIDE: number
+
+/** Dirt top texture tones. */
+export const DIRT_LIGHT: number
+export const DIRT_DARK: number
+export const DIRT_CRACK: number
+export const DIRT_HILITE: number
+export const DIRT_SHADOW: number
+export const DIRT_OUTLINE: number
+export const DIRT_SIDE: number
+
+/** Tilled soil texture tones. */
+export const TILLED_CLOD: number
+export const TILLED_CRUMB: number
+export const TILLED_HILITE: number
+export const TILLED_SHADOW: number
+export const TILLED_OUTLINE: number
+export const TILLED_SIDE: number
+
+/** Bush decoration tones. */
+export const BUSH_DARK: number
+export const BUSH_MID: number
+export const BUSH_LIGHT: number
+
+/** Flower decoration tones. */
+export const FLOWER_WHITE: number
+export const FLOWER_YELLOW: number
+export const FLOWER_CENTER: number
+
+/** Ribbon outline colors per biome (Slice B pinned). */
+export const OUTLINE_COLORS: Record<string, number>
 
 export interface TileVariantManifestEntry {
   name: string
@@ -26,6 +62,8 @@ export interface TileVariantManifestEntry {
   /** edge variants: per-biome colors of the two halves (top face + root band) */
   topColors?: Record<string, number>
   baseColors?: Record<string, number>
+  /** ribbon outline color (Slice B) — composer reads mesh.userData.outlineColor */
+  outlineColor?: number
 }
 
 /** Machine-readable variant manifest (composer + fixture registration). */
