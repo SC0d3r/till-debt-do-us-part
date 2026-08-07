@@ -1,72 +1,202 @@
 {
   "grass-plain": {
     "path": "tests/screenshots/grass-plain.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
+    "capturedAt": "2026-08-07T10:36:30.685Z",
+    "commit": "6c086c41cf667b7e8d4cb97ead8e9f4fb20d721b"
   },
   "grass-flowers": {
     "path": "tests/screenshots/grass-flowers.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
+    "capturedAt": "2026-08-07T08:43:31.296Z",
+    "commit": "25ca2640ec673c232e55a007bd3a31707a392c9a"
   },
   "grass-bushes": {
     "path": "tests/screenshots/grass-bushes.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
+    "capturedAt": "2026-08-07T08:43:31.296Z",
+    "commit": "25ca2640ec673c232e55a007bd3a31707a392c9a"
   },
   "grass-dirt-n": {
     "path": "tests/screenshots/grass-dirt-n.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
+    "capturedAt": "2026-08-07T08:43:31.296Z",
+    "commit": "25ca2640ec673c232e55a007bd3a31707a392c9a"
   },
   "grass-dirt-e": {
     "path": "tests/screenshots/grass-dirt-e.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
+    "capturedAt": "2026-08-07T08:43:31.297Z",
+    "commit": "25ca2640ec673c232e55a007bd3a31707a392c9a"
   },
   "grass-dirt-s": {
     "path": "tests/screenshots/grass-dirt-s.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
+    "capturedAt": "2026-08-07T08:43:31.297Z",
+    "commit": "25ca2640ec673c232e55a007bd3a31707a392c9a"
   },
   "grass-dirt-w": {
     "path": "tests/screenshots/grass-dirt-w.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
+    "capturedAt": "2026-08-07T08:43:31.297Z",
+    "commit": "25ca2640ec673c232e55a007bd3a31707a392c9a"
   },
   "grass-tilled": {
     "path": "tests/screenshots/grass-tilled.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
+    "capturedAt": "2026-08-07T08:43:31.297Z",
+    "commit": "25ca2640ec673c232e55a007bd3a31707a392c9a"
   },
   "dirt-plain": {
     "path": "tests/screenshots/dirt-plain.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
+    "capturedAt": "2026-08-07T10:36:30.686Z",
+    "commit": "6c086c41cf667b7e8d4cb97ead8e9f4fb20d721b"
   },
   "grass-tilled-e": {
     "path": "tests/screenshots/grass-tilled-e.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
+    "capturedAt": "2026-08-07T08:43:31.297Z",
+    "commit": "25ca2640ec673c232e55a007bd3a31707a392c9a"
   },
   "grass-tilled-s": {
     "path": "tests/screenshots/grass-tilled-s.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
+    "capturedAt": "2026-08-07T08:43:31.297Z",
+    "commit": "25ca2640ec673c232e55a007bd3a31707a392c9a"
   },
   "grass-tilled-w": {
     "path": "tests/screenshots/grass-tilled-w.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
+    "capturedAt": "2026-08-07T08:43:31.297Z",
+    "commit": "25ca2640ec673c232e55a007bd3a31707a392c9a"
   },
   "grass-tilled-n": {
     "path": "tests/screenshots/grass-tilled-n.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
+    "capturedAt": "2026-08-07T08:43:31.297Z",
+    "commit": "25ca2640ec673c232e55a007bd3a31707a392c9a"
   },
   "tile-showcase": {
     "path": "tests/screenshots/tile-showcase.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
+    "capturedAt": "2026-08-07T10:36:30.686Z",
+    "commit": "6c086c41cf667b7e8d4cb97ead8e9f4fb20d721b"
+  },
+  "water-plain": {
+    "path": "tests/screenshots/water-plain.png",
+    "capturedAt": "2026-08-07T10:36:30.686Z",
+    "commit": "6c086c41cf667b7e8d4cb97ead8e9f4fb20d721b"
+  },
+  "water-plain-b": {
+    "path": "tests/screenshots/water-plain-b.png",
+    "capturedAt": "2026-08-07T10:36:30.686Z",
+    "commit": "6c086c41cf667b7e8d4cb97ead8e9f4fb20d721b"
+  },
+  "sand-plain": {
+    "path": "tests/screenshots/sand-plain.png",
+    "capturedAt": "2026-08-07T10:36:30.686Z",
+    "commit": "6c086c41cf667b7e8d4cb97ead8e9f4fb20d721b"
+  },
+  "sand-plain-b": {
+    "path": "tests/screenshots/sand-plain-b.png",
+    "capturedAt": "2026-08-07T10:36:30.686Z",
+    "commit": "6c086c41cf667b7e8d4cb97ead8e9f4fb20d721b"
+  },
+  "lava-plain": {
+    "path": "tests/screenshots/lava-plain.png",
+    "capturedAt": "2026-08-07T10:36:30.686Z",
+    "commit": "6c086c41cf667b7e8d4cb97ead8e9f4fb20d721b"
+  },
+  "snow-plain": {
+    "path": "tests/screenshots/snow-plain.png",
+    "capturedAt": "2026-08-07T10:36:30.686Z",
+    "commit": "6c086c41cf667b7e8d4cb97ead8e9f4fb20d721b"
+  },
+  "snow-plain-b": {
+    "path": "tests/screenshots/snow-plain-b.png",
+    "capturedAt": "2026-08-07T10:36:30.686Z",
+    "commit": "6c086c41cf667b7e8d4cb97ead8e9f4fb20d721b"
+  },
+  "grass-plain-b": {
+    "path": "tests/screenshots/grass-plain-b.png",
+    "capturedAt": "2026-08-07T10:36:30.685Z",
+    "commit": "6c086c41cf667b7e8d4cb97ead8e9f4fb20d721b"
+  },
+  "grass-plain-c": {
+    "path": "tests/screenshots/grass-plain-c.png",
+    "capturedAt": "2026-08-07T10:36:30.686Z",
+    "commit": "6c086c41cf667b7e8d4cb97ead8e9f4fb20d721b"
+  },
+  "dirt-plain-b": {
+    "path": "tests/screenshots/dirt-plain-b.png",
+    "capturedAt": "2026-08-07T10:36:30.686Z",
+    "commit": "6c086c41cf667b7e8d4cb97ead8e9f4fb20d721b"
+  },
+  "flower": {
+    "path": "tests/screenshots/flower.png",
+    "capturedAt": "2026-08-07T16:40:20.122Z",
+    "commit": "2f54ecfc662a74dd185e1cf6194d01a1ba82d483"
+  },
+  "rock": {
+    "path": "tests/screenshots/rock.png",
+    "capturedAt": "2026-08-07T16:40:20.122Z",
+    "commit": "2f54ecfc662a74dd185e1cf6194d01a1ba82d483"
+  },
+  "bush": {
+    "path": "tests/screenshots/bush.png",
+    "capturedAt": "2026-08-07T16:40:20.122Z",
+    "commit": "2f54ecfc662a74dd185e1cf6194d01a1ba82d483"
+  },
+  "tall-grass": {
+    "path": "tests/screenshots/tall-grass.png",
+    "capturedAt": "2026-08-07T16:40:20.122Z",
+    "commit": "2f54ecfc662a74dd185e1cf6194d01a1ba82d483"
+  },
+  "small-stone": {
+    "path": "tests/screenshots/small-stone.png",
+    "capturedAt": "2026-08-07T16:40:20.122Z",
+    "commit": "2f54ecfc662a74dd185e1cf6194d01a1ba82d483"
+  },
+  "big-stone": {
+    "path": "tests/screenshots/big-stone.png",
+    "capturedAt": "2026-08-07T16:40:20.122Z",
+    "commit": "2f54ecfc662a74dd185e1cf6194d01a1ba82d483"
+  },
+  "pebble-cluster": {
+    "path": "tests/screenshots/pebble-cluster.png",
+    "capturedAt": "2026-08-07T16:40:20.122Z",
+    "commit": "2f54ecfc662a74dd185e1cf6194d01a1ba82d483"
+  },
+  "torch": {
+    "path": "tests/screenshots/torch.png",
+    "capturedAt": "2026-08-07T16:40:20.122Z",
+    "commit": "2f54ecfc662a74dd185e1cf6194d01a1ba82d483"
+  },
+  "lantern": {
+    "path": "tests/screenshots/lantern.png",
+    "capturedAt": "2026-08-07T16:40:20.122Z",
+    "commit": "2f54ecfc662a74dd185e1cf6194d01a1ba82d483"
+  },
+  "gravel-patch": {
+    "path": "tests/screenshots/gravel-patch.png",
+    "capturedAt": "2026-08-07T16:40:20.122Z",
+    "commit": "2f54ecfc662a74dd185e1cf6194d01a1ba82d483"
+  },
+  "cactus": {
+    "path": "tests/screenshots/cactus.png",
+    "capturedAt": "2026-08-07T16:40:20.122Z",
+    "commit": "2f54ecfc662a74dd185e1cf6194d01a1ba82d483"
+  },
+  "dry-shrub": {
+    "path": "tests/screenshots/dry-shrub.png",
+    "capturedAt": "2026-08-07T16:40:20.122Z",
+    "commit": "2f54ecfc662a74dd185e1cf6194d01a1ba82d483"
+  },
+  "bush-snow": {
+    "path": "tests/screenshots/bush-snow.png",
+    "capturedAt": "2026-08-07T16:40:20.122Z",
+    "commit": "2f54ecfc662a74dd185e1cf6194d01a1ba82d483"
+  },
+  "snow-patch": {
+    "path": "tests/screenshots/snow-patch.png",
+    "capturedAt": "2026-08-07T16:40:20.122Z",
+    "commit": "2f54ecfc662a74dd185e1cf6194d01a1ba82d483"
+  },
+  "lava-rock": {
+    "path": "tests/screenshots/lava-rock.png",
+    "capturedAt": "2026-08-07T16:40:20.122Z",
+    "commit": "2f54ecfc662a74dd185e1cf6194d01a1ba82d483"
+  },
+  "props-showcase": {
+    "path": "tests/screenshots/props-showcase.png",
+    "capturedAt": "2026-08-07T16:40:20.121Z",
+    "commit": "2f54ecfc662a74dd185e1cf6194d01a1ba82d483"
   }
 }

@@ -1,8 +1,7 @@
 import type * as THREE from 'three'
 
-export const TRANSITION_TEXTURE_SIZE: number
-export const TRANSITION_STEP_PX: number
-export const TRANSITION_ORIENTATIONS: string[]
+/** Pinned canvas resolution for ALL tile top-face textures. */
+export const TILE_TEXTURE_SIZE: number
 
 /**
  * Creates a configured canvas texture for tile top faces.
@@ -12,17 +11,6 @@ export const TRANSITION_ORIENTATIONS: string[]
 export function makeTileCanvasTexture(
   size: number,
   draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => void,
-): THREE.Texture
-
-/**
- * Bakes the stair-step diagonal split between two biome colors into a
- * 32x32 top-face texture. colorA fills the half the orientation points at.
- */
-export function makeTransitionTopTexture(
-  colorA: number | string | THREE.Color,
-  colorB: number | string | THREE.Color,
-  orientation?: 'n' | 'e' | 's' | 'w',
-  ratio?: number,
 ): THREE.Texture
 
 /**
