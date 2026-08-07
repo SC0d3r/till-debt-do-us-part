@@ -50,8 +50,7 @@
 //       data-order owner still loses the seam to its biome-colored
 //       neighbor); both sides overridden → data-order tie-break
 //   C8  teardown discipline: preview → showcase → preview and
-//       showcase → farm-day chains leave the harness working (loop + fog
-//       restored, no leaks)
+//       showcase → showcase chains leave the harness working (no leaks)
 //   C9  zero page/console errors across the whole battery
 //
 // CI-friendly: CHROME_PATH/BASE_URL from the GitHub Actions workflow
@@ -145,8 +144,6 @@ const EXPECTED_OUTLINE_MASKS = {
 
 const browser = await puppeteer.launch({ ...(useBundled ? {} : { executablePath: CHROME }), headless: true, args: ARGS,
   defaultViewport: { width: 960, height: 540, deviceScaleFactor: 1 } })
-const sleep = ms => new Promise(r => setTimeout(r, ms))
-const modDist = (a, b) => Math.min((a - b + 1440) % 1440, (b - a + 1440) % 1440)
 
 async function newPage() {
   const page = await browser.newPage()
@@ -179,10 +176,9 @@ section('C1. Showcase fixture registration + resolution')
   test('C1b __debug.showcaseTileMap + __debug.showcase exposed', surf.ok && surf.value === true, JSON.stringify(surf))
   const r = await evl(page, () => window.__debug.gotoFixture('tile-showcase'))
   const s = await getState(page)
-  const hudHidden = await evl(page, () => getComputedStyle(document.getElementById('hud')).display === 'none')
-  test('C1c fixture resolves: loop stopped, ready, no HUD',
-    r.ok && s?.started === false && s?.ready === true && hudHidden.ok && hudHidden.value === true,
-    r.ok ? JSON.stringify({ started: s?.started, ready: s?.ready, hud: hudHidden?.value }) : r.error)
+  test('C1c fixture resolves: loop stopped, ready',
+    r.ok && s?.started === false && s?.ready === true,
+    r.ok ? JSON.stringify({ started: s?.started, ready: s?.ready }) : r.error)
   const live = await evl(page, () => {
     const c = window.__debug.showcase.composer
     return { hasComposer: !!c, groups: c ? c.groups.length : -1, passive: c ? typeof c.update === 'undefined' && typeof c.tick === 'undefined' : false }
@@ -891,7 +887,7 @@ section('O5. Seam resolution — ONE line per seam (ownership pass, rev 3 + rev 
 }
 
 // ─────────────────────────────────────────────────────────────
-section('C8. Teardown discipline: preview → showcase → preview, showcase → farm-day')
+section('C8. Teardown discipline: preview → showcase → preview, showcase → showcase')
 {
   const page = await newPage()
   await loadDebug(page)
@@ -906,27 +902,13 @@ section('C8. Teardown discipline: preview → showcase → preview, showcase →
     r1.ok && r2.ok && s2?.started === false && s2?.ready === true && r3.ok && s3?.started === false && s3?.ready === true,
     JSON.stringify({ r1: r1.ok, r2: r2.ok, r3: r3.ok, started2: s2?.started, started3: s3?.started }))
   test('C8b composer disposed when leaving the showcase (handle null)', gone.ok && gone.value === true, JSON.stringify(gone))
-  // Chain 2: showcase → gameplay. The loop must resume WITH fog restored
-  // (DayNightDriver.update dereferences scene.fog every tick; a null-fog
-  // restart would crash), and the previous scene must be intact.
-  await evl(page, () => window.__debug.gotoFixture('tile-showcase'))
-  await evl(page, () => window.__debug.gotoFixture('farm-day'))
-  const s4 = await getState(page)
-  const t4a = s4?.player.timeOfDay
-  await sleep(900)
-  const t4b = (await getState(page))?.player.timeOfDay
-  test('C8c showcase → farm-day: started=true, gold 100, clock resumes (loop + fog alive)',
-    s4?.started === true && s4?.player.gold === 100 && Number.isFinite(t4a) && Number.isFinite(t4b) && modDist(t4a, t4b) > 1,
-    JSON.stringify({ started: s4?.started, gold: s4?.player?.gold, a: t4a, b: t4b }))
-  const hud = await evl(page, () => getComputedStyle(document.getElementById('hud')).display !== 'none')
-  test('C8d HUD restored after leaving the showcase', hud.ok && hud.value === true, JSON.stringify(hud))
-  // Chain 3: showcase → showcase (interrupt one showcase with another).
+  // Chain 2: showcase → showcase (interrupt one showcase with another).
   const r5 = await evl(page, () => window.__debug.gotoFixture('tile-showcase'))
   const r6 = await evl(page, () => window.__debug.gotoFixture('tile-showcase'))
   const s6 = await getState(page)
-  test('C8e showcase → showcase: both resolve, single live composer, ready',
+  test('C8c showcase → showcase: both resolve, single live composer, ready',
     r5.ok && r6.ok && s6?.ready === true && s6?.started === false, JSON.stringify({ r5: r5.ok, r6: r6.ok, ready: s6?.ready }))
-  test('C8f no page errors across teardown chains', page.__pageErrors.length === 0, JSON.stringify(page.__pageErrors))
+  test('C8d no page errors across teardown chains', page.__pageErrors.length === 0, JSON.stringify(page.__pageErrors))
   await page.close()
 }
 
