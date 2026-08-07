@@ -190,12 +190,12 @@ section('X2. Hover battery: empty-mask records, rotated records, spam, off-viewp
   // Move to (8,8): (2,8) restored (tile 0.88, outline green × 0.88), (8,8) hit
   test('X2b moving to ""-mask (8,8): (2,8) restored × 0.88, (8,8) bright + outline × 1.0',
     r.ok && near3(v.out?.on88?.t28, [0.88, 0.88, 0.88]) && near3(v.out?.on88?.o28?.rgb, mul(0x4f7a34, 0.88)) &&
-    near3(v.out?.on88?.t88, [1, 1, 1]) && near3(v.out?.on88?.o88?.rgb, mul(0x4e3d2e, 1)) &&
+    near3(v.out?.on88?.t88, [1, 1, 1]) && near3(v.out?.on88?.o88?.rgb, mul(0x2e6b24, 1)) &&
     v.out?.on88?.hover?.x === 8 && v.out?.on88?.hover?.y === 8,
     r.ok ? JSON.stringify({ t28: v.out?.on88?.t28, o88: v.out?.on88?.o88, hover: v.out?.on88?.hover }) : r.error)
-  // Rotated record (8,0) rot-270: mask 'e', brown owner color × 1.0
-  test('X2c rotated (8,0) rot-270: tile 1.0, outline mask "e" brown × 1.0, rotation reported',
-    r.ok && near3(v.out?.on80?.t80, [1, 1, 1]) && near3(v.out?.on80?.o80?.rgb, mul(0x4e3d2e, 1)) &&
+  // Rotated record (8,0) rot-270: mask 'e', grass owner color × 1.0 (Slice B deep green)
+  test('X2c rotated (8,0) rot-270: tile 1.0, outline mask "e" grass × 1.0, rotation reported',
+    r.ok && near3(v.out?.on80?.t80, [1, 1, 1]) && near3(v.out?.on80?.o80?.rgb, mul(0x2e6b24, 1)) &&
     v.out?.on80?.o80?.mask === 'e' && v.out?.on80?.hover?.x === 8 && v.out?.on80?.hover?.y === 0,
     r.ok ? JSON.stringify(v.out?.on80) : r.error)
   // Spam: no throw, hover consistent (either a tile or null)

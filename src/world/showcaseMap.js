@@ -20,9 +20,10 @@
  * grass↔tilled edge tiles, whose outline uses their fromBiome color) in
  * columns x=0..2 carries a GREEN outline color 0x4f7a34, harmonious with the
  * grass greens; the rest of the grass field (x=3..4), the tilled patch
- * interior and the dirt path keep the biome palette's BROWN defaults
- * (grass #4e3d2e / dirt #6b4a2e / tilled #4a3a26). The left 3 columns vs the
- * rest is a clear side-by-side green/brown comparison on the same field.
+ * interior and the dirt path keep the biome palette's defaults
+ * (grass #2e6b24 Slice B deep green / dirt #6b4a2e / tilled #4a3a26). The
+ * left 3 columns vs the rest is a clear side-by-side green/brown comparison
+ * on the same field.
  * Green records: 21 total — rows y=4..8: x=0..2; rows y=0..3: the grass
  * cells of x=0..2 (x=1..2 rows y=1..3 are the grass-tilled patch INTERIOR,
  * biome tilled, so they keep the tilled brown).
@@ -43,7 +44,7 @@
  *
  * GRID (x = column 0..8 left→right; y = row 0..8 south→north). The 'G' row
  * marks the GREEN-outline columns (grass-owned cells of x=0..2 — the demo
- * split vs the brown biome default on x=3..8):
+ * split vs the biome-default deep green on x=3..8):
  *
  *         G  G  G  .  .  .  .  .  .
  *   y=8  .  B  .  .  .  |>  #  #  <|
@@ -69,8 +70,8 @@
  * the '^' at x=1..2 row y=0 and the 'v' at x=1..2 row y=4) carry
  * `outlineColor: 0x4f7a34` (green). The 'x' tilled-patch interior (x=1..2,
  * rows y=1..3 — biome tilled), the dirt path and the x=3..8 grass keep the
- * brown biome palette. See the OUTLINE COLOR DEMO prose above for the exact
- * 21 green records.
+ * biome palette (Slice B deep green / dirt brown / tilled loam). See the
+ * OUTLINE COLOR DEMO prose above for the exact 21 green records.
  *
  * IMPORTANT (prod-bundle gate): SHOWCASE_MAP must stay a provably-pure
  * module-scope value (a literal array). A top-level build loop with map
