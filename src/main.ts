@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { TileMapComposer } from './world/TileMapComposer'
 import { SHOWCASE_MAP } from './world/showcaseMap'
-import { createGrassTile } from './assets/tiles/grass'
+import { resolveFactory } from './assets/tiles'
 import { initDevHarness } from './debug/devHarness'
 
 // ─── Fast QA mode (dev-only) ───
@@ -66,13 +66,13 @@ class TileWorld {
     rim.position.set(0, 3, -4)
     this.scene.add(ambient, key, fill, rim)
 
-    // The showcase map is the world: variant STRING → grass-family factory
+    // The showcase map is the world: variant STRING → tile-registry factory
     // (the composer knows nothing about families; resolveFactory is the only
-    // family knowledge and it lives here, in the composition root).
+    // family knowledge and it lives in the registry, src/assets/tiles/index.js).
     this.composer = new TileMapComposer({
       parent: this.scene,
       data: SHOWCASE_MAP,
-      resolveFactory: (variant) => () => createGrassTile(variant),
+      resolveFactory: (variant) => resolveFactory(variant),
       raycastTarget: this.camera,
       outline: { mode: 'interior' },
     })
