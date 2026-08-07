@@ -1,7 +1,9 @@
 {
   "status": "idle",
   "feature": null,
+  "category": null,
   "current_step": null,
-  "last_updated": "2026-08-06T20:10:00Z",
-  "notes": "TileMapComposer slice A SHIPPED as dev d78dc8c (pushed). All revisions landed: diagonal lattice (no holes), per-record rotation, one-line-per-seam outlines with biome-match seam ownership, per-instance colors, green-vs-brown A/B showcase. All critics green (SHIP/SHIP w/followups), qa-tester SHIP w/followups. Docs committed next. Milestone check: default cadence met (6 features since v0.1, 2 categories) — milestone regression dispatched; merge to master + tag v0.2 if green."
+  "last_updated": "2026-08-07T10:30:00Z",
+  "notes": "Pivot shipped to dev. Farming game removed; tile world foundation is the product surface. Build 487.69 kB raw / 124.94 kB gzip. qa=SHIP (148/148 + 14/14 fixtures), design/perf/visual = SHIP WITH FOLLOWUPS, follow-ups queued in FEATURE_BACKLOG.md. Next cycle: pick a backlog item (tile-kit batch or pivot follow-ups).",
+  "subagent_sessions": {}
 }

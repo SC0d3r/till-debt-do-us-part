@@ -16,6 +16,44 @@ Follow-ups queued: <backlog items added as a result, or "none">
 
 ---
 
+## Project pivot: Harvest-Moon farming game removed — tile world foundation — Tech & Performance — 2026-08-07
+Commit: <pending commit>
+Summary: Executed `PROJECT_PIVOT_AND_IDENTITY_OVERRIDE.md` end to end. The entire
+farming game was deleted (src/farm, src/mine, src/npcs, src/economy,
+src/progression, src/player, src/ui, src/data, src/persistence, WorldBuilder,
+DayNightDriver, CoinFx, DayCycle, RootEvents, AssetLoader, Instancing,
+MeshFactory, i18n, DebugActions, all farming tests/screenshots/assets, slot
+DOM). What survives: the tile system (TileMapComposer, showcaseMap, grass
+family, transitionTexture), generic engine infra (InputManager, SoundManager,
+disposeObject), the DORMANT slot machine (decoupled to `{ gold: number }`
+wallet, unimported, tree-shaken out of the bundle), and the debug harness
+(rewritten: ready/getState/gotoFixture/listFixtures/setFastMode/previewAsset/
+showcaseTileMap/showcase — setState/fastForward/triggerEvent deleted as
+farming-era state API). New: `src/core/procedural.ts` (COLORS trimmed to the 6
+used keys + SeededRNG), `src/main.ts` rewritten as a 119-line TileWorld
+composition root booting SHOWCASE_MAP (9x9 grass map, 4-light rig, `?fast=1`
+QA mode, devGraph). Fixture catalog re-pinned to 14 (13 asset-preview +
+tile-showcase); prod gate GATES reduced to ['__debug','devHarness']; test:e2e
+repointed to qa-tile-kit-regression. README rewritten (bilingual, no farming
+framing); DEBUG_HARNESS.md + TILE_SYSTEM_CONVENTION.md + FEATURE_BACKLOG.md
+banners/refs updated; old milestones VOIDed, farming backlog items removed.
+Bundle: 631 kB → 487.69 kB raw (125 kB gzip), 12 modules.
+Verdicts: design=SHIP WITH FOLLOWUPS (pre-build boundary check + post-build:
+Blocker was staging-only, procedural.ts now tracked; Majors fixed: i18n.ts
+deleted, public/ farm assets deleted, stale docs updated)
+performance=SHIP WITH FOLLOWUPS (Major dead-assets fixed — ~6.4 MB of farm
+PNGs/MP3s deleted from dist; Nits queued: fast-QA dead members, vestigial
+dtScale param, settleTick loop, pointermove alloc)
+visual=SHIP WITH FOLLOWUPS (Major: boot camera framing — map ~10% of frame,
+queued; Minor: grass-root SW wall near-black, queued; Nits: dead COLORS keys,
+queued)
+qa=SHIP (148/148 assertions across qa-tile-kit-regression 41/41,
+qa-composer-regression 76/76, qa-composer-exploratory 31/31, smoke-ci PASS;
+14/14 fixtures captured, zero page errors, zero timeouts; prod-gate green)
+Follow-ups queued: boot camera framing; grass-root wall shading; dead COLORS
+keys; getState active-fixture reporting; vestigial dtScale param; unimported
+dead-code audit (see FEATURE_BACKLOG.md "Follow-ups from project pivot").
+
 ## TileMapComposer + showcase map (slice A) — Tech & Performance — 2026-08-06
 Commit: d78dc8c
 Summary: Generic data-driven tile-map composer (`src/world/TileMapComposer.js`,

@@ -12,7 +12,7 @@ set -uo pipefail
 #   ./scripts/run-ci-puppeteer.sh --fixtures=name1,name2 [--ref=dev]
 #   ./scripts/run-ci-puppeteer.sh --all-fixtures [--ref=dev]
 #   ./scripts/run-ci-puppeteer.sh --e2e [--ref=dev]
-#   ./scripts/run-ci-puppeteer.sh --tests=tests/qa-harness.mjs,tests/probe-daynight.mjs
+#   ./scripts/run-ci-puppeteer.sh --tests=tests/qa-tile-kit-regression.mjs,tests/qa-composer-regression.mjs
 #   ./scripts/run-ci-puppeteer.sh --fixtures=name1 --e2e   # both in one dispatch
 #   ./scripts/run-ci-puppeteer.sh --all-fixtures --concurrency=3   # parallel capture pages
 #
