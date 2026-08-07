@@ -23,7 +23,8 @@
 
 import * as THREE from 'three'
 import fixtures from '../../tests/scene-fixtures.json'
-import * as grassTiles from '../assets/tiles/grass'
+import { VARIANTS as TILE_VARIANTS, resolveFactory } from '../assets/tiles'
+import { PROPS as PROP_VARIANTS, resolvePropFactory, createProp } from '../assets/props'
 import { TileMapComposer, type TileMapRecord, type TileMapOutlineOptions } from '../world/TileMapComposer'
 import { SHOWCASE_MAP, validateShowcaseMap } from '../world/showcaseMap'
 
@@ -42,6 +43,23 @@ interface ShowcaseDebugHandle {
   lastHover: unknown
   validation: { ok: boolean; errors: string[] } | null
   projectTile(x: number, y: number): { x: number; y: number } | null
+  /** NDC projections of the showcase maps through the CURRENT camera (B2
+   *  framing regression check): every grid row center (tile map) and every
+   *  staged prop (props map) must land inside NDC ±0.95 — full map visible,
+   *  nothing clipped. */
+  ndc(map: 'tile' | 'props'): {
+    rows: Array<{ x: number; y: number; nx: number; ny: number }>
+    props: Array<{ name: string; nx: number; ny: number }>
+  }
+}
+
+/** Geometry inspection for the prop brightness/NaN regression checks (B1/B3):
+ *  NaN vertex count, world bbox, and the color of the highest vertex (the
+ *  light cap — must equal the light tone × PROP_BRIGHTNESS). */
+interface PropInspect {
+  nanCount: number
+  bbox: { min: [number, number, number]; max: [number, number, number] }
+  maxYColor: [number, number, number]
 }
 
 interface DebugApi {
@@ -53,6 +71,7 @@ interface DebugApi {
   previewAsset(name: string, opts?: Record<string, unknown>): Promise<void>
   showcaseTileMap(data?: TileMapRecord[], opts?: { outline?: TileMapOutlineOptions }): Promise<void>
   showcase: ShowcaseDebugHandle
+  inspectProp(name: string): PropInspect
 }
 
 declare global {
@@ -93,7 +112,7 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
   // Showcase-map debug handle. Declared before the api object because api
   // references it directly; projectTile is a hoisted function declaration, so
   // referencing it in the literal is safe.
-  const showcase: ShowcaseDebugHandle = { composer: null, lastHover: null, validation: null, projectTile }
+  const showcase: ShowcaseDebugHandle = { composer: null, lastHover: null, validation: null, projectTile, ndc }
   // Reused projection scratch (event/test-driven, not per-frame).
   const projVec = new THREE.Vector3()
 
@@ -106,6 +125,7 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
     previewAsset,
     showcaseTileMap,
     showcase,
+    inspectProp,
   }
   window.__debug = api
 
@@ -161,12 +181,22 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
   // from the showcase map — asset review needs a clean, unambiguous shot with
   // no map context, lighting variance, or occlusion.
   //
-  // Iterate the family's VARIANTS manifest so new variants get previews
-  // automatically (no per-variant hardcoding here).
+  // Iterate the MERGED tile registry so every family's variants get previews
+  // automatically (no per-family hardcoding here), then the merged PROP
+  // registry — prop previews add a host tile + prop framing via previewAsset
+  // below (assetFactories entries are just the prop factories).
   const assetFactories: Record<string, () => THREE.Object3D> = {}
-  for (const variant of Object.keys(grassTiles.VARIANTS)) {
-    assetFactories[variant] = () => grassTiles.createGrassTile(variant)
+  for (const variant of Object.keys(TILE_VARIANTS)) {
+    assetFactories[variant] = resolveFactory(variant)
   }
+  for (const name of Object.keys(PROP_VARIANTS)) {
+    assetFactories[name] = resolvePropFactory(name)
+  }
+
+  // Tile top-face height (TILE_SYSTEM_CONVENTION.md §1: top face ~0.34).
+  // Prop local origins sit at their base contact point, so placing a prop at
+  // this height rests it exactly on the tile surface.
+  const TILE_TOP_Y = 0.34
 
   interface PreviewState {
     savedChildren: THREE.Object3D[]
@@ -285,16 +315,40 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
     const cam = world.camera
     preview.previewObjects.push(...addStudioRig())
 
-    const asset = factory()
-    asset.position.set(0, 0, 0)
-    scene.add(asset)
-    preview.previewObjects.push(asset)
+    // Props preview ON a neutral host tile so the "rests on the surface"
+    // behavior is reviewable: the host tile variant comes from the prop's
+    // manifest metadata (per-biome hosts: sand for cactus/dry-shrub, snow for
+    // snow props, lava for lava-rock, grass/dirt for the rest).
+    const propEntry = PROP_VARIANTS[name]
+    if (propEntry) {
+      const hostVariant = propEntry.hostTile ?? 'grass-plain'
+      const host = resolveFactory(hostVariant)()
+      host.position.set(0, 0, 0)
+      scene.add(host)
+      preview.previewObjects.push(host)
 
-    // Iso framing from the south (+z): the diamond's N-S axis is vertical on
-    // screen and the two front side walls are visible. Camera pulled in tight
-    // so the tile fills ~60% of the frame height.
-    cam.position.set(0, 1.0, 1.28)
-    cam.lookAt(0, 0.2, 0)
+      const asset = factory()
+      const topY = (host.userData?.outlineTop as number | undefined) ?? TILE_TOP_Y
+      asset.position.set(0, topY, 0)
+      scene.add(asset)
+      preview.previewObjects.push(asset)
+
+      // Slight pull-back vs. the bare-tile framing so the prop's vertical
+      // accent (tall-grass 0.26, torch 0.24) stays inside the frame.
+      cam.position.set(0, 1.15, 1.52)
+      cam.lookAt(0, 0.17, 0)
+    } else {
+      const asset = factory()
+      asset.position.set(0, 0, 0)
+      scene.add(asset)
+      preview.previewObjects.push(asset)
+
+      // Iso framing from the south (+z): the diamond's N-S axis is vertical on
+      // screen and the two front side walls are visible. Camera pulled in tight
+      // so the tile fills ~60% of the frame height.
+      cam.position.set(0, 1.0, 1.28)
+      cam.lookAt(0, 0.2, 0)
+    }
 
     markDirty()
     await waitForSettle()
@@ -306,8 +360,8 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
   // data-driven TileMapComposer and frames the camera for the entire 9x9 map.
   // Default map-level outline config: mode 'interior' (edges touching another
   // cell) — the outline color demo lives in SHOWCASE_MAP's per-record
-  // outlineColor fields (green grass columns x=0..2 vs the brown biome
-  // default). Tests may override the outline config via opts.
+  // outlineColor fields (green grass columns x=0..2 vs the biome-default deep
+  // green on x=3..8). Tests may override the outline config via opts.
   async function showcaseTileMap(data?: TileMapRecord[], opts?: { outline?: TileMapOutlineOptions }): Promise<void> {
     const mapData = data ?? SHOWCASE_MAP
     // Data-level acceptance gate FIRST: a bad map throws before any staging
@@ -328,10 +382,10 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
       composer = new TileMapComposer({
         parent: scene,
         data: mapData,
-        // Variant STRING → grass-family factory (the composer knows nothing
+        // Variant STRING → tile-registry factory (the composer knows nothing
         // about families; resolveFactory is the only family knowledge and it
-        // lives here, in the debug harness).
-        resolveFactory: (variant) => () => grassTiles.createGrassTile(variant),
+        // lives in the registry, src/assets/tiles/index.js).
+        resolveFactory: (variant) => resolveFactory(variant),
         raycastTarget: cam,
         onHover: (record) => { showcase.lastHover = record },
         outline: opts?.outline ?? { mode: 'interior' },
@@ -350,10 +404,13 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
     }
 
     // 3/4 isometric framing of the WHOLE map: same neutral rig look as
-    // previewAsset (32° elevation, camera from the south/+z) but pulled back
-    // so the 9x9 lattice fits with margin.
-    cam.position.set(0, 8.2, 16.8)
-    cam.lookAt(0, 0.2, 4)
+    // previewAsset (32° elevation, camera from the south/+z). B2 (re-review):
+    // the previous pull-in hit ≥75% fill but CLIPPED the map — front row
+    // (grid y=8) projected below the frame and side columns cut. At 50° FOV /
+    // 4:3 the 9×9 diamond can't fully fit at ≥75% fill; relax to "full map
+    // visible with balanced margins" per the visual-critic's numbers.
+    cam.position.set(0, 6.5, 13.5)
+    cam.lookAt(0, 0.25, 4.0)
 
     markDirty()
     await waitForSettle()
@@ -372,6 +429,196 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
       x: (projVec.x * 0.5 + 0.5) * window.innerWidth,
       y: (-projVec.y * 0.5 + 0.5) * window.innerHeight,
     }
+  }
+
+  /** B2 framing regression hook: projects every 9×9 grid row center (tile
+   *  map) or every staged prop position (props map) through the CURRENT
+   *  camera and returns raw NDC. The QA suite asserts all values stay inside
+   *  ±0.95 so the maps are fully visible with balanced margins. */
+  function ndc(map: 'tile' | 'props'): { rows: Array<{ x: number; y: number; nx: number; ny: number }>; props: Array<{ name: string; nx: number; ny: number }> } {
+    const rows: Array<{ x: number; y: number; nx: number; ny: number }> = []
+    const props: Array<{ name: string; nx: number; ny: number }> = []
+    if (map === 'tile') {
+      for (let y = 0; y <= 8; y++) {
+        for (let x = 0; x <= 8; x++) {
+          projVec.set((x - y) * 0.5, 0.25, (x + y) * 0.5).project(world.camera)
+          rows.push({ x, y, nx: projVec.x, ny: projVec.y })
+        }
+      }
+    } else {
+      for (const p of PROPS_SHOWCASE_PLACEMENTS) {
+        projVec.set((p.x - p.y) * 0.5 + p.dx, TILE_TOP_Y, (p.x + p.y) * 0.5 + p.dz).project(world.camera)
+        props.push({ name: p.name, nx: projVec.x, ny: projVec.y })
+      }
+    }
+    return { rows, props }
+  }
+
+  /** Geometry inspection for the B1/B3 regression checks: NaN vertex count,
+   *  world bbox, and the vertex color at the highest point (the light cap —
+   *  must equal the light tone × PROP_BRIGHTNESS, not the raw hex). */
+  function inspectProp(name: string): PropInspect {
+    const mesh = createProp(name)
+    const geo = mesh.geometry
+    const pos = geo.attributes.position
+    const col = geo.attributes.color
+    let nanCount = 0
+    let maxY = -Infinity
+    let maxYIdx = -1
+    const min = [Infinity, Infinity, Infinity] as [number, number, number]
+    const max = [-Infinity, -Infinity, -Infinity] as [number, number, number]
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i)
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) nanCount++
+      if (x < min[0]) min[0] = x
+      if (y < min[1]) min[1] = y
+      if (z < min[2]) min[2] = z
+      if (x > max[0]) max[0] = x
+      if (y > max[1]) max[1] = y
+      if (z > max[2]) max[2] = z
+      if (y > maxY) { maxY = y; maxYIdx = i }
+    }
+    const maxYColor: [number, number, number] = maxYIdx >= 0
+      ? [col.getX(maxYIdx), col.getY(maxYIdx), col.getZ(maxYIdx)]
+      : [0, 0, 0]
+    return { nanCount, bbox: { min, max }, maxYColor }
+  }
+
+  // ── Props showcase (a 7x6 mixed-terrain DIORAMA with all 15 props) ──
+  // Same preview staging + studio rig as showcaseTileMap, but the tile grid
+  // is a small biome diorama (reference B section 6: grass border ring,
+  // diagonal dirt/sand checkerboard interior, water pool back-right, snow
+  // band + lava pocket) and every prop in the library is staged sparsely and
+  // asymmetrically — one prop per tile, slight offsets, themed placement
+  // (flowers up the grass ridge, rocks tucked into corners, cactus on sand,
+  // torch + lantern along the dirt path, snow props on snow, lava on lava).
+  const PROPS_SHOWCASE_MAP: TileMapRecord[] = [
+    // y=0: grass border
+    { x: 0, y: 0, variant: 'grass-plain' },
+    { x: 1, y: 0, variant: 'grass-plain' },
+    { x: 2, y: 0, variant: 'grass-plain' },
+    { x: 3, y: 0, variant: 'grass-plain' },
+    { x: 4, y: 0, variant: 'grass-plain' },
+    { x: 5, y: 0, variant: 'grass-plain' },
+    { x: 6, y: 0, variant: 'grass-plain' },
+    // y=1: dirt path start, snow band, lava pocket
+    { x: 0, y: 1, variant: 'grass-plain' },
+    { x: 1, y: 1, variant: 'dirt-plain' },
+    { x: 2, y: 1, variant: 'dirt-plain' },
+    { x: 3, y: 1, variant: 'snow-plain' },
+    { x: 4, y: 1, variant: 'lava-plain' },
+    { x: 5, y: 1, variant: 'lava-plain' },
+    { x: 6, y: 1, variant: 'grass-plain' },
+    // y=2: dirt/sand checker, snow band
+    { x: 0, y: 2, variant: 'grass-plain' },
+    { x: 1, y: 2, variant: 'dirt-plain' },
+    { x: 2, y: 2, variant: 'sand-plain' },
+    { x: 3, y: 2, variant: 'snow-plain' },
+    { x: 4, y: 2, variant: 'grass-plain' },
+    { x: 5, y: 2, variant: 'grass-plain' },
+    { x: 6, y: 2, variant: 'grass-plain' },
+    // y=3: sand band, dirt, water pool (back-right)
+    { x: 0, y: 3, variant: 'grass-plain' },
+    { x: 1, y: 3, variant: 'sand-plain' },
+    { x: 2, y: 3, variant: 'sand-plain' },
+    { x: 3, y: 3, variant: 'dirt-plain' },
+    { x: 4, y: 3, variant: 'water-plain' },
+    { x: 5, y: 3, variant: 'water-plain' },
+    { x: 6, y: 3, variant: 'grass-plain' },
+    // y=4: sand + dirt, water pool continues
+    { x: 0, y: 4, variant: 'grass-plain' },
+    { x: 1, y: 4, variant: 'grass-plain' },
+    { x: 2, y: 4, variant: 'sand-plain' },
+    { x: 3, y: 4, variant: 'dirt-plain' },
+    { x: 4, y: 4, variant: 'water-plain' },
+    { x: 5, y: 4, variant: 'water-plain' },
+    { x: 6, y: 4, variant: 'grass-plain' },
+    // y=5: grass border
+    { x: 0, y: 5, variant: 'grass-plain' },
+    { x: 1, y: 5, variant: 'grass-plain' },
+    { x: 2, y: 5, variant: 'grass-plain' },
+    { x: 3, y: 5, variant: 'grass-plain' },
+    { x: 4, y: 5, variant: 'grass-plain' },
+    { x: 5, y: 5, variant: 'grass-plain' },
+    { x: 6, y: 5, variant: 'grass-plain' },
+  ]
+
+  // Prop placements: data tile (x, y) + local offset (dx, dz) within the
+  // tile's diamond footprint. Sparse + asymmetric — one prop per tile, never
+  // the tile center, slight random-feel offsets (±0.1-0.2) and themed
+  // positioning per reference B section 6. The prop's local origin is its
+  // base contact point; TILE_TOP_Y lifts it onto the tile top face.
+  const PROPS_SHOWCASE_PLACEMENTS: Array<{ name: string; x: number; y: number; dx: number; dz: number }> = [
+    // flowers up the grass ridge, grass tuft on the top border
+    { name: 'flower', x: 0, y: 4, dx: -0.16, dz: 0.14 },
+    { name: 'tall-grass', x: 2, y: 5, dx: 0.2, dz: -0.05 },
+    // rocks tucked into grass corners
+    { name: 'rock', x: 6, y: 4, dx: -0.2, dz: 0.08 },
+    { name: 'bush', x: 0, y: 1, dx: -0.06, dz: -0.16 },
+    // stone trio on the dirt path / sand edge, tucked into corners
+    { name: 'small-stone', x: 1, y: 2, dx: 0.28, dz: 0.3 },
+    { name: 'big-stone', x: 3, y: 4, dx: 0.04, dz: -0.12 },
+    { name: 'pebble-cluster', x: 2, y: 4, dx: 0.26, dz: 0.3 },
+    // desert on the sand band
+    { name: 'cactus', x: 2, y: 2, dx: 0.02, dz: 0.06 },
+    { name: 'dry-shrub', x: 2, y: 3, dx: -0.18, dz: 0.14 },
+    // snow props on the snow band
+    { name: 'bush-snow', x: 3, y: 2, dx: 0.06, dz: -0.08 },
+    { name: 'snow-patch', x: 3, y: 1, dx: 0.04, dz: 0.02 },
+    // lava on the lava pocket
+    { name: 'lava-rock', x: 4, y: 1, dx: 0.02, dz: -0.02 },
+    // torch + lantern along the dirt path / border edge
+    { name: 'torch', x: 1, y: 1, dx: 0.36, dz: 0.08 },
+    { name: 'lantern', x: 6, y: 0, dx: -0.38, dz: 0.02 },
+    // gravel on the dirt path
+    { name: 'gravel-patch', x: 2, y: 1, dx: -0.12, dz: -0.16 },
+  ]
+
+  async function propsShowcase(): Promise<void> {
+    const validation = validateShowcaseMap(PROPS_SHOWCASE_MAP)
+    if (!validation.ok) {
+      throw new Error(`propsShowcase: invalid tile data (${validation.errors.length} error(s)):\n  - ${validation.errors.join('\n  - ')}`)
+    }
+    teardownPreview()
+    const preview = beginPreviewState()
+    const scene = world.scene
+    const cam = world.camera
+    preview.previewObjects.push(...addStudioRig())
+
+    let composer: TileMapComposer
+    try {
+      composer = new TileMapComposer({
+        parent: scene,
+        data: PROPS_SHOWCASE_MAP,
+        resolveFactory: (variant) => resolveFactory(variant),
+        raycastTarget: cam,
+        onHover: () => { /* props showcase is static staging — no hover test */ },
+        outline: { mode: 'all' },
+      })
+    } catch (e) {
+      teardownPreview()
+      throw e
+    }
+    preview.onTeardown = () => {
+      composer.dispose()
+    }
+
+    for (const p of PROPS_SHOWCASE_PLACEMENTS) {
+      const asset = resolvePropFactory(p.name)()
+      asset.position.set((p.x - p.y) * 0.5 + p.dx, TILE_TOP_Y, (p.x + p.y) * 0.5 + p.dz)
+      scene.add(asset)
+      preview.previewObjects.push(asset)
+    }
+
+    // Same 32° iso framing as showcaseTileMap, fitted to the 7x6 diorama
+    // (world span ~5.5 x ~5.5 units). B2 (re-review): pulled back per the
+    // visual-critic's numbers so the LANTERN prop (6,0) and the front border
+    // row land inside NDC ±0.95 — full diorama visible, balanced margins.
+    cam.position.set(0.5, 5.0, 10.0)
+    cam.lookAt(0.25, 0.2, 3.3)
+
+    markDirty()
+    await waitForSettle()
   }
 
   // ── gotoFixture ──
@@ -410,6 +657,7 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
   // category (previewAsset); only the showcase fixture needs a setup.
   const fixtureSetups: Record<string, () => void | Promise<void>> = {
     'tile-showcase': () => showcaseTileMap(),
+    'props-showcase': () => propsShowcase(),
   }
 
   // Initial settle: ready=true shortly after page load (covers the boot world).

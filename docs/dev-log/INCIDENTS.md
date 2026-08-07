@@ -68,3 +68,16 @@ new SILENT-FAILURE PROTOCOL) and delivered full reviews.
 Retries: 2 rounds of critics before restart; 1 resume each after silent empty.
 Resolution: agent MDs fixed + committed (777b146); opencode restarted by user;
 critics re-ran successfully with NVIDIA vision.
+
+## 2026-08-07 11:18Z — Slice B tile trim critic round
+Subagent: visual-critic, ui-critic, asset-critic, performance-critic (4 parallel dispatches)
+Observed: all four were dispatched in parallel with design-critic. design-critic
+completed (SHIP WITH FOLLOWUPS, ses_0242ad302ffesYFvM7BNuTbXj7). The other four
+returned "Task cancelled" with NO task ids — the user accidentally closed
+opencode mid-dispatch. Session ids were never returned, so the same sessions
+cannot be resumed (SILENT-FAILURE PROTOCOL rule 5: session lost = say so, don't
+pretend). Per user directive the critics will be re-dispatched FRESH after the
+prop library (slice B section 4) is built, so the whole slice is reviewed at
+once — tile-only verdicts would be premature anyway.
+Retries: n/a (cannot resume lost sessions)
+Resolution: recorded as lost sessions; fresh dispatch scheduled post-props
