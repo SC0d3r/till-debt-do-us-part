@@ -15,13 +15,12 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const DIST = join(process.cwd(), 'dist')
+// The tile kit (TileMapComposer, showcaseMap, grass family) is now the
+// PRODUCT (project pivot, 2026-08-07) — it ships in the production bundle, so
+// only the debug harness itself must stay tree-shaken out. Strings unique to
+// the harness:
 const GATES = [
   '__debug', 'devHarness',
-  // TileMapComposer slice A (2026-08-06): the composer + showcase map are
-  // debug-harness-only this slice (no game module imports them), so the whole
-  // tile-kit must stay tree-shaken out of prod. Strings unique to the kit:
-  'TileMapComposer', 'showcaseMap', 'SHOWCASE_MAP', 'tile-showcase',
-  'showcaseTileMap', 'createGrassTile', 'OUTLINE_COLORS', 'grass-dirt', 'grass-tilled',
 ]
 
 function walk(dir) {

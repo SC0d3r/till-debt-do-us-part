@@ -49,7 +49,7 @@
  */
 
 import * as THREE from 'three'
-import { COLORS, SeededRNG } from '../../core/MeshFactory'
+import { COLORS, SeededRNG } from '../../core/procedural'
 import {
   TRANSITION_TEXTURE_SIZE,
   makeTileCanvasTexture,

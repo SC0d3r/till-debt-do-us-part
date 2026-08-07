@@ -1,7 +1,9 @@
 {
-  "status": "idle",
-  "feature": null,
-  "current_step": null,
-  "last_updated": "2026-08-06T20:10:00Z",
-  "notes": "TileMapComposer slice A SHIPPED as dev d78dc8c (pushed). All revisions landed: diagonal lattice (no holes), per-record rotation, one-line-per-seam outlines with biome-match seam ownership, per-instance colors, green-vs-brown A/B showcase. All critics green (SHIP/SHIP w/followups), qa-tester SHIP w/followups. Docs committed next. Milestone check: default cadence met (6 features since v0.1, 2 categories) — milestone regression dispatched; merge to master + tag v0.2 if green."
+  "status": "in-progress",
+  "feature": "project-pivot-remove-farming-game",
+  "category": "Tech & Performance",
+  "current_step": 3,
+  "last_updated": "2026-08-07T00:10:00Z",
+  "notes": "Executing PROJECT_PIVOT_AND_IDENTITY_OVERRIDE.md. Durability done (banners, backlog cleanup, VOID milestones). Inventory complete: slot machine at src/slot/SlotMachine.ts (dormant, own dir; decouple from PlayerState to minimal gold wallet). Farming files: farm/, mine/, npcs/, economy/, progression/, player/, ui/, data/, persistence/, WorldBuilder, DayNightDriver, CoinFx, DayCycle, RootEvents, MeshFactory farming models (keep COLORS+SeededRNG). Keep: tile system, devHarness (trimmed), InputManager/SoundManager/i18n/disposeObject. Tests: keep composer+tile-kit suites, delete farm suites, repoint test:e2e. Now: design-critic pre-build boundary check.",
+  "subagent_sessions": {}
 }
