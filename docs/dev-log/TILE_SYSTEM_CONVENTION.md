@@ -119,7 +119,7 @@ needs fixing.
 - **Every family module exports a machine-readable `VARIANTS` manifest**
   (`{ 'grass-plain': {...}, 'grass-dirt-n': {...}, ... }`) used for fixture
   registration and by the composer to map data-level variant strings.
-- Reuse `COLORS` from `src/core/MeshFactory.ts` where the palette overlaps;
+- Reuse `COLORS` from `src/core/procedural.ts` where the palette overlaps;
   define new family colors (e.g. the earthy side-wall band) once in the
   family module and reference them from the manifest so later families
   harmonize.
