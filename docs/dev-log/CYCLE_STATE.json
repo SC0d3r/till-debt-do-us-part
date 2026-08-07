@@ -1,9 +1,14 @@
 {
-  "status": "idle",
-  "feature": null,
-  "category": null,
-  "current_step": null,
-  "last_updated": "2026-08-07T10:30:00Z",
-  "notes": "Pivot shipped to dev. Farming game removed; tile world foundation is the product surface. Build 487.69 kB raw / 124.94 kB gzip. qa=SHIP (148/148 + 14/14 fixtures), design/perf/visual = SHIP WITH FOLLOWUPS, follow-ups queued in FEATURE_BACKLOG.md. Next cycle: pick a backlog item (tile-kit batch or pivot follow-ups).",
-  "subagent_sessions": {}
+  "status": "in-progress",
+  "feature": "Slice B: pixel-art tile & prop redesign",
+  "category": "Assets & Art",
+  "current_step": "3.5-rev2",
+  "last_updated": "2026-08-07T12:30:00Z",
+  "notes": "USER COURSE-CORRECTION 2026-08-07: (1) trust NVIDIA vision model, many detailed questions; (2) no qa-tester this cycle; (3-6) plain-only tiles, zipper deleted, dirt own module - ALL DONE; (7) no individual screenshots, one composite only; (8) finish SLICE_B doc - DONE. design-critic on tiles: SHIP WITH FOLLOWUPS. visual/ui/asset/performance critics CANCELLED when user closed opencode (sessions lost, INCIDENTS.md) - re-dispatch fresh after props. PROPS ROUND 1 (crossed-quad sprites): REJECTED - 'like piece of paper'. PROPS ROUND 2 (solid prisms): REJECTED 2026-08-07 12:15Z - 'instead of bush it has created a tile', lantern flat, big stone flat + not toward camera, flower + cactus bad. User supplied TWO detailed reference specs (classic 2:1 dimetric isometric, 45° azimuth / ~26.565° elevation, orthographic or high-FOV perspective; hand-painted 3-tone ramps: top +25% bright, left mid, right -25% dark; tinted non-black outline; low-poly real geometry: bush=flattened icosphere subdiv1 flat-shaded, rock=angular chunks, flower=stems+petal spheres, tall-grass=tapered blade fans, contact shadows, sparse asymmetric placement). ROUND 3 IN FLIGHT: full visual redesign of all 15 props per the user references (same session ses_02406cebbffeXgwOCsbw16BhpZ; keep registry/harness/fixtures/tests integration intact - only the geometry+material design changes). Camera stays as-is (approved for tiles); props must be designed for the existing world camera (south/+z, ~38 deg elevation).",
+  "subagent_sessions": {
+    "asset-creator-trim": "ses_024886518ffeR3epiF7yX12WZQ",
+    "feature-writer-showcase": "ses_024881df1ffe1pK98e4ltSJq15",
+    "design-critic-tiles": "ses_0242ad302ffesYFvM7BNuTbXj7",
+    "asset-creator-props": "ses_02406cebbffeXgwOCsbw16BhpZ"
+  }
 }
