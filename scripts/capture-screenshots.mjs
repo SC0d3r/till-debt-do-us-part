@@ -4,7 +4,7 @@
  *
  * Usage:
  *   node scripts/capture-screenshots.mjs --all
- *   node scripts/capture-screenshots.mjs --fixtures=farm-day,shop-open
+ *   node scripts/capture-screenshots.mjs --fixtures=grass-plain,tile-showcase
  *   node scripts/capture-screenshots.mjs --all --concurrency=2
  *
  * Requires puppeteer-core + a system Chrome (CHROME_PATH env or common paths).
@@ -18,21 +18,19 @@
  * the GPU flags (plain SwiftShader software rendering).
  *
  * This machine (headless Linux, no discrete GPU) needs the SOFTWARE-RENDERING
- * fallback: `--use-gl=desktop` stalls the WebGL farm scenes to ~1-2 fps here
+ * fallback: `--use-gl=desktop` stalls the WebGL tile scenes to ~1-2 fps here
  * (GPU stalls / SwiftShader deprecation warnings in the console), while plain
  * software rendering keeps ~9-14 fps. The harness settle is wall-clock based
  * (see src/debug/devHarness.ts), so even the slow GPU path settles, but most
- * farm-scene fixtures land on the software path on this machine. The GPU path
+ * tile-scene fixtures land on the software path on this machine. The GPU path
  * is kept as the primary attempt per the spec.
  *
- * Viewport is 960x720 (NOT the 960x540 suggested in DEBUG_HARNESS.md): at
- * 540px height the slot machine's measure() hits its mobile breakpoint
- * (vh < 620 → stacked layout) and the controls hint is hidden by CSS. 720px
- * gives a proper desktop reference: desktop slot layout + visible hint.
- * Additionally, headless Chrome reports `(hover: none)` (no input devices),
- * which would trip the slot's mobile media query anyway — loadPage() strips
- * the `(hover: none)` clause from those rules via CSSOM so captures show the
- * real desktop layout (see the comment in loadPage).
+ * Viewport is 960x720 (NOT the 960x540 suggested in DEBUG_HARNESS.md): the
+ * taller frame gives the tile-showcase map and the asset-preview studio shots
+ * comfortable margins. Additionally, headless Chrome reports `(hover: none)`
+ * (no input devices), which would trip any `(hover: none)` mobile media query
+ * in the CSS — loadPage() strips that clause from such rules via CSSOM so
+ * captures show the real desktop layout (see the comment in loadPage).
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'node:fs'
@@ -209,13 +207,12 @@ async function loadPage(page, url) {
     console.log(`[loadPage] initial settle never became ready within 30s — continuing, fixture waits will govern`)
   }
   // Headless Chrome reports `(hover: none)` and `(pointer: none)` (it has no
-  // input devices), which trips the slot machine's mobile CSS media query
-  // (`@media (max-width: 700px), (max-height: 620px) and (orientation:
-  // landscape), (hover: none)`) even at desktop viewport sizes — hiding the
-  // controls hint and switching the slot to the mobile layout. No flag or CDP
-  // emulation can change hover/pointer in headless, so drop the `(hover: none)`
-  // clause out of those rules via CSSOM (mediaText is writable). Real touch
-  // devices are unaffected: the `(pointer: coarse)` clauses remain.
+  // input devices), which trips any `(hover: none)` mobile media query in the
+  // page CSS even at desktop viewport sizes — hiding UI that desktop users
+  // would see. No flag or CDP emulation can change hover/pointer in headless,
+  // so drop the `(hover: none)` clause out of those rules via CSSOM (mediaText
+  // is writable). Real touch devices are unaffected: the `(pointer: coarse)`
+  // clauses remain.
   await page.evaluate(() => {
     for (const sheet of document.styleSheets) {
       let rules

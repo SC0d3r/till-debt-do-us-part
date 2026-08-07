@@ -44,7 +44,7 @@ on:
         type: boolean
         default: false
       tests:
-        description: "Comma-separated custom puppeteer test scripts to run (e.g. tests/qa-harness.mjs,tests/probe-daynight.mjs). Each must read BASE_URL/CHROME_PATH env (see tests/qa-harness.mjs for the pattern)."
+        description: "Comma-separated custom puppeteer test scripts to run (e.g. tests/qa-tile-kit-regression.mjs,tests/qa-composer-regression.mjs). Each must read BASE_URL/CHROME_PATH env (see tests/qa-tile-kit-regression.mjs for the pattern)."
         required: false
         default: ""
       concurrency:

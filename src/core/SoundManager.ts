@@ -1,13 +1,9 @@
 // Sound system:
 // - All game sound effects are synthesized with the Web Audio API (no files).
-// - The gameplay-loop song is a real MP3 file (public/gameplayloopsong.mp3)
-//   streamed through an HTMLAudioElement — no per-9.6s WebAudio node churn.
 
 export class SoundManager {
   private ctx: AudioContext | null = null
   private masterGain: GainNode | null = null
-  private musicEl: HTMLAudioElement | null = null
-  private musicPlaying = false
   private volume = 0.3
 
   init() {
@@ -253,52 +249,9 @@ export class SoundManager {
     }, 1400)
   }
 
-  // ─── Background music (MP3) ───
-  private ensureMusicEl(): HTMLAudioElement {
-    if (!this.musicEl) {
-      this.musicEl = new Audio('gameplayloopsong.mp3')
-      this.musicEl.loop = true
-      this.musicEl.volume = this.volume
-      this.musicEl.addEventListener('error', () => { this.musicEl = null })
-    }
-    return this.musicEl
-  }
-
-  startMusic() {
-    if (this.musicPlaying) return
-    this.ensureCtx()
-    this.musicPlaying = true
-    const el = this.ensureMusicEl()
-    el.play().catch(() => { this.musicPlaying = false })
-  }
-
   setVolume(v: number) {
     this.volume = Math.max(0, Math.min(1, v))
     if (this.masterGain) this.masterGain.gain.value = this.volume
-    if (this.musicEl) this.musicEl.volume = this.volume
-  }
-
-  pauseMusic() {
-    this.musicPlaying = false
-    this.musicEl?.pause()
-    if (this.ctx?.state === 'running') this.ctx.suspend()
-  }
-
-  resumeMusic() {
-    if (this.ctx?.state === 'suspended') this.ctx.resume()
-    if (!this.musicPlaying) {
-      this.musicPlaying = true
-      const el = this.ensureMusicEl()
-      el.play().catch(() => { this.musicPlaying = false })
-    }
-  }
-
-  stopMusic() {
-    this.musicPlaying = false
-    if (this.musicEl) {
-      this.musicEl.pause()
-      this.musicEl.currentTime = 0
-    }
   }
 }
 

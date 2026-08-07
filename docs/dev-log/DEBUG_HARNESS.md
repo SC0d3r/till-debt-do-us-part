@@ -31,48 +31,57 @@ bloat the production bundle or break the game).
 
 ### A.1 Debug API surface
 
-Add `src/debug/devHarness.js` (adapt the path/pattern to however this project
-already organizes code). Gate: only active when the URL has `?debug=1` AND this
-is not a production build — dead-code-eliminated from prod output entirely
+Implemented as `src/debug/devHarness.ts` (the game director's project pivot
+removed the farming-era `devHarness.js`; this file is the post-pivot rewrite).
+Gate: only active when the URL has `?debug=1` AND this is not a production
+build — dead-code-eliminated from prod output entirely
 (`if (import.meta.env.DEV) { ... }` or this bundler's equivalent), not just
-runtime-hidden.
+runtime-hidden. Verified by `scripts/check-prod-bundle.mjs` (GATES =
+`['__debug','devHarness']`).
 
 Expose `window.__debug` with:
 
 - **`ready: boolean`** — false while a transition is in flight, true once the
-  scene has settled (assets loaded, render stabilized).
-- **`setState(partial)`** — the low-level primitive. Directly writes into the
-  game's actual state (position, inventory, currency, time-of-day, weather,
-  open menu, quest/relationship flags — whatever this project's state shape
-  really is) with no simulated input at all. Everything else below is built on
-  top of this.
+  scene has settled (render stabilized).
 - **`getState()`** — returns a plain, serializable snapshot of current
-  relevant game state. This matters a lot for a canvas-rendered game: there's
-  no DOM to query, so this is how anything (tests, later tooling) checks "did
-  the harvest actually add to inventory" without screenshotting and eyeballing
-  it.
+  relevant state (world started/ready, renderer settings, fast-mode flags,
+  fixture preview status). This matters a lot for a canvas-rendered game:
+  there's no DOM to query, so this is how tests check "did the state change"
+  without screenshotting and eyeballing it.
 - **`gotoFixture(name)`** — named, high-level jump for screenshotting: looks up
-  `name` in the fixture registry (A.2) and calls `setState` with whatever that
-  fixture needs, then waits for `ready`.
-- **`fastForward(amount)`** — advances the game's internal clock/timers
-  (in-game minutes/days, growth timers, cooldowns) without waiting real
-  wall-clock time or hand-stepping hundreds of animation frames. Essential for
-  anything time-based — a crop that takes in-game days to grow should be
-  testable/screenshot-able in milliseconds of real time.
-- **`triggerEvent(name, payload?)`** — fires a specific internal game event
-  directly (e.g. `"cropMatured"`, `"toolBroke"`) so a reaction can be tested
-  without engineering the full real precondition chain that would naturally
-  cause it.
+  `name` in the fixture registry (A.2), calls the right transition for its
+  category (`previewAsset` for `"asset-preview"`, `showcaseTileMap` for the
+  tile showcase), then waits for `ready`.
 - **`listFixtures()`** — returns the fixture registry as-is.
+- **`setFastMode(enabled, renderEvery = 60)`** — dev-only QA speed-up: lowers
+  renderer resolution/antialias and throttles rendering to every Nth frame
+  while keeping world logic running (via `?fast=1` at boot, or called
+  programmatically). Drives the fast-path e2e suites.
 - **`previewAsset(name, opts?)`** — loads exactly one asset (built by
   `asset-creator`) into a neutral, isolated preview: plain studio background,
   a standard 3-point lighting rig, and a camera framed to fill most of the
-  viewport with the asset. This is deliberately separate from `gotoFixture`
-  (which jumps to real in-game scenes/states) — asset review needs a clean,
-  unambiguous shot with no gameplay context, lighting variance, or occlusion
-  from other objects. Sets `ready` the same way as any other transition. Added
-  by `asset-creator` the first time it's needed; every asset it builds after
-  that registers a fixture that resolves through this same path.
+  viewport with the asset. This is deliberately separate from the showcase map
+  (which is a real scene) — asset review needs a clean, unambiguous shot with
+  no gameplay context, lighting variance, or occlusion from other objects.
+  Sets `ready` the same way as any other transition. Added by `asset-creator`
+  the first time it's needed; every asset it builds after that registers a
+  fixture that resolves through this same path.
+- **`showcaseTileMap(opts?)`** — jumps to the showcase tile map (the current
+  product surface) with optional validation output. Also returns a
+  `showcase` handle (`{ composer, lastHover, validation, projectTile }`)
+  for tests that need projection or hover state.
+
+Removed in the project pivot (no longer exists — do not call): `setState`,
+`fastForward`, `triggerEvent`. The post-pivot game has no mutable game-state
+shape to write into (no farming state, no timers), so those primitives were
+deleted rather than kept as dead API. If a future feature introduces mutable
+state or time-based mechanics, revive the minimal `setState`/`fastForward`
+subset this doc described, in the same change that introduces the state —
+never as follow-up cleanup.
+
+Reset any state that could leak between calls — this API will be called
+repeatedly in the same page without a reload, both by the capture script and
+by test scripts.
 
 Reset any state that could leak between calls — this API will be called
 repeatedly in the same page without a reload, both by the capture script and
@@ -89,9 +98,9 @@ should check each fixture's category to know which path to call).
 `devHarness.js` should import this JSON as its single source of truth, so
 there's only one place to edit, not two that drift.
 
-Seed it with at least: main menu, farm scene (day), farm scene (night, if the
-game has one yet), one open in-game menu, one dialogue/interaction state —
-whatever actually exists right now.
+Seed it with at least: the tile showcase map (day), one asset preview per
+registered asset, and any new visually distinct scene/menu states as they
+appear.
 
 ### A.3 Capture script — `scripts/capture-screenshots.mjs`
 
@@ -166,16 +175,15 @@ runtime-gated.
 
 ### A.5 Acceptance criteria
 
-- [ ] `window.__debug.gotoFixture(name)` works for at least 5 seed fixtures.
-- [ ] `window.__debug.setState`/`getState`/`fastForward` work for at least one
-      real example each (e.g. set+read inventory count; fast-forward a crop
-      from planted to grown).
+- [ ] `window.__debug.gotoFixture(name)` works for every registered fixture.
+- [ ] `window.__debug.getState()` returns a serializable snapshot for at least
+      one real example (e.g. world started/ready flags).
 - [ ] `node scripts/capture-screenshots.mjs --all` captures every registered
       fixture — report actual wall-clock time in your summary.
 - [ ] Production-bundle grep-check exists and passes.
 - [ ] `tests/scene-fixtures.json`, `tests/screenshots/index.json`, and a short
-      `tests/README.md` (how to add a fixture, how to use setState/getState/
-      fastForward in a test) all exist.
+      `tests/README.md` (how to add a fixture, how to use the debug API in a
+      test) all exist.
 
 Out of scope for this first pass: no replay/recording system, no exhaustive
 state-combination coverage — just enough to be useful, growing from here.
@@ -191,13 +199,13 @@ a normal part of being "done" — this is already a standing rule in
 
 - Register/update a fixture in `tests/scene-fixtures.json`, wired into
   `gotoFixture`, for any new visually distinct state.
-- Extend `setState`/`getState` to cover any new piece of state the feature
-  introduces (new inventory item types, new flags, new timers). If
-  `qa-tester` or `scene-capture` can't reach or assert on a piece of state
-  through the debug API, that's a gap to close in the same change that
-  introduced the state — not a later cleanup task.
-- If a feature adds a new time-based mechanic, extend `fastForward`'s internal
-  clock-advance logic to cover it.
+- Extend `getState` to cover any new piece of state the feature introduces
+  (new flags, new settings). If `qa-tester` or `scene-capture` can't reach or
+  assert on a piece of state through the debug API, that's a gap to close in
+  the same change that introduced the state — not a later cleanup task.
+- If a feature adds a new time-based mechanic, revive a minimal
+  `fastForward`-style clock-advance hook (see the A.1 note on what the pivot
+  removed) as part of that same feature.
 
 `asset-creator` has the equivalent standing rule for its own output: every
 asset it builds registers a `"asset-preview"` fixture through `previewAsset`
@@ -222,11 +230,11 @@ Precondition setup should almost never be "click through the UI to reach the
 right state" — that's exactly the slow, framerate-bound pattern this system
 exists to remove. Instead:
 
-1. Use `page.evaluate(() => window.__debug.setState({...}))` — or
-   `gotoFixture` if an existing named fixture already matches — to jump
-   straight to the precondition for whatever's actually under test.
-2. Use `fastForward()` to skip time-based setup (e.g. "crop is fully grown")
-   instead of waiting or hand-driving hundreds of ticks.
+1. Use `page.evaluate(() => window.__debug.gotoFixture(name))` — or
+   `showcaseTileMap`/`previewAsset` directly if no named fixture matches — to
+   jump straight to the precondition for whatever's actually under test.
+2. Use `setFastMode(true)` when a test needs many logical frames quickly
+   (fast-path QA) instead of waiting or hand-driving hundreds of ticks.
 3. Perform the ACTUAL interaction under test with real simulated input
    (click/key events) — this part is never skipped, since it's specifically
    what's being tested. Debug hooks get you to the starting line fast; they
@@ -236,10 +244,10 @@ exists to remove. Instead:
    canvas. Far faster and more reliable than pixel-based assertions for a
    WebGL game — reserve screenshots for what `visual-critic`/`ui-critic`
    actually need to look at, not for QA pass/fail logic.
-5. If a piece of state needed for a test isn't exposed via `getState`/
-   `setState` yet, don't work around it (e.g. don't scrape the canvas) — file
-   it as a gap per Part B and note it explicitly in the review output instead
-   of silently skipping coverage.
+5. If a piece of state needed for a test isn't exposed via `getState` yet,
+   don't work around it (e.g. don't scrape the canvas) — file it as a gap per
+   Part B and note it explicitly in the review output instead of silently
+   skipping coverage.
 
 ## Part E — Running via GitHub Actions instead of locally (optional, recommended if local capture/testing is slow)
 
@@ -315,9 +323,9 @@ same `build` output.
 
 **Custom test scripts must be CI-friendly**: read `BASE_URL` and `CHROME_PATH`
 from the environment instead of hardcoding `http://localhost:5173` (the runner
-serves the dev server on port 4173) — see `tests/qa-harness.mjs` for the exact
-pattern, including optional `PUPPETEER_BUNDLED=1` support for the bundled
-Chromium provisioning mode.
+serves the dev server on port 4173) — see `tests/qa-tile-kit-regression.mjs`
+for the exact pattern, including optional `PUPPETEER_BUNDLED=1` support for
+the bundled Chromium provisioning mode.
 
 **Why the dev server and not `vite preview`?** The harness is gated by
 `import.meta.env.DEV`, which Vite statically replaces with `false` in *every*
@@ -344,15 +352,18 @@ software rendering. An earlier design probed the GPU flags on one fixture first
 and fell back to software per-fixture; in practice that probe wasted ~8-20s of
 every run for a known outcome. The workflow now always passes `--software` and
 `capture-screenshots.mjs` skips the probe entirely (kept only for local
-machines that do have a usable GPU). Capture is ~30s for all 9 fixtures either
-way, and the software-rendered PNGs are visually indistinguishable in quality.
+machines that do have a usable GPU). Capture is ~30s for the full fixture
+catalog either way, and the software-rendered PNGs are visually
+indistinguishable in quality.
 
 ### Browser provisioning benchmark (2026-08-05, run IDs 31007742349/31008271519/31008271710)
 
-All three runs: 9 fixtures + full e2e loop, concurrency 3, fixed pipeline
-(`--software`, boot-wait). `conclusion` was `failure` in every case solely due
-to the known L9b slot-spin test failure (56/57 — a real game bug, tracked in
-the backlog), never due to infrastructure.
+Historical (pre-pivot, farming-era catalog: 9 fixtures + full e2e loop,
+concurrency 3, fixed pipeline `--software`, boot-wait). `conclusion` was
+`failure` in every case solely due to the then-known L9b slot-spin test
+failure (56/57 — a real game bug, tracked in the backlog), never due to
+infrastructure. The provisioning-cost conclusions still hold for the
+post-pivot tile catalog.
 
 | browser input      | build | capture job (inside) | e2e job | provisioning cost |
 |--------------------|-------|----------------------|---------|-------------------|
@@ -372,7 +383,7 @@ The one command `scene-capture`/`qa-tester`/`feature-writer` actually run:
 
 ```
 ./scripts/run-ci-puppeteer.sh --fixtures=name1,name2   # or --all-fixtures, and/or --e2e
-./scripts/run-ci-puppeteer.sh --tests=tests/qa-harness.mjs,tests/probe-daynight.mjs  # arbitrary custom tests
+./scripts/run-ci-puppeteer.sh --tests=tests/qa-tile-kit-regression.mjs,tests/qa-composer-regression.mjs  # arbitrary custom tests
 ./scripts/run-ci-puppeteer.sh --fixtures=name1 --async  # dispatch, don't wait
 ./scripts/run-ci-puppeteer.sh --collect=run-1785922569-12345   # later: fetch that run's results
 ```

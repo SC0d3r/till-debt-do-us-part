@@ -139,11 +139,11 @@ a given state, this kit adds a debug/test harness:
 faster than local Chrome. It supports:
 
 - `--fixtures=name1,name2` / `--all-fixtures` — screenshot capture.
-- `--e2e` — the full-loop suite.
-- `--tests=tests/qa-harness.mjs,<any>.mjs` — **arbitrary custom puppeteer
+- `--e2e` — runs `tests/qa-tile-kit-regression.mjs`.
+- `--tests=tests/qa-tile-kit-regression.mjs,<any>.mjs` — **arbitrary custom puppeteer
   test scripts**; the workflow runs each with `node` and uploads output to
   `tests/e2e-results/`. Custom tests must read `BASE_URL`/`CHROME_PATH` env
-  (see `tests/qa-harness.mjs`).
+  (see `tests/qa-tile-kit-regression.mjs`).
 - `--async` then `--collect=<tag>` — dispatch without waiting, keep working,
   fetch results later. Agents are expected to multitask this way instead of
   blocking on CI.

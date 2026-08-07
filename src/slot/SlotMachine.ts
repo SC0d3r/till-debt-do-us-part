@@ -1,4 +1,3 @@
-import { PlayerState } from '../player/PlayerState'
 import { sound } from '../core/SoundManager'
 
 // ─── Symbol definitions ───
@@ -58,7 +57,7 @@ interface Cell {
 
 // ─── 2D Slot machine (pure DOM/CSS, no WebGL) ───
 export class SlotMachine {
-  private player: PlayerState
+  private wallet: { gold: number }
   private onHud: () => void
   private onClosed: () => void
 
@@ -111,11 +110,11 @@ export class SlotMachine {
     confetti: document.getElementById('slot-confetti')!,
   }
 
-  constructor(player: PlayerState, onHud: () => void, onClosed: () => void) {
-    this.player = player
+  constructor(wallet: { gold: number }, onHud: () => void, onClosed: () => void) {
+    this.wallet = wallet
     this.onHud = onHud
     this.onClosed = onClosed
-    this.displayMoney = player.gold
+    this.displayMoney = wallet.gold
 
     // Build the 2D grid panel
     this.grid = document.createElement('div')
@@ -171,7 +170,7 @@ export class SlotMachine {
     document.querySelectorAll('.slot-quick').forEach((b) => {
       b.addEventListener('click', () => {
         const amt = (b as HTMLElement).dataset.amt
-        if (amt === 'max') this.setBet(Math.min(this.player.gold, MAX_BET))
+        if (amt === 'max') this.setBet(Math.min(this.wallet.gold, MAX_BET))
         else this.changeBet(parseInt(amt || '1'))
       })
     })
@@ -192,7 +191,7 @@ export class SlotMachine {
       ? Math.min(this.bet + delta, MAX_BET)
       : Math.max(MIN_BET, this.bet + delta)
     if (next === this.bet) return
-    if (delta > 0 && next > this.player.gold) {
+    if (delta > 0 && next > this.wallet.gold) {
       this.deny(this.el.bet)
       return
     }
@@ -201,8 +200,8 @@ export class SlotMachine {
 
   // after a round, if the bet exceeds what we can afford, drop it to our gold
   private clampBetToAfford() {
-    if (this.bet > this.player.gold) {
-      this.bet = Math.max(MIN_BET, this.player.gold)
+    if (this.bet > this.wallet.gold) {
+      this.bet = Math.max(MIN_BET, this.wallet.gold)
       this.renderBet()
     }
   }
@@ -216,7 +215,7 @@ export class SlotMachine {
   pressSpin() {
     if (this.closed) return
     if (this.state !== 'idle' && this.state !== 'win') return
-    if (this.player.gold < this.bet) {
+    if (this.wallet.gold < this.bet) {
       this.deny(this.el.spin)
       return
     }
@@ -249,15 +248,15 @@ export class SlotMachine {
   private renderBet() {
     this.betFrom = parseFloat((this.el.bet.textContent ?? '').replace(/[^0-9]/g, '') || '0') || this.bet
     this.betRollT = 0
-    const afford = this.player.gold >= this.bet
+    const afford = this.wallet.gold >= this.bet
     this.el.spin.classList.toggle('slot-disabled', !afford)
-    this.el.spin.classList.toggle('slot-heartbeat', this.player.gold >= 500)
+    this.el.spin.classList.toggle('slot-heartbeat', this.wallet.gold >= 500)
   }
 
   // ─── Open / close / lifecycle ───
   open() {
     this.closed = false
-    this.displayMoney = this.player.gold
+    this.displayMoney = this.wallet.gold
     this.resetToIdle()
     this.renderBet()
     this.updateMoneyText()
@@ -312,7 +311,7 @@ export class SlotMachine {
 
   // ─── Spin & round flow ───
   private spin() {
-    this.player.gold -= this.bet
+    this.wallet.gold -= this.bet
     this.onHud()
     sound.slotClick()
     sound.slotSpinWhoosh()
@@ -425,9 +424,9 @@ export class SlotMachine {
     if (this.moneyRollT < 1) {
       this.moneyRollT = Math.min(1, this.moneyRollT + dt * 3.2)
       const p = 1 - Math.pow(1 - this.moneyRollT, 3)
-      this.displayMoney = Math.floor(this.moneyFrom + (this.player.gold - this.moneyFrom) * p)
+      this.displayMoney = Math.floor(this.moneyFrom + (this.wallet.gold - this.moneyFrom) * p)
       this.updateMoneyText()
-    } else if (this.displayMoney !== this.player.gold) {
+    } else if (this.displayMoney !== this.wallet.gold) {
       this.moneyFrom = this.displayMoney
       this.moneyRollT = 0
     }
@@ -650,7 +649,7 @@ export class SlotMachine {
     this.setRoundActive(false)
     this.clampBetToAfford()
     const win = this.totalWin
-    this.player.gold += win
+    this.wallet.gold += win
     this.winCredited = true
     this.onHud()
 

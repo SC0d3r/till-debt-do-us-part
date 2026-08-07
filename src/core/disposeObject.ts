@@ -2,9 +2,9 @@ import * as THREE from 'three'
 
 // Disposes every geometry and material under `root` exactly once, guarding
 // shared resources with Sets (a mesh's geometry can be shared, and a material
-// can be an array of materials). Textures are deliberately NOT disposed:
-// getTileTexture() caches textures module-wide (src/core/MeshFactory.ts), so
-// they are shared across FarmGrid instances and mine scenes — disposing them
+// can be an array of materials). Textures are deliberately NOT disposed: the
+// tile family modules (src/assets/tiles/*) cache their canvas textures
+// module-wide, so they are shared across every tile instance — disposing them
 // would break the next scene that reuses the cache.
 export function disposeObject(root: THREE.Object3D): void {
   const seenGeo = new Set<THREE.BufferGeometry>()
