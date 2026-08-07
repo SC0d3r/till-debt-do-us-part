@@ -1,9 +1,12 @@
 {
-  "status": "idle",
-  "feature": null,
-  "category": null,
-  "current_step": null,
-  "last_updated": "2026-08-07T10:30:00Z",
-  "notes": "Pivot shipped to dev. Farming game removed; tile world foundation is the product surface. Build 487.69 kB raw / 124.94 kB gzip. qa=SHIP (148/148 + 14/14 fixtures), design/perf/visual = SHIP WITH FOLLOWUPS, follow-ups queued in FEATURE_BACKLOG.md. Next cycle: pick a backlog item (tile-kit batch or pivot follow-ups).",
-  "subagent_sessions": {}
+  "status": "in-progress",
+  "feature": "Slice B: pixel-art tile & prop redesign",
+  "category": "Assets & Art",
+  "current_step": "4",
+  "last_updated": "2026-08-07T12:30:00Z",
+  "notes": "USER COURSE-CORRECTION 2026-08-07: (1) agents must TRUST the NVIDIA vision model and ask it many detailed/specific questions with generous token allowance; (2) do NOT run qa-tester this cycle; (3) remove grass-dirt + grass-tilled variants/code/images entirely; (4) remove all old two-tier/layer tile creation code (transition zipper); (5) grass ships ONLY plain grass variants (grass-plain/-b/-c) - no flowers/bushes/dirt/tilled; (6) keep lava/sand/snow/water/dirt; (7) do NOT commit individual screenshot images - one composite example image only; (8) finish SLICE_B_PIXEL_ART_TILES_AND_PROPS.md completely (director task). asset-creator trim DONE (13 fixtures, dirt.js module, tileTexture.js rename, build+cycles green, showcaseMap.js still broken at runtime until feature-writer lands). feature-writer showcase rewrite session ses_024881df1ffe1pK98e4ltSJq15 returned EMPTY (silent failure) - resuming same session. Images: tests/screenshots/index.json still lists deleted PNGs; handle at ship time (single composite image only).",
+  "subagent_sessions": {
+    "asset-creator-trim": "ses_024886518ffeR3epiF7yX12WZQ",
+    "feature-writer-showcase": "ses_024881df1ffe1pK98e4ltSJq15"
+  }
 }
