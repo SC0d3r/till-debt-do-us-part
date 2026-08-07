@@ -1,8 +1,9 @@
 # Test & Screenshot Harness
 
 Dev-loop infrastructure for the tile-based world (project pivot, 2026-08-07:
-the Harvest-Moon farming game was deleted; the tile system — TileMapComposer +
-the grass biome family — is now the product). A debug API (`window.__debug`)
+the Harvest-Moon farming game was deleted; the tile system — TileMapComposer,
+the tile families and the prop library — is now the product). A debug API
+(`window.__debug`)
 exposed **only** in dev builds with `?debug=1` in the URL lets tests and the
 screenshot pipeline jump straight to any fixture — no clicking through the UI.
 The entire harness is tree-shaken out of the production bundle (verified by
@@ -26,10 +27,12 @@ and use `window.__debug` from the console:
   setup (see below). The reset step tears down any active preview — so
   fixtures never leak into each other.
 - **`listFixtures()`** — the fixture registry from `tests/scene-fixtures.json`
-  (13 asset-preview fixtures + the `tile-showcase` map fixture).
-- **`previewAsset(name)`** — loads exactly one tile asset into a neutral
-  studio (plain background, 3-point rig, tight iso framing). Stops the game
-  loop for the duration of the preview; teardown restores the world.
+  (27 asset-preview fixtures — 12 tile variants across the grass/dirt/water/sand/lava/snow families plus all 15 props staged on their biome host tiles — and two showcase fixtures: `tile-showcase`, `props-showcase`).
+- **`previewAsset(name)`** — loads exactly one asset into a neutral studio
+  (plain background, 3-point rig, tight iso framing). Tile assets sit at the
+  origin; props are staged on their `hostTile` (from the prop registry manifest,
+  e.g. cactus → `sand-plain`) with their base resting on the tile's top face.
+  Stops the game loop for the duration of the preview; teardown restores the world.
 - **`showcaseTileMap(data?, opts?)`** — builds a map through the data-driven
   TileMapComposer (defaults to SHOWCASE_MAP) and frames the camera for the
   whole grid. Same preview staging as `previewAsset`.
@@ -59,10 +62,11 @@ in `reset()` too.
 1. Add an entry to `tests/scene-fixtures.json`:
    `{ "name": "my-scene", "description": "What it looks like", "category": "asset-preview" }`
 2. Asset-preview fixtures are dispatched by category automatically (the harness
-   iterates the grass family's VARIANTS manifest). For a new category, add a
-   matching setup in `src/debug/devHarness.ts` under `fixtureSetups`, keyed by
-   the same name. Every registered name MUST have a setup; `gotoFixture` throws
-   otherwise.
+   iterates the merged tile + prop VARIANTS manifests — adding a prop to
+   `src/assets/props/*.js` with `hostTile` metadata gets a preview for free).
+   For a new category, add a matching setup in `src/debug/devHarness.ts` under
+   `fixtureSetups`, keyed by the same name. Every registered name MUST have a
+   setup; `gotoFixture` throws otherwise.
 
 ## Capturing screenshots
 
