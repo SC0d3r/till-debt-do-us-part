@@ -1,49 +1,4 @@
 {
-  "main-menu": {
-    "path": "tests/screenshots/main-menu.png",
-    "capturedAt": "2026-08-06T23:22:22.821Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
-  },
-  "farm-day": {
-    "path": "tests/screenshots/farm-day.png",
-    "capturedAt": "2026-08-06T23:22:22.821Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
-  },
-  "farm-crops-grown": {
-    "path": "tests/screenshots/farm-crops-grown.png",
-    "capturedAt": "2026-08-06T23:22:22.821Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
-  },
-  "shop-open": {
-    "path": "tests/screenshots/shop-open.png",
-    "capturedAt": "2026-08-06T23:22:22.821Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
-  },
-  "inventory-open": {
-    "path": "tests/screenshots/inventory-open.png",
-    "capturedAt": "2026-08-06T23:22:22.821Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
-  },
-  "dialogue-open": {
-    "path": "tests/screenshots/dialogue-open.png",
-    "capturedAt": "2026-08-06T23:22:22.821Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
-  },
-  "mine-floor-1": {
-    "path": "tests/screenshots/mine-floor-1.png",
-    "capturedAt": "2026-08-06T23:22:22.821Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
-  },
-  "slot-machine": {
-    "path": "tests/screenshots/slot-machine.png",
-    "capturedAt": "2026-08-06T23:22:22.821Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
-  },
-  "farm-night": {
-    "path": "tests/screenshots/farm-night.png",
-    "capturedAt": "2026-08-06T23:22:22.821Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
-  },
   "grass-plain": {
     "path": "tests/screenshots/grass-plain.png",
     "capturedAt": "2026-08-06T23:22:22.822Z",
