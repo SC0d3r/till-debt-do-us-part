@@ -1,53 +1,8 @@
 {
-  "main-menu": {
-    "path": "tests/screenshots/main-menu.png",
-    "capturedAt": "2026-08-06T23:22:22.821Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
-  },
-  "farm-day": {
-    "path": "tests/screenshots/farm-day.png",
-    "capturedAt": "2026-08-06T23:22:22.821Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
-  },
-  "farm-crops-grown": {
-    "path": "tests/screenshots/farm-crops-grown.png",
-    "capturedAt": "2026-08-06T23:22:22.821Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
-  },
-  "shop-open": {
-    "path": "tests/screenshots/shop-open.png",
-    "capturedAt": "2026-08-06T23:22:22.821Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
-  },
-  "inventory-open": {
-    "path": "tests/screenshots/inventory-open.png",
-    "capturedAt": "2026-08-06T23:22:22.821Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
-  },
-  "dialogue-open": {
-    "path": "tests/screenshots/dialogue-open.png",
-    "capturedAt": "2026-08-06T23:22:22.821Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
-  },
-  "mine-floor-1": {
-    "path": "tests/screenshots/mine-floor-1.png",
-    "capturedAt": "2026-08-06T23:22:22.821Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
-  },
-  "slot-machine": {
-    "path": "tests/screenshots/slot-machine.png",
-    "capturedAt": "2026-08-06T23:22:22.821Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
-  },
-  "farm-night": {
-    "path": "tests/screenshots/farm-night.png",
-    "capturedAt": "2026-08-06T23:22:22.821Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
-  },
   "grass-plain": {
     "path": "tests/screenshots/grass-plain.png",
-    "capturedAt": "2026-08-06T23:22:22.822Z",
-    "commit": "267ca7c9fc5793b36cd982224695e92e448ff90e"
+    "capturedAt": "2026-08-07T05:13:14.070Z",
+    "commit": "2742988c356f681c6005fcfb65b74979c4f14f67"
   },
   "grass-flowers": {
     "path": "tests/screenshots/grass-flowers.png",
@@ -111,7 +66,7 @@
   },
   "tile-showcase": {
     "path": "tests/screenshots/tile-showcase.png",
-    "capturedAt": "2026-08-06T23:35:05.855Z",
-    "commit": "f085fdb66ba10d30d79a0d781ffd0279c9ee21b7"
+    "capturedAt": "2026-08-07T05:13:14.070Z",
+    "commit": "2742988c356f681c6005fcfb65b74979c4f14f67"
   }
 }

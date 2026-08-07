@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "capture": "node scripts/capture-screenshots.mjs",
     "check:cycles": "madge --circular --extensions ts src",
-    "test:e2e": "node tests/e2e-full-loop.mjs",
+    "test:e2e": "node tests/qa-tile-kit-regression.mjs",
     "test:prod-gate": "npm run build && node scripts/check-prod-bundle.mjs"
   },
   "dependencies": {
