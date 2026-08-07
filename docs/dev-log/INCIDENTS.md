@@ -68,3 +68,39 @@ new SILENT-FAILURE PROTOCOL) and delivered full reviews.
 Retries: 2 rounds of critics before restart; 1 resume each after silent empty.
 Resolution: agent MDs fixed + committed (777b146); opencode restarted by user;
 critics re-ran successfully with NVIDIA vision.
+
+## 2026-08-07 11:18Z — Slice B tile trim critic round
+Subagent: visual-critic, ui-critic, asset-critic, performance-critic (4 parallel dispatches)
+Observed: all four were dispatched in parallel with design-critic. design-critic
+completed (SHIP WITH FOLLOWUPS, ses_0242ad302ffesYFvM7BNuTbXj7). The other four
+returned "Task cancelled" with NO task ids — the user accidentally closed
+opencode mid-dispatch. Session ids were never returned, so the same sessions
+cannot be resumed (SILENT-FAILURE PROTOCOL rule 5: session lost = say so, don't
+pretend). Per user directive the critics will be re-dispatched FRESH after the
+prop library (slice B section 4) is built, so the whole slice is reviewed at
+once — tile-only verdicts would be premature anyway.
+Retries: n/a (cannot resume lost sessions)
+Resolution: recorded as lost sessions; fresh dispatch scheduled post-props
+
+## 2026-08-07 13:20Z — Prop library build: 3x user rejection + power outage
+Subagent: asset-creator (ses_02406cebbffeXgwOCsbw16BhpZ, resumed across all rounds)
+Observed: round 1 (crossed-quad sprites) rejected by user ("like a piece of
+paper"); round 2 (solid prisms) rejected ("instead of bush it has created a
+tile"); round 3 (final icosa/blob forms) was interrupted by a power outage
+mid-run — resumed the SAME session per SILENT-FAILURE PROTOCOL and completed.
+Two further fix rounds (flower NaN bug, camera framing, brightness) also
+interrupted by internet outages; each resumed the same session.
+Retries: 2 resumes of the same session (power outage + network), plus 2 fix
+rounds in the same session
+Resolution: all 15 props built and approved; both gating critics reached
+SHIP WITH FOLLOWUPS after fix round 2.
+
+## 2026-08-08 02:00Z — Local screenshot re-capture after accidental deletion
+Subagent: none (director)
+Observed: during the ship sequence, `rm -f tests/screenshots/*.png` deleted
+the fresh captures AND the composite before the composite was committed.
+Retries: re-ran `node scripts/capture-screenshots.mjs --all --concurrency=2`
+locally (took ~10 min, timed out the shell but completed; dev server had to
+be killed manually).
+Resolution: 29 fresh captures re-taken, composite rebuilt, individual PNGs
+gitignored per user directive.

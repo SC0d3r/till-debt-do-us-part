@@ -1,9 +1,8 @@
 {
   "status": "idle",
   "feature": null,
-  "category": null,
   "current_step": null,
-  "last_updated": "2026-08-07T10:30:00Z",
-  "notes": "Pivot shipped to dev. Farming game removed; tile world foundation is the product surface. Build 487.69 kB raw / 124.94 kB gzip. qa=SHIP (148/148 + 14/14 fixtures), design/perf/visual = SHIP WITH FOLLOWUPS, follow-ups queued in FEATURE_BACKLOG.md. Next cycle: pick a backlog item (tile-kit batch or pivot follow-ups).",
+  "last_updated": "2026-08-08T02:30:00Z",
+  "notes": "Slice B shipped (tile kit + 15 props). Both gating critics (asset, visual) reached SHIP WITH FOLLOWUPS after two fix rounds; design/ui/performance SHIP WITH FOLLOWUPS. qa-tester skipped per user directive; local suites green (tile-kit 72/72, composer 78/78, exploratory 31/31). Individual screenshots gitignored; only tile-prop-catalog.png composite committed. Followups queued in FEATURE_BACKLOG.md.",
   "subagent_sessions": {}
 }

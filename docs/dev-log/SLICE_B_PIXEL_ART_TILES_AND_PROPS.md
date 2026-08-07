@@ -18,6 +18,20 @@ completely — this is the only valid Slice B from now on. Specifically
 voided: the two-band (top-strip + base-strip) tile shape, and the flat
 per-face vertex-tint coloring approach. Both are replaced below.
 
+**USER REVISION 2026-08-07 (binding, supersedes anything below that
+conflicts):** the tile kit ships PLAIN variants only. The grass family is
+`grass-plain` / `grass-plain-b` / `grass-plain-c` and nothing else — no
+flowers, no bushes, no dirt, no tilled, no grass↔dirt or grass↔tilled
+transition/edge variants. The transition zipper utility
+(`makeTransitionTopTexture` + staircase) is DELETED; `transitionTexture.js`
+was renamed to `tileTexture.js` and keeps only the shared canvas-texture
+factory (`makeTileCanvasTexture`, `maskDiamondEdge`, `TILE_TEXTURE_SIZE`).
+Dirt is its own family module (`src/assets/tiles/dirt.js`: `dirt-plain`,
+`dirt-plain-b`). The surviving roster is: grass (3 plain variants), dirt
+(2), water (2), sand (2), lava (1), snow (2) = 12 variants. Biomes simply
+abut in maps — no edge tiles, no orientation bookkeeping. The showcase map
+is a 9x9 biome patchwork proving all six families in one view.
+
 Update `docs/dev-log/TILE_SYSTEM_CONVENTION.md`'s existing coloring-rule
 section **in place** — replace its text, don't leave the old rule sitting
 alongside a new contradictory one. That file is what `asset-critic` actually
@@ -142,15 +156,17 @@ forest-green for grass, dark navy for water).
 
 ## 3. Biome roster
 
-Grass, desert/sand, lava, snow, water — same roster as before, unaffected by
-this shape/coloring change. The reference documents explicitly cover
-grass/dirt/water/sand; **extrapolate the same technical rules to lava and
-snow**, which aren't pictured — the "Shared technical style rules" and
-"Shared style rules" sections in the references are written as universal
-rules, not per-material flavor text, so they transfer directly. If any of
-these biome families already exist from earlier work, redo them to this
-spec rather than leaving the old shape/coloring in place — that's exactly
-what section 0's "this replaces the previous Slice B" means in practice.
+Grass, dirt, desert/sand, lava, snow, water — six families. Per the user
+revision above: **plain variants only**, no transition/edge tiles; dirt is
+its own module, grass ships only `grass-plain`/`-b`/`-c`. The reference
+documents explicitly cover grass/dirt/water/sand; **extrapolate the same
+technical rules to lava and snow**, which aren't pictured — the "Shared
+technical style rules" and "Shared style rules" sections in the references
+are written as universal rules, not per-material flavor text, so they
+transfer directly. If any of these biome families already exist from earlier
+work, redo them to this spec rather than leaving the old shape/coloring in
+place — that's exactly what section 0's "this replaces the previous Slice B"
+means in practice.
 
 Water still needs its own multi-tone treatment (bright sparkle highlights,
 mid blue, deeper navy pooling) per the reference's water breakdown
@@ -193,24 +209,58 @@ Category-variety override still applies until section 6 is met.
 
 ## 6. Definition of done
 
-- [ ] `TILE_SYSTEM_CONVENTION.md`'s coloring-rule section is replaced (not
+Status legend: `[x]` done on dev, `[ ]` not yet, `[~]` superseded/removed by
+the user revision.
+
+- [x] `TILE_SYSTEM_CONVENTION.md`'s coloring-rule section is replaced (not
       appended to) with this document's rules.
-- [ ] Every tile is single-section (no base band), correct reduced height,
-      geometry silhouette unchanged/precise.
-- [ ] Every tile/prop texture uses nearest-neighbor filtering, hard palette,
+- [x] Every tile is single-section (no base band), correct reduced height
+      (top face ~0.34, base 0), geometry silhouette unchanged/precise.
+- [x] Every tile texture uses nearest-neighbor filtering, hard palette,
       above-left shading with real highlight/shadow, organic
       directional noise (not random-square noise).
-- [ ] Every tile/prop has a baked-in jagged texture outline per the
+- [x] Every tile has a baked-in jagged texture outline per the
       reference, independent of and compatible with the existing ribbon
       outline system.
-- [ ] `outlineColor`/`outlineTop`/`outlineBase` set correctly on every tile.
-- [ ] All 5 biomes built or rebuilt to this spec, including lava/snow
-      (extrapolated, per section 3).
-- [ ] 2-3 texture variants exist for common tile types, as distinct variant
-      strings.
-- [ ] Full prop library (section 4) built to this spec, correct socket
-      metadata on each.
-- [ ] `asset-critic`, `ui-critic`, `visual-critic`, `performance-critic` all
-      signed off.
-- [ ] Once all of the above is true: hold here. Slice C is a separate brief
-      handed to you next.
+- [x] `outlineColor`/`outlineTop`/`outlineBase` set correctly on every tile
+      (grass deep green, dirt warm brown, water deep blue, sand warm brown,
+      lava ember orange, snow pale blue).
+- [x] All 6 biome families built to this spec: grass (plain only, per user
+      revision), dirt, water, sand, lava, snow.
+- [x] 2-3 texture variants exist for common tile types, as distinct variant
+      strings (`grass-plain/-b/-c`, `dirt-plain/-b`, `water-plain/-b`,
+      `sand-plain/-b`, `snow-plain/-b`).
+- [x] Full prop library (section 4) built to this spec, correct socket
+      metadata on each — 15 props shipped (flower, rock, bush, tall-grass,
+      cactus, small-stone, big-stone, pebble-cluster, torch, lantern,
+      gravel-patch, dry-shrub, bush-snow, snow-patch, lava-rock), each with
+      `userData.socket = { type, max }`, shared builders in
+      `src/assets/props/propBase.js`, merged registry `src/assets/props/index.js`.
+- [x] `asset-critic`, `ui-critic`, `visual-critic`, `performance-critic` all
+      signed off on the tile batch (2026-08-07: asset/visual reached
+      SHIP WITH FOLLOWUPS after two fix rounds; design/ui/performance
+      SHIP WITH FOLLOWUPS on the first pass).
+- [x] Once all of the above is true: hold here. Slice C is a separate brief
+      handed to you next. (Tile + prop portion done; followups queued in
+      FEATURE_BACKLOG.md.)
+
+### Batch log
+
+- **2026-08-07 tiles (dev)**: pixel-art painter utility
+  (`src/assets/pixelart/pixelPainter.js`), single-section prism
+  (`src/assets/tiles/tilePrism.js`), shared canvas-texture factory
+  (`src/assets/tiles/tileTexture.js`), six family modules (grass/dirt/water/
+  sand/lava/snow) with 12 plain variants, merged registry
+  (`src/assets/tiles/index.js`), showcase map rewritten as a biome
+  patchwork, composer tests re-pinned to the trimmed roster. The old
+  transition zipper and all grass-dirt/grass-tilled/flowers/bushes code and
+  fixtures were removed per the user revision.
+- **2026-08-07 props (dev)**: 15 low-poly camera-facing props built to the
+  two user references (2:1 dimetric iso, 3-tone ramps, tinted outline,
+  contact rings, sparse asymmetric placement). Three geometry generations:
+  crossed-quads (rejected: "paper"), solid prisms (rejected: "a tile, not a
+  bush"), final icosa/blob/post/blade-fan forms with vertex-baked shading
+  (`PROP_BRIGHTNESS = 0.575` applied in `shadeFaces`). `props-showcase`
+  diorama (7x6 mixed terrain) registered; QA suite extended to 72 tests
+  (T1–T11 incl. NDC framing assertions); 29 fixtures total in
+  `tests/scene-fixtures.json`.

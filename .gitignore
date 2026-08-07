@@ -7,3 +7,8 @@ dist/
 tests/.tmp-baseline/
 
 tests/e2e-results/
+
+# Individual fixture captures stay untracked — only the composite example
+# image is committed (see docs/dev-log/SLICE_B_PIXEL_ART_TILES_AND_PROPS.md).
+tests/screenshots/*.png
+!tests/screenshots/tile-prop-catalog.png

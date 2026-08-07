@@ -16,6 +16,33 @@ Follow-ups queued: <backlog items added as a result, or "none">
 
 ---
 
+## Slice B: pixel-art tile kit trim + 15-prop library — Assets & Art — 2026-08-08
+Commit: <pending commit>
+Summary: Executed `SLICE_B_PIXEL_ART_TILES_AND_PROPS.md` end to end. Tile kit
+trimmed to plain-only per user revision: six biome families (grass/dirt/
+water/sand/lava/snow) with 12 variants (grass-plain/-b/-c, dirt-plain/-b,
+water-plain/-b, sand-plain/-b, lava-plain, snow-plain/-b), single-section
+prism, baked jagged outlines, `pixelPainter.js` noise utility, transition
+zipper + all grass-dirt/grass-tilled/flowers/bushes code removed. New prop
+library: 15 low-poly camera-facing props (flower, rock, bush, tall-grass,
+cactus, small-stone, big-stone, pebble-cluster, torch, lantern,
+gravel-patch, dry-shrub, bush-snow, snow-patch, lava-rock) built from shared
+`propBase.js` geometry builders with vertex-baked 3-tone pixel shading
+(`PROP_BRIGHTNESS = 0.575`), tinted outlines, contact rings, and socket
+metadata; `props-showcase` 7x6 diorama fixture. Three geometry generations
+(crossed-quads and solid prisms rejected by user; final icosa/blob/post/
+blade-fan forms approved). Showcase map rewritten as 9x9 biome patchwork;
+29 fixtures; QA suites re-pinned (tile-kit 72/72, composer 78/78,
+exploratory 31/31). Individual screenshots gitignored — one composite
+example image (`tile-prop-catalog.png`) committed.
+Verdicts: design=SHIP WITH FOLLOWUPS ui=SHIP WITH FOLLOWUPS
+visual=SHIP WITH FOLLOWUPS (after 2 fix rounds) performance=SHIP WITH
+FOLLOWUPS asset=SHIP WITH FOLLOWUPS (after 2 fix rounds) qa=SKIPPED (user
+directive; local suites green instead)
+Follow-ups queued: selection-ring ownership pinning, hover cursor,
+outline frame cache key, prop instancing, dead-code sweep, prop-rocket
+nits, organic-boundary demo, lava-plain-b variant (see FEATURE_BACKLOG.md)
+
 ## Project pivot: Harvest-Moon farming game removed — tile world foundation — Tech & Performance — 2026-08-07
 Commit: <pending commit>
 Summary: Executed `PROJECT_PIVOT_AND_IDENTITY_OVERRIDE.md` end to end. The entire

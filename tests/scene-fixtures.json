@@ -5,68 +5,143 @@
     "category": "asset-preview"
   },
   {
-    "name": "grass-flowers",
-    "description": "Grass tile family: grass with scattered flower dots (asset preview)",
+    "name": "grass-plain-b",
+    "description": "Grass tile family: plain grass tile, texture variant B (asset preview)",
     "category": "asset-preview"
   },
   {
-    "name": "grass-bushes",
-    "description": "Grass tile family: grass with a merged low-poly bush (asset preview)",
-    "category": "asset-preview"
-  },
-  {
-    "name": "grass-dirt-n",
-    "description": "Grass tile family: grass to dirt transition, dirt toward north (asset preview)",
-    "category": "asset-preview"
-  },
-  {
-    "name": "grass-dirt-e",
-    "description": "Grass tile family: grass to dirt transition, dirt toward east (asset preview)",
-    "category": "asset-preview"
-  },
-  {
-    "name": "grass-dirt-s",
-    "description": "Grass tile family: grass to dirt transition, dirt toward south (asset preview)",
-    "category": "asset-preview"
-  },
-  {
-    "name": "grass-dirt-w",
-    "description": "Grass tile family: grass to dirt transition, dirt toward west (asset preview)",
-    "category": "asset-preview"
-  },
-  {
-    "name": "grass-tilled",
-    "description": "Grass tile family: grass to tilled-soil transition (asset preview)",
-    "category": "asset-preview"
-  },
-  {
-    "name": "grass-tilled-n",
-    "description": "Grass tile family: grass to tilled-soil transition, tilled toward north (asset preview)",
-    "category": "asset-preview"
-  },
-  {
-    "name": "grass-tilled-e",
-    "description": "Grass tile family: grass to tilled-soil transition, tilled toward east (asset preview)",
-    "category": "asset-preview"
-  },
-  {
-    "name": "grass-tilled-s",
-    "description": "Grass tile family: grass to tilled-soil transition, tilled toward south (asset preview)",
-    "category": "asset-preview"
-  },
-  {
-    "name": "grass-tilled-w",
-    "description": "Grass tile family: grass to tilled-soil transition, tilled toward west (asset preview)",
+    "name": "grass-plain-c",
+    "description": "Grass tile family: plain grass tile, texture variant C (asset preview)",
     "category": "asset-preview"
   },
   {
     "name": "dirt-plain",
-    "description": "Grass tile family: plain dirt tile, showcase context for the transitions (asset preview)",
+    "description": "Dirt tile family: plain dirt tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "dirt-plain-b",
+    "description": "Dirt tile family: plain dirt tile, texture variant B (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "water-plain",
+    "description": "Water tile family: plain water tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "water-plain-b",
+    "description": "Water tile family: plain water tile, texture variant B (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "sand-plain",
+    "description": "Sand tile family: plain sand tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "sand-plain-b",
+    "description": "Sand tile family: plain sand tile, texture variant B (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "lava-plain",
+    "description": "Lava tile family: plain lava tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "snow-plain",
+    "description": "Snow tile family: plain snow tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "snow-plain-b",
+    "description": "Snow tile family: plain snow tile, texture variant B (asset preview)",
     "category": "asset-preview"
   },
   {
     "name": "tile-showcase",
-    "description": "TileMapComposer showcase: 9x9 grass field with a dirt path, tilled patch and oriented transitions",
+    "description": "TileMapComposer showcase: 9x9 biome patchwork of all six plain tile families",
+    "category": "showcase"
+  },
+  {
+    "name": "flower",
+    "description": "Prop library: tiny white two-bloom flower on a grass host tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "rock",
+    "description": "Prop library: dark blue-gray lumpy boulder on a grass host tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "bush",
+    "description": "Prop library: dense emerald bush on a grass host tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "tall-grass",
+    "description": "Prop library: vertical spiky grass tuft on a grass host tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "small-stone",
+    "description": "Prop library: tiny rounded corner stone on a grass host tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "big-stone",
+    "description": "Prop library: large corner/center stone on a grass host tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "pebble-cluster",
+    "description": "Prop library: grouped 2-3 pebble cluster on a grass host tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "torch",
+    "description": "Prop library: wooden stake torch with baked flame on a grass host tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "lantern",
+    "description": "Prop library: small lantern with warm baked glow on a grass host tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "gravel-patch",
+    "description": "Prop library: flat scattered gravel surface overlay on a dirt host tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "cactus",
+    "description": "Prop library: desert saguaro cactus on a sand host tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "dry-shrub",
+    "description": "Prop library: dry withered shrub (bush shape, dry palette) on a sand host tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "bush-snow",
+    "description": "Prop library: snow-recolored bush (bush shape, snow palette) on a snow host tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "snow-patch",
+    "description": "Prop library: flat snow-drift surface overlay on a snow host tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "lava-rock",
+    "description": "Prop library: dark basalt rock with baked ember cracks on a lava host tile (asset preview)",
+    "category": "asset-preview"
+  },
+  {
+    "name": "props-showcase",
+    "description": "Prop showcase: all 15 props staged on a 7x6 mixed-terrain diorama (rests-on-tiles + cross-prop hierarchy proof)",
     "category": "showcase"
   }
 ]

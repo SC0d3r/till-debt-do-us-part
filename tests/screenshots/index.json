@@ -1,72 +1,147 @@
 {
   "grass-plain": {
     "path": "tests/screenshots/grass-plain.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
-  },
-  "grass-flowers": {
-    "path": "tests/screenshots/grass-flowers.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
-  },
-  "grass-bushes": {
-    "path": "tests/screenshots/grass-bushes.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
-  },
-  "grass-dirt-n": {
-    "path": "tests/screenshots/grass-dirt-n.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
-  },
-  "grass-dirt-e": {
-    "path": "tests/screenshots/grass-dirt-e.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
-  },
-  "grass-dirt-s": {
-    "path": "tests/screenshots/grass-dirt-s.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
-  },
-  "grass-dirt-w": {
-    "path": "tests/screenshots/grass-dirt-w.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
-  },
-  "grass-tilled": {
-    "path": "tests/screenshots/grass-tilled.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
+    "capturedAt": "2026-08-07T22:33:18.949Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
   },
   "dirt-plain": {
     "path": "tests/screenshots/dirt-plain.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
-  },
-  "grass-tilled-e": {
-    "path": "tests/screenshots/grass-tilled-e.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
-  },
-  "grass-tilled-s": {
-    "path": "tests/screenshots/grass-tilled-s.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
-  },
-  "grass-tilled-w": {
-    "path": "tests/screenshots/grass-tilled-w.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
-  },
-  "grass-tilled-n": {
-    "path": "tests/screenshots/grass-tilled-n.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
+    "capturedAt": "2026-08-07T22:33:18.951Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
   },
   "tile-showcase": {
     "path": "tests/screenshots/tile-showcase.png",
-    "capturedAt": "2026-08-07T06:33:53.126Z",
-    "commit": "24ae082032a1974c3363ce3bbf70a1ec3d368760"
+    "capturedAt": "2026-08-07T22:33:18.952Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "water-plain": {
+    "path": "tests/screenshots/water-plain.png",
+    "capturedAt": "2026-08-07T22:33:18.951Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "water-plain-b": {
+    "path": "tests/screenshots/water-plain-b.png",
+    "capturedAt": "2026-08-07T22:33:18.951Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "sand-plain": {
+    "path": "tests/screenshots/sand-plain.png",
+    "capturedAt": "2026-08-07T22:33:18.951Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "sand-plain-b": {
+    "path": "tests/screenshots/sand-plain-b.png",
+    "capturedAt": "2026-08-07T22:33:18.952Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "lava-plain": {
+    "path": "tests/screenshots/lava-plain.png",
+    "capturedAt": "2026-08-07T22:33:18.952Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "snow-plain": {
+    "path": "tests/screenshots/snow-plain.png",
+    "capturedAt": "2026-08-07T22:33:18.952Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "snow-plain-b": {
+    "path": "tests/screenshots/snow-plain-b.png",
+    "capturedAt": "2026-08-07T22:33:18.952Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "grass-plain-b": {
+    "path": "tests/screenshots/grass-plain-b.png",
+    "capturedAt": "2026-08-07T22:33:18.950Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "grass-plain-c": {
+    "path": "tests/screenshots/grass-plain-c.png",
+    "capturedAt": "2026-08-07T22:33:18.951Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "dirt-plain-b": {
+    "path": "tests/screenshots/dirt-plain-b.png",
+    "capturedAt": "2026-08-07T22:33:18.951Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "flower": {
+    "path": "tests/screenshots/flower.png",
+    "capturedAt": "2026-08-07T22:33:18.952Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "rock": {
+    "path": "tests/screenshots/rock.png",
+    "capturedAt": "2026-08-07T22:33:18.952Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "bush": {
+    "path": "tests/screenshots/bush.png",
+    "capturedAt": "2026-08-07T22:33:18.952Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "tall-grass": {
+    "path": "tests/screenshots/tall-grass.png",
+    "capturedAt": "2026-08-07T22:33:18.952Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "small-stone": {
+    "path": "tests/screenshots/small-stone.png",
+    "capturedAt": "2026-08-07T22:33:18.952Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "big-stone": {
+    "path": "tests/screenshots/big-stone.png",
+    "capturedAt": "2026-08-07T22:33:18.953Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "pebble-cluster": {
+    "path": "tests/screenshots/pebble-cluster.png",
+    "capturedAt": "2026-08-07T22:33:18.953Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "torch": {
+    "path": "tests/screenshots/torch.png",
+    "capturedAt": "2026-08-07T22:33:18.953Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "lantern": {
+    "path": "tests/screenshots/lantern.png",
+    "capturedAt": "2026-08-07T22:33:18.953Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "gravel-patch": {
+    "path": "tests/screenshots/gravel-patch.png",
+    "capturedAt": "2026-08-07T22:33:18.953Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "cactus": {
+    "path": "tests/screenshots/cactus.png",
+    "capturedAt": "2026-08-07T22:33:18.953Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "dry-shrub": {
+    "path": "tests/screenshots/dry-shrub.png",
+    "capturedAt": "2026-08-07T22:33:18.953Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "bush-snow": {
+    "path": "tests/screenshots/bush-snow.png",
+    "capturedAt": "2026-08-07T22:33:18.953Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "snow-patch": {
+    "path": "tests/screenshots/snow-patch.png",
+    "capturedAt": "2026-08-07T22:33:18.953Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "lava-rock": {
+    "path": "tests/screenshots/lava-rock.png",
+    "capturedAt": "2026-08-07T22:33:18.954Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+  },
+  "props-showcase": {
+    "path": "tests/screenshots/props-showcase.png",
+    "capturedAt": "2026-08-07T22:33:18.954Z",
+    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
   }
 }

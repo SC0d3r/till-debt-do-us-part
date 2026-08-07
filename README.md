@@ -8,8 +8,11 @@ concept was replaced per the project pivot; the final genre is TBD).
 
 What exists today:
 - **Procedural tile system** — data-driven `TileMapComposer` rendering
-  instanced isometric tile maps (grass family: plain/flowers/bushes, dirt
-  transitions, edge seams) with hover highlighting and outlines.
+  instanced isometric tile maps (six plain-only biome families: grass, dirt,
+  water, sand, lava, snow) with hover highlighting and outlines.
+- **Pixel-art prop library** — 15 low-poly, camera-facing props (flower, rock,
+  bush, cactus, torch, lantern, …) built from shared geometry builders with
+  baked 3-tone pixel shading and contact rings.
 - **Debug/QA harness** — `window.__debug` (dev-only, `?debug=1`) with fixture
   jumping, asset previews, and fast-mode for automated testing.
 
