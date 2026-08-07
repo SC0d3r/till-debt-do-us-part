@@ -1,14 +1,16 @@
-// QA regression — TileMapComposer slice A (data-driven isometric tile map
+// QA regression — TileMapComposer slice B (data-driven isometric tile map
 // composer + showcase map). Scope: src/world/TileMapComposer.js (grouping,
 // diagonal-lattice positioning, per-instance rotation, instanceColor init,
 // hover contract, mid-build leak cleanup, dispose, tile OUTLINES) and
-// src/world/showcaseMap.js (SHOWCASE_MAP + validateShowcaseMap incl. the
-// ghost-edge check), wired through the debug-only showcase fixture
+// src/world/showcaseMap.js (SHOWCASE_MAP + validateShowcaseMap — the
+// post-trim data gate: known variant + unique coordinates only, no edge
+// checks), wired through the debug-only showcase fixture
 // (src/debug/devHarness.ts showcaseTileMap). This file verifies:
 //   C1  registry + fixture: 'tile-showcase' (category showcase) resolves via
 //       gotoFixture with the loop stopped, HUD hidden, composer live
 //   C2  grouping by variant STRING: 12 groups, instance counts match the data
-//       (81 tiles total; grass-dirt-n group = the rotation-proof cells)
+//       (81 tiles total across the six-biome patchwork; the grass-plain
+//       group includes the 6 rotated cells of row y=5)
 //   C3  positioning: every instance matrix translation is exactly
 //       ((x−y)*0.5, 0, (x+y)*0.5); rotation 0 keeps identity, 90/180/270
 //       apply the correct per-instance y-rotation; adjacent data cells sit
@@ -17,25 +19,26 @@
 //   C5  hover contract on synthetic pointer events: 1.0 highlight, 0.88
 //       restore on move-off, clear on pointerout AND window blur, onHover
 //       delivers {x, y, variant, rotation, instanceId, group}
-//   C6  validateShowcaseMap gate: SHOWCASE_MAP passes (rotation-aware); bad
-//       data throws before any staging (harness stays usable); a rotated
-//       edge pointing the wrong way is rejected; a GHOST edge (edge dropped
-//       inside a foreign field) is rejected; a legit split boundary passes
+//   C6  validateShowcaseMap gate: SHOWCASE_MAP passes; unknown variant and
+//       duplicate coordinate are rejected before any staging (harness stays
+//       usable); a valid minimal cross-biome map passes (no edges needed)
 //   C7  composer guards: elevation != 0 throws; rotation not in 0/90/180/270
 //       throws (clear errors, harness stays usable)
 //   O1  outline construction: SEAM-RESOLVED local masks with the exact
 //       data-derived table (rev 4 ownership: the tile whose outline color
 //       matches its own biome renders each shared edge when exactly one
-//       side is biome-colored, data-order otherwise — the GREEN records
-//       lose their seams to brown biome-colored neighbors; (2,0)/(2,8)/
-//       (8,8) render nothing yet still own an empty '' instance), 81
-//       outline instances (ONE per record), one shared white material,
-//       instance matrices tracking the tile lattice+rotation
+//       side is biome-colored, data-order otherwise — the GREEN records of
+//       the top-center 3x3 block lose their seams to biome-colored
+//       neighbors; (5,8)/(8,8) render nothing yet still own an empty ''
+//       instance), 81 outline instances (ONE per record), one shared white
+//       material, instance matrices tracking the tile lattice+rotation
 //   O2  outline color resolution: record outlineColor > manifest biome
-//       palette (edges = fromBiome owner) > map-level > global; rest state
-//       instanceColor = resolved × 0.88; per-record overrides (mode 'none',
-//       side list, explicit color) through showcaseTileMap custom data
-//   O3  hover sync on a ROTATED record ((5,2) grass-dirt-n @ 90): tile AND
+//       palette > map-level > global; rest state instanceColor = resolved ×
+//       0.88 — green override 0x4f7a34 on the demo zone, grass 0x2e6b24,
+//       dirt 0x6b4a2e, water 0x1c4e6e, sand 0x9a7440, lava 0xd4561c, snow
+//       0x8ea9c9; per-record overrides (mode 'none', side list, explicit
+//       color) through showcaseTileMap custom data
+//   O3  hover sync on a ROTATED record ((0,5) grass-plain @ 90): tile AND
 //       outline instanceColor brighten to × 1.0 together, restore together
 //   O4  outline guards (bad record/map outline options throw clearly, harness
 //       stays usable) + teardown (leaving the fixture removes every outline
@@ -82,23 +85,25 @@ function test(name, pass, detail = '') {
 
 // Expected per-variant instance counts for the hand-authored 9x9 SHOWCASE_MAP
 // (mirrors the data in src/world/showcaseMap.js — a change to the map must
-// update this table; the test pins the counts). grass-dirt-n: 6 = the
-// rotation-proof path boundaries (3 × rotation 90 at x=5, 3 × rotation 270
-// at x=8, rows y=0..2); grass-dirt-e/w: 6 each = the baked path boundaries
-// of rows y=3..8.
+// update this table; the test pins the counts). The map is a six-biome
+// patchwork with NO transition/edge tiles: snow 3x3 top-left, water 3x3
+// top-right, sand 3x3 bottom-left, lava 3x3 bottom-right, dirt 2x2 center,
+// grass everywhere else (~41 cells). grass-plain: 30 = 41 grass cells − 5
+// grass-plain-b − 6 grass-plain-c (the 6 rotated cells of row y=5 are plain
+// grass-plain too).
 const EXPECTED_GROUPS = {
-  'grass-plain': 18,
-  'grass-flowers': 3,
-  'grass-bushes': 3,
-  'grass-dirt-e': 6,
-  'grass-dirt-w': 6,
-  'grass-dirt-n': 6,
-  'grass-tilled': 9,
-  'grass-tilled-n': 3,
-  'grass-tilled-e': 3,
-  'grass-tilled-s': 3,
-  'grass-tilled-w': 3,
-  'dirt-plain': 18,
+  'grass-plain': 30,
+  'grass-plain-b': 5,
+  'grass-plain-c': 6,
+  'dirt-plain': 3,
+  'dirt-plain-b': 1,
+  'water-plain': 7,
+  'water-plain-b': 2,
+  'sand-plain': 7,
+  'sand-plain-b': 2,
+  'lava-plain': 9,
+  'snow-plain': 6,
+  'snow-plain-b': 3,
 }
 
 // Expected resolved-LOCAL outline masks for the showcase under the default
@@ -108,38 +113,40 @@ const EXPECTED_GROUPS = {
 // desired side that has a neighbor the OWNER renders the seam — owner = the
 // tile whose outline color MATCHES ITS OWN BIOME when exactly one side of
 // the seam is biome-colored (resolved color EXACTLY equals the variant's
-// manifest palette color; edges use their fromBiome owner color), otherwise
-// the tile with lexicographically smaller data coords (x, then y) — and the
-// non-owner drops the side if the owner also desires it (the non-owner's
-// desire stands otherwise). Border sides are unaffected by ownership.
-// The 21 GREEN records (explicit outlineColor 0x4f7a34 — NOT biome-matched)
-// lose their seams to brown biome-colored neighbors: every green|brown seam
-// renders in brown regardless of data order (green|green stays green via
-// the data-order tie-break). Derived from the 9x9 grid (validated against
-// an independent sim that reproduces the rev-3 table exactly):
-//   interior cells (49) own n+e, EXCEPT: green-adjacent tilled cells
-//     (1,2),(1,3),(3,4),(3,5),(3,6),(3,7),(3,0) win 'w' too → 'n,e,w';
-//     (1,1) wins 's' AND 'w' → 'n,e,s,w'; (2,1) loses 'w' to (1,1) →
-//     'n,e,s'; rotated (5,1),(5,2) → local 'n,w'
-//   green cells lose every brown-adjacent seam: (2,0),(2,8) → '' (EMPTY);
-//     (1,0) → 'e'; (2,4),(2,5),(2,6),(2,7),(0,1),(0,2),(0,3) → 'n';
-//     (3,8) gains 'w' from (2,8) → 'e,w'
-//   path/borders keep rev-3 shapes: (8,0),(8,1),(8,2) rotated → 'e';
-//     (8,3..7) and (6,0..3),(7,0..3) → 'n'; row y=8 → 'e' ×6 + 'e,w' + '' ×2
+// manifest palette color), otherwise the tile with lexicographically smaller
+// data coords (x, then y) — and the non-owner drops the side if the owner
+// also desires it (the non-owner's desire stands otherwise). Border sides
+// are unaffected by ownership.
+// The 9 GREEN records (explicit outlineColor 0x4f7a34 — NOT biome-matched)
+// lose their seams to biome-colored neighbors: every green|biome seam
+// renders in the neighbor's color regardless of data order (green|green
+// stays green via the data-order tie-break). Derived from the 9x9 grid
+// (validated against an independent sim that reproduces the composer's
+// PASS1/PASS2 exactly):
+//   interior cells own n+e, EXCEPT: green (5,7),(5,6) lose 'e' to the water
+//     east → 'n'; (6,8) gains 'w' from green (5,8) → 'e,w'; (6,7),(6,6)
+//     gain 'w' → 'n,e,w'; the x=8 border column keeps only its 'n' (west is
+//     owned by x=7, east is off-grid)
+//   green cells lose every biome-colored seam: (5,8) → '' (EMPTY);
+//     (3,8),(4,8) → 'e'; (5,7),(5,6) → 'n'; (3,7),(4,7),(3,6),(4,6) → 'n,e'
+//   rotated row y=5: (0,5)@90 → 'n,w'; (1,5)@180 → 's,w'; (2,5)@270 →
+//     'e,s'; (6,5)@90 → 'n,w'; (7,5)@180 → 's,w'; (8,5)@270 → 'e'
+//   border corners: (0,0),(0,8),(8,0) keep their single owned side;
+//     (8,8) water → '' (EMPTY)
 // Final local table (81 instances — EVERY record owns exactly one outline
 // instance; empty '' masks emit zero-triangle frames):
-//   'n,e' 43 | 'n,e,w' 7 | 'n' 12 | 'e' 10 | 'e,w' 1 | 'n,w' 3 |
-//   'n,e,s' 1 | 'n,e,s,w' 1 | '' 3
+//   'n,e' 55 | 'n' 9 | 'e' 7 | 'n,e,w' 2 | 'n,w' 2 | 's,w' 2 | '' 2 |
+//   'e,w' 1 | 'e,s' 1
 const EXPECTED_OUTLINE_MASKS = {
-  'n,e': 43,
-  'n,e,w': 7,
-  'n': 12,
-  'e': 10,
+  'n,e': 55,
+  'n': 9,
+  'e': 7,
+  'n,e,w': 2,
+  'n,w': 2,
+  's,w': 2,
+  '': 2,
   'e,w': 1,
-  'n,w': 3,
-  'n,e,s': 1,
-  'n,e,s,w': 1,
-  '': 3,
+  'e,s': 1,
 }
 
 const browser = await puppeteer.launch({ ...(useBundled ? {} : { executablePath: CHROME }), headless: true, args: ARGS,
@@ -339,42 +346,42 @@ section('C5. Hover contract on synthetic pointer events')
       const h = sh.lastHover
       return h ? { x: h.x, y: h.y, rotation: h.rotation, variant: h.variant, instanceId: h.instanceId, group: h.group.variant } : null
     }
-    const pA = sh.projectTile(4, 4) // grass-plain, map center
-    const pB = sh.projectTile(2, 2) // grass-tilled, patch interior
+    const pA = sh.projectTile(5, 4) // grass-plain, center-east
+    const pB = sh.projectTile(3, 3) // dirt-plain, center dirt patch
     const out = {}
 
     fire('pointermove', pA.x, pA.y)
-    out.afterA = { color: colorOf('grass-plain', 4, 4), hover: hoverOf() }
+    out.afterA = { color: colorOf('grass-plain', 5, 4), hover: hoverOf() }
 
     fire('pointermove', pB.x, pB.y)
-    out.afterB = { a: colorOf('grass-plain', 4, 4), b: colorOf('grass-tilled', 2, 2), hover: hoverOf() }
+    out.afterB = { a: colorOf('grass-plain', 5, 4), b: colorOf('dirt-plain', 3, 3), hover: hoverOf() }
 
     fire('pointerout', 0, 0)
-    out.afterOut = { a: colorOf('grass-plain', 4, 4), b: colorOf('grass-tilled', 2, 2), hover: hoverOf() }
+    out.afterOut = { a: colorOf('grass-plain', 5, 4), b: colorOf('dirt-plain', 3, 3), hover: hoverOf() }
 
     fire('pointermove', pA.x, pA.y)
-    out.afterRehover = { color: colorOf('grass-plain', 4, 4), hover: hoverOf() }
+    out.afterRehover = { color: colorOf('grass-plain', 5, 4), hover: hoverOf() }
     window.dispatchEvent(new Event('blur'))
-    out.afterBlur = { color: colorOf('grass-plain', 4, 4), hover: hoverOf() }
+    out.afterBlur = { color: colorOf('grass-plain', 5, 4), hover: hoverOf() }
     return out
   })
   const v = r.ok ? r.value : {}
   const near = (rgb, t) => rgb && Math.abs(rgb[0] - t) < 1e-6 && Math.abs(rgb[1] - t) < 1e-6 && Math.abs(rgb[2] - t) < 1e-6
   test('C5a pointermove highlights the tile to (1,1,1) + onHover record {x,y,variant,rotation,instanceId,group}',
     r.ok && near(v.afterA?.color?.rgb, 1) &&
-    v.afterA?.hover?.x === 4 && v.afterA?.hover?.y === 4 && v.afterA?.hover?.variant === 'grass-plain' &&
+    v.afterA?.hover?.x === 5 && v.afterA?.hover?.y === 4 && v.afterA?.hover?.variant === 'grass-plain' &&
     v.afterA?.hover?.rotation === 0 &&
     typeof v.afterA?.hover?.instanceId === 'number' && v.afterA?.hover?.group === 'grass-plain',
     r.ok ? JSON.stringify(v.afterA) : r.error)
   test('C5b move to another tile: previous restored to 0.88, new at 1.0',
     r.ok && near(v.afterB?.a?.rgb, 0.88) && near(v.afterB?.b?.rgb, 1) &&
-    v.afterB?.hover?.x === 2 && v.afterB?.hover?.y === 2 && v.afterB?.hover?.variant === 'grass-tilled',
+    v.afterB?.hover?.x === 3 && v.afterB?.hover?.y === 3 && v.afterB?.hover?.variant === 'dirt-plain',
     r.ok ? JSON.stringify(v.afterB) : r.error)
   test('C5c pointerout clears hover: both restored, onHover(null)',
     r.ok && near(v.afterOut?.a?.rgb, 0.88) && near(v.afterOut?.b?.rgb, 0.88) && v.afterOut?.hover === null,
     r.ok ? JSON.stringify(v.afterOut) : r.error)
   test('C5d rehover works after pointerout, and window blur clears it',
-    r.ok && near(v.afterRehover?.color?.rgb, 1) && v.afterRehover?.hover?.x === 4 &&
+    r.ok && near(v.afterRehover?.color?.rgb, 1) && v.afterRehover?.hover?.x === 5 &&
     near(v.afterBlur?.color?.rgb, 0.88) && v.afterBlur?.hover === null,
     r.ok ? JSON.stringify({ rehover: v.afterRehover, blur: v.afterBlur }) : r.error)
   test('C5e no page errors during hover battery', page.__pageErrors.length === 0, JSON.stringify(page.__pageErrors))
@@ -391,60 +398,55 @@ section('C6. validateShowcaseMap gate (data-level acceptance)')
   test('C6a SHOWCASE_MAP passes validateShowcaseMap (0 errors)',
     val.ok && val.value?.ok === true && val.value?.errors?.length === 0,
     val.ok ? JSON.stringify(val.value) : val.error)
-  // Bad data: an edge with no toBiome neighbor on its named side.
+  // Bad data: an unknown variant is rejected at the data gate.
   const bad = await evl(page, () => window.__debug.showcaseTileMap([
-    { x: 0, y: 0, variant: 'grass-dirt-n' },
+    { x: 0, y: 0, variant: 'grass-flowers' },
     { x: 1, y: 0, variant: 'grass-plain' },
   ]))
-  test('C6b misoriented edge data throws before any staging (invalid map data)',
-    !bad.ok && String(bad.error).includes('invalid map data') && String(bad.error).includes('grass-dirt-n'),
+  test('C6b unknown variant data throws before any staging (invalid map data)',
+    !bad.ok && String(bad.error).includes('invalid map data') && String(bad.error).includes('grass-flowers'),
     bad.ok ? 'did not throw' : bad.error)
   const val2 = await evl(page, () => window.__debug.showcase.validation)
   test('C6c validation result is exposed on the showcase handle',
     val2.ok && val2.value?.ok === false && val2.value?.errors?.length > 0, val2.ok ? JSON.stringify(val2.value) : val2.error)
-  // Rotation-aware gate: a rotated edge must point at the toBiome neighbor on
-  // its EFFECTIVE side. grass-dirt-n rotated 90 → dirt half east — a dirt
-  // neighbor to the north must NOT satisfy it.
-  const rotBad = await evl(page, () => window.__debug.showcaseTileMap([
-    { x: 0, y: 0, variant: 'grass-dirt-n', rotation: 90 },
-    { x: 0, y: 1, variant: 'dirt-plain' },
+  // Duplicate coordinates are rejected too.
+  const dup = await evl(page, () => window.__debug.showcaseTileMap([
+    { x: 0, y: 0, variant: 'grass-plain' },
+    { x: 0, y: 0, variant: 'dirt-plain' },
   ]))
-  test('C6d rotated edge pointing the wrong way is rejected (effective-side check)',
-    !rotBad.ok && String(rotBad.error).includes('invalid map data') && String(rotBad.error).includes('points e'),
-    rotBad.ok ? 'did not throw' : rotBad.error)
-  // And the same rotated variant with the dirt neighbor on its EFFECTIVE east
-  // side must pass.
-  const rotOk = await evl(page, () => window.__debug.showcaseTileMap([
-    { x: 0, y: 0, variant: 'grass-dirt-n', rotation: 90 },
+  test('C6d duplicate coordinate rejected by the data gate',
+    !dup.ok && String(dup.error).includes('invalid map data') && String(dup.error).includes('duplicate tile'),
+    dup.ok ? 'did not throw' : dup.error)
+  // A valid minimal cross-biome map passes (no edge variants needed — biomes
+  // simply abut).
+  const ok = await evl(page, () => window.__debug.showcaseTileMap([
+    { x: 0, y: 0, variant: 'grass-plain' },
     { x: 1, y: 0, variant: 'dirt-plain' },
+    { x: 0, y: 1, variant: 'water-plain' },
   ]))
-  test('C6e rotated edge accepted when the dirt neighbor sits on the effective side',
-    rotOk.ok, rotOk.ok ? '' : rotOk.error)
+  test('C6e valid cross-biome map accepted (no edges required)',
+    ok.ok, ok.ok ? '' : ok.error)
   // Unknown variant also rejected at data level.
   const unknown = await evl(page, () => window.__debug.showcaseTileMap([{ x: 0, y: 0, variant: 'bogus' }]))
   test('C6f unknown variant rejected by the data gate',
     !unknown.ok && String(unknown.error).includes('invalid map data') && String(unknown.error).includes('bogus'),
     unknown.ok ? 'did not throw' : unknown.error)
-  // GHOST edge (design-critic fold-in): grass-dirt-e dropped INSIDE the dirt
-  // field passes the toBiome-side check (dirt ahead) but has no owner-biome
-  // (grass) cell on either perpendicular side — must be rejected.
-  const ghost = await evl(page, () => window.__debug.showcaseTileMap([
-    { x: 0, y: 0, variant: 'grass-plain' }, { x: 0, y: 1, variant: 'grass-plain' }, { x: 0, y: 2, variant: 'grass-plain' },
-    { x: 1, y: 0, variant: 'dirt-plain' }, { x: 1, y: 1, variant: 'grass-dirt-e' }, { x: 1, y: 2, variant: 'dirt-plain' },
-    { x: 2, y: 0, variant: 'dirt-plain' }, { x: 2, y: 1, variant: 'dirt-plain' }, { x: 2, y: 2, variant: 'dirt-plain' },
+  // Duplicate coordinate with a surviving variant is still rejected.
+  const dup2 = await evl(page, () => window.__debug.showcaseTileMap([
+    { x: 2, y: 2, variant: 'grass-plain' },
+    { x: 2, y: 2, variant: 'grass-plain-b' },
   ]))
-  test('C6g ghost edge inside a foreign field rejected (perpendicular owner check)',
-    !ghost.ok && String(ghost.error).includes('invalid map data') && String(ghost.error).includes('ghost edge'),
-    ghost.ok ? 'did not throw' : ghost.error)
-  // A LEGIT boundary (edge sitting on its owner biome's cell, dirt ahead,
-  // owner biome on a perpendicular side) must still pass.
-  const legit = await evl(page, () => window.__debug.showcaseTileMap([
-    { x: 0, y: 0, variant: 'grass-plain' }, { x: 1, y: 0, variant: 'grass-plain' }, { x: 2, y: 0, variant: 'grass-plain' },
-    { x: 0, y: 1, variant: 'grass-dirt-n' }, { x: 1, y: 1, variant: 'grass-dirt-n' }, { x: 2, y: 1, variant: 'grass-dirt-n' },
-    { x: 0, y: 2, variant: 'dirt-plain' }, { x: 1, y: 2, variant: 'dirt-plain' }, { x: 2, y: 2, variant: 'dirt-plain' },
+  test('C6g duplicate coordinate rejected (surviving variants, same cell)',
+    !dup2.ok && String(dup2.error).includes('invalid map data') && String(dup2.error).includes('duplicate tile'),
+    dup2.ok ? 'did not throw' : dup2.error)
+  // A valid map with every surviving biome passes.
+  const all = await evl(page, () => window.__debug.showcaseTileMap([
+    { x: 0, y: 0, variant: 'grass-plain' }, { x: 1, y: 0, variant: 'dirt-plain' },
+    { x: 2, y: 0, variant: 'water-plain' }, { x: 3, y: 0, variant: 'sand-plain' },
+    { x: 4, y: 0, variant: 'lava-plain' }, { x: 5, y: 0, variant: 'snow-plain' },
   ]))
-  test('C6h legit split boundary accepted (owner behind / rim pass)',
-    legit.ok, legit.ok ? '' : legit.error)
+  test('C6h valid six-biome map accepted',
+    all.ok, all.ok ? '' : all.error)
   // Harness must still be usable after all the rejected attempts.
   const rec = await evl(page, () => window.__debug.gotoFixture('tile-showcase'))
   const s = await getState(page)
@@ -536,8 +538,10 @@ section('O1. Outline construction: masks, counts, instance matrices')
       return g ? g.mask : null
     }
     return { sortMasks, total, whiteShared, matBad: matBad.slice(0, 5), spot: {
-      '0,0': maskOf(0, 0), '0,8': maskOf(0, 8), '8,0': maskOf(8, 0), '8,8': maskOf(8, 8), '5,2': maskOf(5, 2),
-      '2,8': maskOf(2, 8), '3,8': maskOf(3, 8), '2,0': maskOf(2, 0), '1,1': maskOf(1, 1), '2,1': maskOf(2, 1),
+      '0,0': maskOf(0, 0), '0,8': maskOf(0, 8), '8,0': maskOf(8, 0), '8,8': maskOf(8, 8),
+      '5,8': maskOf(5, 8), '3,8': maskOf(3, 8), '6,8': maskOf(6, 8),
+      '0,5': maskOf(0, 5), '8,5': maskOf(8, 5), '1,5': maskOf(1, 5), '2,5': maskOf(2, 5),
+      '5,7': maskOf(5, 7), '3,3': maskOf(3, 3), '5,4': maskOf(5, 4),
     } }
   })
   const expectedSort = JSON.stringify(Object.entries(EXPECTED_OUTLINE_MASKS).sort((a, b) => a[0].localeCompare(b[0])))
@@ -548,11 +552,13 @@ section('O1. Outline construction: masks, counts, instance matrices')
     r.ok && r.value.whiteShared === true, r.ok ? '' : r.error)
   test('O1c every outline instance matrix tracks its tile (lattice + rotation)',
     r.ok && r.value.matBad.length === 0, r.ok ? JSON.stringify(r.value.matBad) : r.error)
-  test('O1d seam-resolved spot masks: (0,0) n+e, (0,8)/(8,0) single owned side, (8,8) EMPTY, (5,2) rotated n,w; rev 4: GREEN (2,8)/(2,0) EMPTY, (3,8) e,w, tilled (1,1) full ring, (2,1) n,e,s',
+  test('O1d seam-resolved spot masks: sand corner (0,0) n+e, snow (0,8) e, lava (8,0) n; rev 4: GREEN (5,8) EMPTY, water (8,8) EMPTY, (6,8) e,w, (5,7) n; rotated (0,5)@90 n,w, (1,5)@180 s,w, (2,5)@270 e,s, (8,5)@270 e; dirt (3,3) + grass (5,4) n,e',
     r.ok && r.value.spot['0,0'] === 'n,e' && r.value.spot['0,8'] === 'e' &&
-    r.value.spot['8,0'] === 'e' && r.value.spot['8,8'] === '' && r.value.spot['5,2'] === 'n,w' &&
-    r.value.spot['2,8'] === '' && r.value.spot['2,0'] === '' && r.value.spot['3,8'] === 'e,w' &&
-    r.value.spot['1,1'] === 'n,e,s,w' && r.value.spot['2,1'] === 'n,e,s',
+    r.value.spot['8,0'] === 'n' && r.value.spot['8,8'] === '' && r.value.spot['5,8'] === '' &&
+    r.value.spot['3,8'] === 'e' && r.value.spot['6,8'] === 'e,w' &&
+    r.value.spot['0,5'] === 'n,w' && r.value.spot['8,5'] === 'e' &&
+    r.value.spot['1,5'] === 's,w' && r.value.spot['2,5'] === 'e,s' &&
+    r.value.spot['5,7'] === 'n' && r.value.spot['3,3'] === 'n,e' && r.value.spot['5,4'] === 'n,e',
     r.ok ? JSON.stringify(r.value.spot) : r.error)
   test('O1e no page errors', page.__pageErrors.length === 0, JSON.stringify(page.__pageErrors))
   await page.close()
@@ -581,26 +587,32 @@ section('O2. Outline color resolution + per-record overrides')
       }
       return null
     }
-    // Rest-state checks: record outlineColor > manifest biome palette (edge =
-    // fromBiome owner) > map-level > global, all × 0.88 at rest.
+    // Rest-state checks: record outlineColor > manifest biome palette >
+    // map-level > global, all × 0.88 at rest.
     return {
-      green: near(colorOf(0, 8), mul(0x4f7a34, 0.88)),      // record green override
-      brown: near(colorOf(3, 8), mul(0x4e3d2e, 0.88)),      // grass palette default
-      dirt: near(colorOf(6, 8), mul(0x6b4a2e, 0.88)),       // dirt palette
-      tilled: near(colorOf(2, 3), mul(0x4a3a26, 0.88)),     // tilled palette (tilled interior)
-      edgeOwner: near(colorOf(5, 2), mul(0x4e3d2e, 0.88)),  // grass-dirt-n rot90 uses grass owner
+      green: near(colorOf(3, 8), mul(0x4f7a34, 0.88)),      // record green override (demo zone)
+      grass: near(colorOf(5, 4), mul(0x2e6b24, 0.88)),      // grass palette default (Slice B deep green)
+      dirt: near(colorOf(3, 3), mul(0x6b4a2e, 0.88)),       // dirt palette
+      water: near(colorOf(6, 8), mul(0x1c4e6e, 0.88)),      // water palette (deep blue)
+      sand: near(colorOf(0, 2), mul(0x9a7440, 0.88)),       // sand palette
+      lava: near(colorOf(6, 0), mul(0xd4561c, 0.88)),       // lava palette
+      snow: near(colorOf(0, 8), mul(0x8ea9c9, 0.88)),       // snow palette
     }
   })
-  test('O2a (0,8) grass-plain rest = GREEN 0x4f7a34 × 0.88 (record override)',
+  test('O2a (3,8) grass-plain rest = GREEN 0x4f7a34 × 0.88 (record override)',
     r.ok && r.value.green === true, r.ok ? '' : r.error)
-  test('O2b (3,8) grass-plain rest = grass palette 0x4e3d2e × 0.88 (brown baseline)',
-    r.ok && r.value.brown === true, r.ok ? '' : r.error)
-  test('O2c (6,8) dirt-plain rest = dirt palette 0x6b4a2e × 0.88',
+  test('O2b (5,4) grass-plain rest = grass palette 0x2e6b24 × 0.88 (Slice B deep green baseline)',
+    r.ok && r.value.grass === true, r.ok ? '' : r.error)
+  test('O2c (3,3) dirt-plain rest = dirt palette 0x6b4a2e × 0.88',
     r.ok && r.value.dirt === true, r.ok ? '' : r.error)
-  test('O2d (2,3) grass-tilled interior rest = tilled palette 0x4a3a26 × 0.88',
-    r.ok && r.value.tilled === true, r.ok ? '' : r.error)
-  test('O2e (5,2) rotated edge uses its fromBiome (grass) owner color',
-    r.ok && r.value.edgeOwner === true, r.ok ? '' : r.error)
+  test('O2d (6,8) water-plain rest = water palette 0x1c4e6e × 0.88',
+    r.ok && r.value.water === true, r.ok ? '' : r.error)
+  test('O2e (0,2) sand-plain rest = sand palette 0x9a7440 × 0.88',
+    r.ok && r.value.sand === true, r.ok ? '' : r.error)
+  test('O2f (6,0) lava-plain rest = lava palette 0xd4561c × 0.88',
+    r.ok && r.value.lava === true, r.ok ? '' : r.error)
+  test('O2g (0,8) snow-plain rest = snow palette 0x8ea9c9 × 0.88',
+    r.ok && r.value.snow === true, r.ok ? '' : r.error)
   // Per-record overrides through custom map data (mode 'all'):
   //   - explicit side list ['e'] at rotation 0 → local mask 'e'
   //   - explicit side list ['e'] at rotation 90 → local mask 'n' (CCW)
@@ -628,17 +640,17 @@ section('O2. Outline color resolution + per-record overrides')
     })()
     return { groups, total: c.outlineGroups.reduce((n, g) => n + g.count, 0), red }
   })
-  test('O2f side list resolves to local masks: rot 0 ["e"] → "e", rot 90 ["e"] → "n"; "none" → empty "" instance',
+  test('O2h side list resolves to local masks: rot 0 ["e"] → "e", rot 90 ["e"] → "n"; "none" → empty "" instance',
     o.ok && ov.ok && ov.value.total === 4 &&
     ov.value.groups.length === 3 &&
     ov.value.groups.some(g => g[0] === 'e' && g[1] === 2) && // (0,0) rot0 + (2,0) rot0 merge into the 'e' group
     ov.value.groups.some(g => g[0] === 'n' && g[1] === 1) && // (1,0) rot90 'e' → local 'n' (CCW)
     ov.value.groups.some(g => g[0] === '' && g[1] === 1),    // (3,0) 'none' → invisible empty frame
     o.ok ? JSON.stringify(ov.value.groups) : o.error)
-  test('O2g record outlineColor overrides the biome palette (red × 0.88)',
+  test('O2i record outlineColor overrides the biome palette (red × 0.88)',
     ov.ok && Math.abs(ov.value.red[0] - 0.88) < 1e-6 && ov.value.red[1] === 0 && ov.value.red[2] === 0,
     ov.ok ? JSON.stringify(ov.value.red) : ov.error)
-  test('O2h no page errors during override battery', page.__pageErrors.length === 0, JSON.stringify(page.__pageErrors))
+  test('O2j no page errors during override battery', page.__pageErrors.length === 0, JSON.stringify(page.__pageErrors))
   await page.close()
 }
 
@@ -676,40 +688,42 @@ section('O3. Hover sync on a rotated record (tile + outline brighten together)')
       const h = sh.lastHover
       return h ? { x: h.x, y: h.y, rotation: h.rotation, variant: h.variant } : null
     }
-    const p52 = sh.projectTile(5, 2) // grass-dirt-n @ rotation 90 — owns n+e → local n,w
-    const p18 = sh.projectTile(1, 8) // grass-bushes, GREEN outline column (owns e)
+    const p05 = sh.projectTile(0, 5) // grass-plain @ rotation 90 — owns n+e → local n,w
+    const p38 = sh.projectTile(3, 8) // grass-plain, GREEN outline demo zone (owns e)
     const out = {}
-    fire('pointermove', p52.x, p52.y)
-    out.on52 = { tile: tileColorOf(5, 2), outline: outlineOf(5, 2), hover: hoverOf() }
-    fire('pointermove', p18.x, p18.y)
-    out.on18 = { t52: tileColorOf(5, 2), o52: outlineOf(5, 2), t18: tileColorOf(1, 8), o18: outlineOf(1, 8), hover: hoverOf() }
+    fire('pointermove', p05.x, p05.y)
+    out.on05 = { tile: tileColorOf(0, 5), outline: outlineOf(0, 5), hover: hoverOf() }
+    fire('pointermove', p38.x, p38.y)
+    out.on38 = { t05: tileColorOf(0, 5), o05: outlineOf(0, 5), t38: tileColorOf(3, 8), o38: outlineOf(3, 8), hover: hoverOf() }
     fire('pointerout', 0, 0)
-    out.afterOut = { t52: tileColorOf(5, 2), o52: outlineOf(5, 2), t18: tileColorOf(1, 8), o18: outlineOf(1, 8), hover: hoverOf() }
+    out.afterOut = { t05: tileColorOf(0, 5), o05: outlineOf(0, 5), t38: tileColorOf(3, 8), o38: outlineOf(3, 8), hover: hoverOf() }
     return out
   })
   const v = r.ok ? r.value : {}
-  // (5,2): grass-dirt-n @ 90 — outline = grass owner brown (no record color).
-  const brown = (f) => [((0x4e / 255) > 0.04045 ? Math.pow((0x4e / 255 + 0.055) / 1.055, 2.4) : 0x4e / 255 / 12.92) * f,
-    ((0x3d / 255) > 0.04045 ? Math.pow((0x3d / 255 + 0.055) / 1.055, 2.4) : 0x3d / 255 / 12.92) * f,
-    ((0x2e / 255) > 0.04045 ? Math.pow((0x2e / 255 + 0.055) / 1.055, 2.4) : 0x2e / 255 / 12.92) * f]
+  // (0,5): grass-plain @ 90 — outline = grass palette color (Slice B deep
+  // green, no record color). Channels hardcoded here to keep the assertion
+  // math independent of the family module.
+  const grassOwner = (f) => [((0x2e / 255) > 0.04045 ? Math.pow((0x2e / 255 + 0.055) / 1.055, 2.4) : 0x2e / 255 / 12.92) * f,
+    ((0x6b / 255) > 0.04045 ? Math.pow((0x6b / 255 + 0.055) / 1.055, 2.4) : 0x6b / 255 / 12.92) * f,
+    ((0x24 / 255) > 0.04045 ? Math.pow((0x24 / 255 + 0.055) / 1.055, 2.4) : 0x24 / 255 / 12.92) * f]
   const green = (f) => [((0x4f / 255) > 0.04045 ? Math.pow((0x4f / 255 + 0.055) / 1.055, 2.4) : 0x4f / 255 / 12.92) * f,
     ((0x7a / 255) > 0.04045 ? Math.pow((0x7a / 255 + 0.055) / 1.055, 2.4) : 0x7a / 255 / 12.92) * f,
     ((0x34 / 255) > 0.04045 ? Math.pow((0x34 / 255 + 0.055) / 1.055, 2.4) : 0x34 / 255 / 12.92) * f]
   const near3 = (a, b) => a && Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(a[1] - b[1]) < 1e-6 && Math.abs(a[2] - b[2]) < 1e-6
-  test('O3a hovering ROTATED (5,2): tile → (1,1,1) AND outline → resolved × 1.0, mask n,w',
-    r.ok && near3(v.on52?.tile, [1, 1, 1]) && near3(v.on52?.outline?.rgb, brown(1)) &&
-    v.on52?.outline?.mask === 'n,w' && v.on52?.hover?.rotation === 90 && v.on52?.hover?.variant === 'grass-dirt-n',
-    r.ok ? JSON.stringify(v.on52) : r.error)
-  test('O3b moving to GREEN cell (1,8): (5,2) tile + outline restored to × 0.88 together',
-    r.ok && near3(v.on18?.t52, [0.88, 0.88, 0.88]) && near3(v.on18?.o52?.rgb, brown(0.88)),
-    r.ok ? JSON.stringify({ t52: v.on18?.t52, o52: v.on18?.o52 }) : r.error)
-  test('O3c new hover (1,8): tile 1.0 + GREEN outline × 1.0',
-    r.ok && near3(v.on18?.t18, [1, 1, 1]) && near3(v.on18?.o18?.rgb, green(1)) &&
-    v.on18?.hover?.x === 1 && v.on18?.hover?.y === 8,
-    r.ok ? JSON.stringify({ t18: v.on18?.t18, o18: v.on18?.o18 }) : r.error)
+  test('O3a hovering ROTATED (0,5): tile → (1,1,1) AND outline → resolved × 1.0, mask n,w',
+    r.ok && near3(v.on05?.tile, [1, 1, 1]) && near3(v.on05?.outline?.rgb, grassOwner(1)) &&
+    v.on05?.outline?.mask === 'n,w' && v.on05?.hover?.rotation === 90 && v.on05?.hover?.variant === 'grass-plain',
+    r.ok ? JSON.stringify(v.on05) : r.error)
+  test('O3b moving to GREEN cell (3,8): (0,5) tile + outline restored to × 0.88 together',
+    r.ok && near3(v.on38?.t05, [0.88, 0.88, 0.88]) && near3(v.on38?.o05?.rgb, grassOwner(0.88)),
+    r.ok ? JSON.stringify({ t05: v.on38?.t05, o05: v.on38?.o05 }) : r.error)
+  test('O3c new hover (3,8): tile 1.0 + GREEN outline × 1.0',
+    r.ok && near3(v.on38?.t38, [1, 1, 1]) && near3(v.on38?.o38?.rgb, green(1)) &&
+    v.on38?.hover?.x === 3 && v.on38?.hover?.y === 8,
+    r.ok ? JSON.stringify({ t38: v.on38?.t38, o38: v.on38?.o38 }) : r.error)
   test('O3d pointerout restores both tiles and both outlines to neutral × 0.88',
-    r.ok && near3(v.afterOut?.t52, [0.88, 0.88, 0.88]) && near3(v.afterOut?.o52?.rgb, brown(0.88)) &&
-    near3(v.afterOut?.t18, [0.88, 0.88, 0.88]) && near3(v.afterOut?.o18?.rgb, green(0.88)) && v.afterOut?.hover === null,
+    r.ok && near3(v.afterOut?.t05, [0.88, 0.88, 0.88]) && near3(v.afterOut?.o05?.rgb, grassOwner(0.88)) &&
+    near3(v.afterOut?.t38, [0.88, 0.88, 0.88]) && near3(v.afterOut?.o38?.rgb, green(0.88)) && v.afterOut?.hover === null,
     r.ok ? JSON.stringify(v.afterOut) : r.error)
   test('O3e no page errors during outline hover battery', page.__pageErrors.length === 0, JSON.stringify(page.__pageErrors))
   await page.close()
@@ -892,7 +906,7 @@ section('C8. Teardown discipline: preview → showcase → preview, showcase →
   const page = await newPage()
   await loadDebug(page)
   // Chain 1: asset preview → showcase → asset preview.
-  const r1 = await evl(page, () => window.__debug.gotoFixture('grass-flowers'))
+  const r1 = await evl(page, () => window.__debug.gotoFixture('grass-plain-b'))
   const r2 = await evl(page, () => window.__debug.gotoFixture('tile-showcase'))
   const s2 = await getState(page)
   const r3 = await evl(page, () => window.__debug.gotoFixture('grass-plain'))
