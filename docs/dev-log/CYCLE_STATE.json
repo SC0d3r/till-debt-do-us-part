@@ -1,9 +1,13 @@
 {
-  "status": "idle",
-  "feature": null,
-  "category": null,
-  "current_step": null,
-  "last_updated": "2026-08-07T10:30:00Z",
-  "notes": "Pivot shipped to dev. Farming game removed; tile world foundation is the product surface. Build 487.69 kB raw / 124.94 kB gzip. qa=SHIP (148/148 + 14/14 fixtures), design/perf/visual = SHIP WITH FOLLOWUPS, follow-ups queued in FEATURE_BACKLOG.md. Next cycle: pick a backlog item (tile-kit batch or pivot follow-ups).",
-  "subagent_sessions": {}
+  "status": "in-progress",
+  "feature": "Slice B: pixel-art tile & prop redesign",
+  "category": "Assets & Art",
+  "current_step": "3.5",
+  "last_updated": "2026-08-07T11:22:00Z",
+  "notes": "USER COURSE-CORRECTION 2026-08-07: (1) trust NVIDIA vision model, ask many detailed questions; (2) no qa-tester this cycle; (3-6) plain-only tiles, zipper deleted, dirt own module - ALL DONE and build green; (7) no individual screenshots, one composite only; (8) finish SLICE_B doc - DONE (all sections verified, batch log written). design-critic on tiles: SHIP WITH FOLLOWUPS (followups: prune dangling index.json entries, rewrite showcaseMap.d.ts, organic-boundary demo before slice C, lava-plain-b variant, stale fixture description, scrub zipper references in main.ts/pixelPainter.js). visual/ui/asset/performance critics were CANCELLED when user closed opencode (no task ids returned - sessions lost, recorded in INCIDENTS.md); will re-dispatch fresh AFTER props built. USER DIRECTIVE 2026-08-07 11:18Z: slice B is NOT finished - the prop library (section 4, reference document two) must be built: 4 center-socket props to the letter (flower, rock, bush, tall grass/fern) + extended roster (small stone corner, big stone, pebble cluster, torch edge, lantern edge, gravel/path surface, cactus, dry shrub, snow bush, snow patch, lava rock) with socket metadata. NOW: asset-creator prop library commission in flight.",
+  "subagent_sessions": {
+    "asset-creator-trim": "ses_024886518ffeR3epiF7yX12WZQ",
+    "feature-writer-showcase": "ses_024881df1ffe1pK98e4ltSJq15",
+    "design-critic-tiles": "ses_0242ad302ffesYFvM7BNuTbXj7"
+  }
 }

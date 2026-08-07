@@ -1,12 +1,12 @@
-// QA regression pass — tile-kit grass family (Assets & Art feature, post-pivot).
-// Scope: the tile modules (src/assets/tiles/grass.js, transitionTexture.js)
-// and the dev harness (previewAsset + 13 asset-preview fixtures) must NOT have
-// broken anything else. The farming game was deleted (project pivot,
-// 2026-08-07): there are no gameplay fixtures, no clock, no HUD. This file
-// verifies:
-//   T1  registry integrity (14 fixtures: 13 asset-preview + 1 showcase)
+// QA regression pass — tile-kit + prop-library (Assets & Art feature, post-pivot).
+// Scope: the tile modules (src/assets/tiles/*.js, tileTexture.js), the prop
+// modules (src/assets/props/*.js) and the dev harness (previewAsset +
+// asset-preview fixtures) must NOT have broken anything else. The farming game
+// was deleted (project pivot, 2026-08-07): there are no gameplay fixtures, no
+// clock, no HUD. This file verifies:
+//   T1  registry integrity (29 fixtures: 27 asset-preview + 2 showcase)
 //   T2  boot state: the tile world loads with the loop running (started=true)
-//   T3  all 13 asset-preview fixtures resolve via gotoFixture/previewAsset
+//   T3  all 27 asset-preview fixtures resolve via gotoFixture/previewAsset
 //   T4  previewAsset stops the loop cleanly (started=false during preview,
 //       teardown restores the world, no crash)
 //   T5  leak prevention: preview → preview / preview → showcase / preview → preview
@@ -14,7 +14,8 @@
 //   T7  REAL input still works after a preview cycle (composer hover alive)
 //   T8  preview spam + interruption mid-preview
 //   T9  resize during preview
-//   T10 zero page/console errors across the whole battery
+//   T10 prop library: props-showcase fixture + prop preview cycles resolve
+//   T11 zero page/console errors across the whole battery
 //
 // DEBUG_HARNESS Part D: preconditions via gotoFixture/previewAsset (debug
 // hooks), the interaction under test (hover after a preview) via REAL input,
@@ -47,12 +48,24 @@ function test(name, pass, detail = '') {
   console.log(`  [${pass ? 'PASS' : 'FAIL'}] ${name}${detail ? ' — ' + detail : ''}`)
 }
 
-const PREVIEW_FIXTURES = [
-  'grass-plain', 'grass-flowers', 'grass-bushes',
-  'grass-dirt-n', 'grass-dirt-e', 'grass-dirt-s', 'grass-dirt-w',
-  'grass-tilled', 'grass-tilled-n', 'grass-tilled-e', 'grass-tilled-s', 'grass-tilled-w',
-  'dirt-plain',
+const TILE_PREVIEW_FIXTURES = [
+  'grass-plain', 'grass-plain-b', 'grass-plain-c',
+  'dirt-plain', 'dirt-plain-b',
+  'water-plain', 'water-plain-b',
+  'sand-plain', 'sand-plain-b',
+  'lava-plain',
+  'snow-plain', 'snow-plain-b',
 ]
+
+const PROP_PREVIEW_FIXTURES = [
+  'flower', 'rock', 'bush', 'tall-grass',
+  'small-stone', 'big-stone', 'pebble-cluster',
+  'torch', 'lantern',
+  'gravel-patch',
+  'cactus', 'dry-shrub', 'bush-snow', 'snow-patch', 'lava-rock',
+]
+
+const ALL_PREVIEW_FIXTURES = [...TILE_PREVIEW_FIXTURES, ...PROP_PREVIEW_FIXTURES]
 
 const browser = await puppeteer.launch({ ...(useBundled ? {} : { executablePath: CHROME }), headless: true, args: ARGS,
   defaultViewport: { width: 960, height: 540, deviceScaleFactor: 1 } })
@@ -84,17 +97,18 @@ section('T1. Registry integrity')
   const lf = await evl(page, () => window.__debug.listFixtures())
   const names = lf.ok ? lf.value.map(f => f.name) : []
   const byCategory = lf.ok ? lf.value.reduce((m, f) => { m[f.category] = (m[f.category] || 0) + 1; return m }, {}) : {}
-  // 14 entries: 13 asset-preview + 1 showcase (tile-showcase). The 9 gameplay
-  // fixtures were deleted with the farming game (project pivot, 2026-08-07).
-  test('T1a listFixtures returns 14 entries (13 asset-preview + 1 showcase)',
-    lf.ok && names.length === 14 &&
-    PREVIEW_FIXTURES.every(n => names.includes(n)) &&
-    names.includes('tile-showcase'),
+  // 29 entries: 27 asset-preview + 2 showcase (tile-showcase + props-showcase).
+  // The 9 gameplay fixtures were deleted with the farming game (project
+  // pivot, 2026-08-07).
+  test('T1a listFixtures returns 29 entries (27 asset-preview + 2 showcase)',
+    lf.ok && names.length === 29 &&
+    ALL_PREVIEW_FIXTURES.every(n => names.includes(n)) &&
+    names.includes('tile-showcase') && names.includes('props-showcase'),
     lf.ok ? `${names.length} entries; cat=${JSON.stringify(byCategory)}` : lf.error)
-  test('T1b fixture names unique', lf.ok && new Set(names).size === 14, lf.ok ? String(new Set(names).size) : lf.error)
-  test('T1c exactly 13 asset-preview fixtures, all from the grass family manifest',
-    lf.ok && byCategory['asset-preview'] === 13 &&
-    PREVIEW_FIXTURES.every(n => lf.value.find(f => f.name === n)?.category === 'asset-preview'),
+  test('T1b fixture names unique', lf.ok && new Set(names).size === 29, lf.ok ? String(new Set(names).size) : lf.error)
+  test('T1c exactly 27 asset-preview fixtures, all from the merged tile + prop registries',
+    lf.ok && byCategory['asset-preview'] === 27 &&
+    ALL_PREVIEW_FIXTURES.every(n => lf.value.find(f => f.name === n)?.category === 'asset-preview'),
     JSON.stringify(byCategory))
   const surf = await evl(page, () => typeof window.__debug.previewAsset === 'function')
   test('T1d __debug.previewAsset is a function', surf.ok && surf.value === true, JSON.stringify(surf))
@@ -118,12 +132,12 @@ section('T2. Boot state: tile world loads with the loop running')
 }
 
 // ─────────────────────────────────────────────────────────────
-section('T3. All 13 asset-preview fixtures resolve via gotoFixture')
+section('T3. All 27 asset-preview fixtures resolve via gotoFixture')
 {
   const page = await newPage()
   await loadDebug(page)
   let ok = true
-  for (const fname of PREVIEW_FIXTURES) {
+  for (const fname of ALL_PREVIEW_FIXTURES) {
     const r = await evl(page, n => window.__debug.gotoFixture(n), fname)
     const s = r.ok ? await getState(page) : null
     const checks = {
@@ -136,7 +150,7 @@ section('T3. All 13 asset-preview fixtures resolve via gotoFixture')
       r.ok ? `failed: ${failed.join(', ')} | state=${JSON.stringify(s)}` : r.error)
     if (!r.ok || failed.length) ok = false
   }
-  test('T3b no page errors across all 13 asset-preview fixtures', ok && page.__pageErrors.length === 0, JSON.stringify(page.__pageErrors))
+  test('T3b no page errors across all 27 asset-preview fixtures', ok && page.__pageErrors.length === 0, JSON.stringify(page.__pageErrors))
   await page.close()
 }
 
@@ -150,7 +164,7 @@ section('T4. previewAsset stops the loop cleanly (boot world → preview → tea
     JSON.stringify({ started: s0?.started }))
   // Direct previewAsset (NOT gotoFixture): preserves started=true at entry,
   // proving the preview itself stops the loop rather than a reset doing it.
-  const p = await evl(page, () => window.__debug.previewAsset('grass-tilled-n'))
+  const p = await evl(page, () => window.__debug.previewAsset('snow-plain-b'))
   const s1 = await getState(page)
   test('T4b previewAsset resolves and loop is stopped (started=false)', p.ok && s1 && s1.started === false,
     p.ok ? JSON.stringify({ started: s1?.started }) : p.error)
@@ -168,19 +182,19 @@ section('T5. Leak prevention: preview → preview / preview → showcase / previ
 {
   const page = await newPage()
   await loadDebug(page)
-  await evl(page, () => window.__debug.gotoFixture('grass-flowers'))
+  await evl(page, () => window.__debug.gotoFixture('grass-plain-b'))
   await evl(page, () => window.__debug.gotoFixture('tile-showcase'))
   const s1 = await getState(page)
   test('T5a preview → showcase: resolves, loop off, ready', s1?.started === false && s1?.ready === true,
     JSON.stringify({ started: s1?.started, ready: s1?.ready }))
-  await evl(page, () => window.__debug.gotoFixture('grass-bushes'))
+  await evl(page, () => window.__debug.gotoFixture('grass-plain-c'))
   const s2 = await getState(page)
   test('T5b showcase → preview: resolves, loop off, ready', s2?.started === false && s2?.ready === true,
     JSON.stringify({ started: s2?.started, ready: s2?.ready }))
   // Preview → preview without showcase in between: teardown must restore the
   // previous preview's saved scene cleanly.
-  const r3 = await evl(page, () => window.__debug.gotoFixture('grass-dirt-s'))
-  const r4 = await evl(page, () => window.__debug.gotoFixture('grass-tilled'))
+  const r3 = await evl(page, () => window.__debug.gotoFixture('water-plain'))
+  const r4 = await evl(page, () => window.__debug.gotoFixture('sand-plain'))
   const r5 = await evl(page, () => window.__debug.gotoFixture('dirt-plain'))
   const s3 = await getState(page)
   test('T5c preview → preview → preview: all resolve, loop stays off, ready', r3.ok && r4.ok && r5.ok && s3?.started === false && s3?.ready === true,
@@ -239,9 +253,9 @@ section('T8. Preview spam + interruption')
   // Spam: fire previews back-to-back without awaiting (exercises
   // teardownPreview mid-preview).
   const spam = await evl(page, async () => {
-    const p1 = window.__debug.previewAsset('grass-flowers')
-    const p2 = window.__debug.previewAsset('grass-bushes')
-    const p3 = window.__debug.previewAsset('grass-dirt-n')
+    const p1 = window.__debug.previewAsset('grass-plain-b')
+    const p2 = window.__debug.previewAsset('grass-plain-c')
+    const p3 = window.__debug.previewAsset('water-plain')
     await Promise.all([p1, p2, p3])
     return true
   })
@@ -249,7 +263,7 @@ section('T8. Preview spam + interruption')
   test('T8a 3 unawaited previewAsset calls settle without error', spam.ok && s1?.ready === true, spam.ok ? JSON.stringify({ started: s1?.started, ready: s1?.ready }) : spam.error)
   // Interrupt: start a preview and immediately jump to the showcase fixture.
   const inter = await evl(page, () => {
-    window.__debug.previewAsset('grass-tilled-e') // not awaited — interrupt
+    window.__debug.previewAsset('lava-plain') // not awaited — interrupt
     return window.__debug.gotoFixture('tile-showcase')
   })
   const s2 = await getState(page)
@@ -265,15 +279,47 @@ section('T9. Resize during preview')
 {
   const page = await newPage()
   await loadDebug(page)
-  await evl(page, () => window.__debug.gotoFixture('grass-dirt-w'))
+  await evl(page, () => window.__debug.gotoFixture('sand-plain'))
   await page.setViewport({ width: 640, height: 480 })
-  const r1 = await evl(page, () => window.__debug.gotoFixture('grass-tilled-w'))
+  const r1 = await evl(page, () => window.__debug.gotoFixture('snow-plain-b'))
   const s1 = await getState(page)
   const r2 = await evl(page, () => window.__debug.gotoFixture('tile-showcase'))
   const s2 = await getState(page)
   test('T9a previews + showcase survive resize mid-preview', r1.ok && s1?.ready === true && r2.ok && s2?.ready === true,
     JSON.stringify({ r1: r1.ok, r2: r2.ok, started: s2?.started }))
   test('T9b no page errors during resize battery', page.__pageErrors.length === 0, JSON.stringify(page.__pageErrors))
+  await page.close()
+}
+
+// ─────────────────────────────────────────────────────────────
+section('T10. Prop library: props-showcase fixture + prop preview cycles')
+{
+  const page = await newPage()
+  await loadDebug(page)
+  // The props-showcase fixture must resolve (composer + 15 staged props).
+  const r1 = await evl(page, () => window.__debug.gotoFixture('props-showcase'))
+  const s1 = await getState(page)
+  test('T10a props-showcase fixture resolves, loop stopped, ready',
+    r1.ok && s1?.started === false && s1?.ready === true,
+    r1.ok ? JSON.stringify({ started: s1?.started, ready: s1?.ready }) : r1.error)
+  // Prop preview cycles with biome-specific host tiles (sand for cactus,
+  // snow for bush-snow, lava for lava-rock, grass for torch) must resolve.
+  const propCycle = ['cactus', 'bush-snow', 'lava-rock', 'torch', 'lantern', 'flower', 'snow-patch', 'gravel-patch']
+  let ok = true
+  for (const pname of propCycle) {
+    const r = await evl(page, n => window.__debug.previewAsset(n), pname)
+    const s = r.ok ? await getState(page) : null
+    const failed = !r.ok || s?.started !== false || s?.ready !== true
+    test(`T10b previewAsset("${pname}") resolves on its host tile`, !failed,
+      r.ok ? JSON.stringify({ started: s?.started, ready: s?.ready }) : r.error)
+    if (failed) ok = false
+  }
+  // Teardown back to the tile showcase — composer world must restore.
+  const r2 = await evl(page, () => window.__debug.gotoFixture('tile-showcase'))
+  const s2 = await getState(page)
+  test('T10c teardown from prop previews to tile-showcase resolves cleanly', r2.ok && s2?.ready === true,
+    JSON.stringify({ started: s2?.started, ready: s2?.ready }))
+  test('T10d no page errors across prop battery', ok && page.__pageErrors.length === 0, JSON.stringify(page.__pageErrors))
   await page.close()
 }
 
