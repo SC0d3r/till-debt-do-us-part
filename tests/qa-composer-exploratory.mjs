@@ -4,16 +4,16 @@
 //   X1  fixture-chain stability: 5× showcase → showcase cycles keep the scene
 //       children count EXACTLY constant (no mesh leaks), then showcase →
 //       showcase again (interrupt) and showcase → preview
-//   X2  hover battery beyond C5/O3: ''-mask records ((2,8),(8,8),(2,0) — zero-
-//       triangle frames) hover + outline-sync without error; rotated (8,0)
-//       rot-270; hover SPAM (100 rapid pointermoves); pointer events outside
+//   X2  hover battery beyond C5/O3: ''-mask records ((5,8),(8,8) — zero-
+//       triangle frames) hover + outline-sync without error; rotated (0,5)
+//       rot-90; hover SPAM (100 rapid pointermoves); pointer events outside
 //       the viewport; projectTile behind-camera → null; projectTile off-grid
 //       → no hit; pointerout after dispose is a no-op (listeners removed)
 //   X3  rejection batteries leave the harness usable: data-level rejections
-//       (misoriented/ghost edges, bad outline values) preserve the LIVE
-//       composer (validation throws BEFORE staging); build-level rejections
-//       (bad rotation) restore the game scene + loop; every rejection is
-//       followed by a working gotoFixture
+//       (unknown variant, duplicate coordinate, bad outline values) preserve
+//       the LIVE composer (validation throws BEFORE staging); build-level
+//       rejections (bad rotation) restore the game scene + loop; every
+//       rejection is followed by a working gotoFixture
 //   X4  teardown leak check: patched addEventListener/removeEventListener
 //       nets ZERO across showcase → preview → showcase cycles (pointermove/
 //       pointerout/blur handlers balanced), and no console/page errors
@@ -145,20 +145,20 @@ section('X2. Hover battery: empty-mask records, rotated records, spam, off-viewp
       return h ? { x: h.x, y: h.y, variant: h.variant } : null
     }
     const out = {}
-    // (a) ''-mask record (2,8): green record whose seam resolution emptied the
+    // (a) ''-mask record (5,8): green record whose seam resolution emptied the
     // mask. Hover must brighten the (invisible) zero-triangle frame's
     // instanceColor to green × 1.0 without throwing.
-    const p28 = sh.projectTile(2, 8)
-    fire('pointermove', p28.x, p28.y)
-    out.on28 = { tile: tileColorOf(2, 8), outline: outlineOf(2, 8), hover: hoverOf() }
-    // (b) ''-mask record (8,8) (edge variant, brown).
+    const p58 = sh.projectTile(5, 8)
+    fire('pointermove', p58.x, p58.y)
+    out.on58 = { tile: tileColorOf(5, 8), outline: outlineOf(5, 8), hover: hoverOf() }
+    // (b) ''-mask record (8,8) (water, deep blue).
     const p88 = sh.projectTile(8, 8)
     fire('pointermove', p88.x, p88.y)
-    out.on88 = { t28: tileColorOf(2, 8), o28: outlineOf(2, 8), t88: tileColorOf(8, 8), o88: outlineOf(8, 8), hover: hoverOf() }
-    // (c) rotated (8,0) grass-dirt-n @ 270 → local mask 'e'.
-    const p80 = sh.projectTile(8, 0)
-    fire('pointermove', p80.x, p80.y)
-    out.on80 = { t80: tileColorOf(8, 0), o80: outlineOf(8, 0), hover: hoverOf() }
+    out.on88 = { t58: tileColorOf(5, 8), o58: outlineOf(5, 8), t88: tileColorOf(8, 8), o88: outlineOf(8, 8), hover: hoverOf() }
+    // (c) rotated (0,5) grass-plain @ 90 → local mask 'n,w'.
+    const p05 = sh.projectTile(0, 5)
+    fire('pointermove', p05.x, p05.y)
+    out.on05 = { t05: tileColorOf(0, 5), o05: outlineOf(0, 5), hover: hoverOf() }
     // (d) hover SPAM: 100 deterministic pseudo-random pointermoves including
     // far outside the viewport — must never throw, end state = last random hit.
     let seed = 12345
@@ -182,22 +182,22 @@ section('X2. Hover battery: empty-mask records, rotated records, spam, off-viewp
     return { out, spamErr, spamHover, behind, offGridProj: { x: offGrid.x, y: offGrid.y } }
   })
   const v = r.ok ? r.value : {}
-  // Empty-mask hover: (2,8) tile 1.0, outline = green × 1.0 (mask '')
-  test('X2a hovering ""-mask (2,8): tile 1.0, invisible frame instanceColor = green × 1.0, hover record set',
-    r.ok && near3(v.out?.on28?.tile, [1, 1, 1]) && near3(v.out?.on28?.outline?.rgb, mul(0x4f7a34, 1)) &&
-    v.out?.on28?.outline?.mask === '' && v.out?.on28?.hover?.x === 2 && v.out?.on28?.hover?.y === 8,
-    r.ok ? JSON.stringify(v.out?.on28) : r.error)
-  // Move to (8,8): (2,8) restored (tile 0.88, outline green × 0.88), (8,8) hit
-  test('X2b moving to ""-mask (8,8): (2,8) restored × 0.88, (8,8) bright + outline × 1.0',
-    r.ok && near3(v.out?.on88?.t28, [0.88, 0.88, 0.88]) && near3(v.out?.on88?.o28?.rgb, mul(0x4f7a34, 0.88)) &&
-    near3(v.out?.on88?.t88, [1, 1, 1]) && near3(v.out?.on88?.o88?.rgb, mul(0x4e3d2e, 1)) &&
+  // Empty-mask hover: (5,8) tile 1.0, outline = green × 1.0 (mask '')
+  test('X2a hovering ""-mask (5,8): tile 1.0, invisible frame instanceColor = green × 1.0, hover record set',
+    r.ok && near3(v.out?.on58?.tile, [1, 1, 1]) && near3(v.out?.on58?.outline?.rgb, mul(0x4f7a34, 1)) &&
+    v.out?.on58?.outline?.mask === '' && v.out?.on58?.hover?.x === 5 && v.out?.on58?.hover?.y === 8,
+    r.ok ? JSON.stringify(v.out?.on58) : r.error)
+  // Move to (8,8): (5,8) restored (tile 0.88, outline green × 0.88), (8,8) hit
+  test('X2b moving to ""-mask (8,8): (5,8) restored × 0.88, (8,8) bright + water outline × 1.0',
+    r.ok && near3(v.out?.on88?.t58, [0.88, 0.88, 0.88]) && near3(v.out?.on88?.o58?.rgb, mul(0x4f7a34, 0.88)) &&
+    near3(v.out?.on88?.t88, [1, 1, 1]) && near3(v.out?.on88?.o88?.rgb, mul(0x1c4e6e, 1)) &&
     v.out?.on88?.hover?.x === 8 && v.out?.on88?.hover?.y === 8,
-    r.ok ? JSON.stringify({ t28: v.out?.on88?.t28, o88: v.out?.on88?.o88, hover: v.out?.on88?.hover }) : r.error)
-  // Rotated record (8,0) rot-270: mask 'e', brown owner color × 1.0
-  test('X2c rotated (8,0) rot-270: tile 1.0, outline mask "e" brown × 1.0, rotation reported',
-    r.ok && near3(v.out?.on80?.t80, [1, 1, 1]) && near3(v.out?.on80?.o80?.rgb, mul(0x4e3d2e, 1)) &&
-    v.out?.on80?.o80?.mask === 'e' && v.out?.on80?.hover?.x === 8 && v.out?.on80?.hover?.y === 0,
-    r.ok ? JSON.stringify(v.out?.on80) : r.error)
+    r.ok ? JSON.stringify({ t58: v.out?.on88?.t58, o88: v.out?.on88?.o88, hover: v.out?.on88?.hover }) : r.error)
+  // Rotated record (0,5) rot-90: mask 'n,w', grass owner color × 1.0 (Slice B deep green)
+  test('X2c rotated (0,5) rot-90: tile 1.0, outline mask "n,w" grass × 1.0, rotation reported',
+    r.ok && near3(v.out?.on05?.t05, [1, 1, 1]) && near3(v.out?.on05?.o05?.rgb, mul(0x2e6b24, 1)) &&
+    v.out?.on05?.o05?.mask === 'n,w' && v.out?.on05?.hover?.x === 0 && v.out?.on05?.hover?.y === 5,
+    r.ok ? JSON.stringify(v.out?.on05) : r.error)
   // Spam: no throw, hover consistent (either a tile or null)
   test('X2d 100-move hover spam (incl. off-viewport): no throw, hover sane',
     r.ok && v.spamErr === null &&
@@ -228,11 +228,9 @@ section('X3. Rejection batteries leave the harness usable (both stages)')
     return { children: c.parent.children.length, groups: c.groups.length }
   })
   const rejections = [
-    ['misoriented edge', [{ x: 0, y: 0, variant: 'grass-dirt-n' }, { x: 1, y: 0, variant: 'grass-plain' }]],
-    ['ghost edge', [
-      { x: 0, y: 0, variant: 'grass-plain' }, { x: 0, y: 1, variant: 'grass-plain' }, { x: 0, y: 2, variant: 'grass-plain' },
-      { x: 1, y: 0, variant: 'dirt-plain' }, { x: 1, y: 1, variant: 'grass-dirt-e' }, { x: 1, y: 2, variant: 'dirt-plain' },
-      { x: 2, y: 0, variant: 'dirt-plain' }, { x: 2, y: 1, variant: 'dirt-plain' }, { x: 2, y: 2, variant: 'dirt-plain' },
+    ['unknown variant', [{ x: 0, y: 0, variant: 'grass-flowers' }]],
+    ['duplicate coordinate', [
+      { x: 0, y: 0, variant: 'grass-plain' }, { x: 0, y: 0, variant: 'dirt-plain' },
     ]],
     ['bad record outline mode', [{ x: 0, y: 0, variant: 'grass-plain', outline: 'sideways' }]],
     ['bad outline side', [{ x: 0, y: 0, variant: 'grass-plain', outline: ['x'] }]],
@@ -253,7 +251,7 @@ section('X3. Rejection batteries leave the harness usable (both stages)')
   // gate (record/map outline validation) throws AFTER staging — the current
   // preview is torn down and the game scene restored (harness usable, not
   // preview-preserving).
-  const dataGate = results.filter(x => x.label === 'misoriented edge' || x.label === 'ghost edge')
+  const dataGate = results.filter(x => x.label === 'unknown variant' || x.label === 'duplicate coordinate')
   const composerGate = results.filter(x => !dataGate.includes(x))
   test('X3a data-gate rejections throw and PRESERVE the live composer identity + children',
     dataGate.length === 2 && dataGate.every(x => x.threw && x.sameComposer && x.childrenStable),
@@ -309,7 +307,7 @@ section('X4. Listener leak check (add/remove net zero across cycles)')
       await window.__debug.gotoFixture('grass-plain') // disposes the composer
       await window.__debug.gotoFixture('tile-showcase')
       await window.__debug.gotoFixture('tile-showcase') // interrupt with another showcase
-      await window.__debug.gotoFixture('grass-flowers') // disposes again
+      await window.__debug.gotoFixture('grass-plain-b') // disposes again
     }
     await cycle()
     await cycle()
