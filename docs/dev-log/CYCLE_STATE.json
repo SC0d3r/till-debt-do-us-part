@@ -1,9 +1,14 @@
 {
-  "status": "idle",
-  "feature": null,
-  "category": null,
-  "current_step": null,
-  "last_updated": "2026-08-07T10:30:00Z",
-  "notes": "Pivot shipped to dev. Farming game removed; tile world foundation is the product surface. Build 487.69 kB raw / 124.94 kB gzip. qa=SHIP (148/148 + 14/14 fixtures), design/perf/visual = SHIP WITH FOLLOWUPS, follow-ups queued in FEATURE_BACKLOG.md. Next cycle: pick a backlog item (tile-kit batch or pivot follow-ups).",
-  "subagent_sessions": {}
+  "status": "in-progress",
+  "feature": "Slice B: pixel-art tile & prop redesign",
+  "category": "Assets & Art",
+  "current_step": "6-fix1",
+  "last_updated": "2026-08-07T13:20:00Z",
+  "notes": "CRITIC PASS 1 RESULTS: asset-critic DO NOT SHIP (flower = flat white sticker, 3/3 vision runs; exact fix recipe given); visual-critic SHIP WITH FOLLOWUPS but 3 BLOCKERS (1 showcase cameras framed too far out ~10% frame - pull in ~30%, (0,8.2,16.8)->(0,~6,~12) + (0.5,6.2,12.2)->(0.5,~4,~8) + center lookAt; 2 bush-snow flat white sticker - widen snow ramp, dark ring below tile; 3 dry-shrub flat/pasted - push mid/dark apart, darken twigs); performance-critic SHIP WITH FOLLOWUPS (no blockers; cache key, instancing plan, dead-code); ui-critic SHIP WITH FOLLOWUPS (no blockers; hover affordance, diorama legibility, selection pinning, stale fixture descriptions); design-critic SHIP WITH FOLLOWUPS (no blockers; tall-grass Major, gravel-patch, rock ribbons, small-stone ring, cactus arms, socket contract pinning, doc scrub). CONSOLIDATED FIX ROUND 1 dispatched to asset-creator (blockers mandatory + cheap high-value followups). qa-tester SKIPPED per user directive. After fixes: rebuild, recapture, re-run asset-critic + visual-critic only.",
+  "subagent_sessions": {
+    "asset-creator-trim": "ses_024886518ffeR3epiF7yX12WZQ",
+    "feature-writer-showcase": "ses_024881df1ffe1pK98e4ltSJq15",
+    "design-critic-tiles": "ses_0242ad302ffesYFvM7BNuTbXj7",
+    "asset-creator-props": "ses_02406cebbffeXgwOCsbw16BhpZ"
+  }
 }
