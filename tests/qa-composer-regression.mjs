@@ -585,16 +585,16 @@ section('O2. Outline color resolution + per-record overrides')
     // fromBiome owner) > map-level > global, all × 0.88 at rest.
     return {
       green: near(colorOf(0, 8), mul(0x4f7a34, 0.88)),      // record green override
-      brown: near(colorOf(3, 8), mul(0x4e3d2e, 0.88)),      // grass palette default
+      grass: near(colorOf(3, 8), mul(0x2e6b24, 0.88)),      // grass palette default (Slice B deep green)
       dirt: near(colorOf(6, 8), mul(0x6b4a2e, 0.88)),       // dirt palette
       tilled: near(colorOf(2, 3), mul(0x4a3a26, 0.88)),     // tilled palette (tilled interior)
-      edgeOwner: near(colorOf(5, 2), mul(0x4e3d2e, 0.88)),  // grass-dirt-n rot90 uses grass owner
+      edgeOwner: near(colorOf(5, 2), mul(0x2e6b24, 0.88)),  // grass-dirt-n rot90 uses grass owner (Slice B deep green)
     }
   })
   test('O2a (0,8) grass-plain rest = GREEN 0x4f7a34 × 0.88 (record override)',
     r.ok && r.value.green === true, r.ok ? '' : r.error)
-  test('O2b (3,8) grass-plain rest = grass palette 0x4e3d2e × 0.88 (brown baseline)',
-    r.ok && r.value.brown === true, r.ok ? '' : r.error)
+  test('O2b (3,8) grass-plain rest = grass palette 0x2e6b24 × 0.88 (Slice B deep green baseline)',
+    r.ok && r.value.grass === true, r.ok ? '' : r.error)
   test('O2c (6,8) dirt-plain rest = dirt palette 0x6b4a2e × 0.88',
     r.ok && r.value.dirt === true, r.ok ? '' : r.error)
   test('O2d (2,3) grass-tilled interior rest = tilled palette 0x4a3a26 × 0.88',
@@ -688,27 +688,29 @@ section('O3. Hover sync on a rotated record (tile + outline brighten together)')
     return out
   })
   const v = r.ok ? r.value : {}
-  // (5,2): grass-dirt-n @ 90 — outline = grass owner brown (no record color).
-  const brown = (f) => [((0x4e / 255) > 0.04045 ? Math.pow((0x4e / 255 + 0.055) / 1.055, 2.4) : 0x4e / 255 / 12.92) * f,
-    ((0x3d / 255) > 0.04045 ? Math.pow((0x3d / 255 + 0.055) / 1.055, 2.4) : 0x3d / 255 / 12.92) * f,
-    ((0x2e / 255) > 0.04045 ? Math.pow((0x2e / 255 + 0.055) / 1.055, 2.4) : 0x2e / 255 / 12.92) * f]
+  // (5,2): grass-dirt-n @ 90 — outline = grass owner color (Slice B deep green,
+  // no record color). Channels hardcoded here to keep the assertion math
+  // independent of the family module.
+  const grassOwner = (f) => [((0x2e / 255) > 0.04045 ? Math.pow((0x2e / 255 + 0.055) / 1.055, 2.4) : 0x2e / 255 / 12.92) * f,
+    ((0x6b / 255) > 0.04045 ? Math.pow((0x6b / 255 + 0.055) / 1.055, 2.4) : 0x6b / 255 / 12.92) * f,
+    ((0x24 / 255) > 0.04045 ? Math.pow((0x24 / 255 + 0.055) / 1.055, 2.4) : 0x24 / 255 / 12.92) * f]
   const green = (f) => [((0x4f / 255) > 0.04045 ? Math.pow((0x4f / 255 + 0.055) / 1.055, 2.4) : 0x4f / 255 / 12.92) * f,
     ((0x7a / 255) > 0.04045 ? Math.pow((0x7a / 255 + 0.055) / 1.055, 2.4) : 0x7a / 255 / 12.92) * f,
     ((0x34 / 255) > 0.04045 ? Math.pow((0x34 / 255 + 0.055) / 1.055, 2.4) : 0x34 / 255 / 12.92) * f]
   const near3 = (a, b) => a && Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(a[1] - b[1]) < 1e-6 && Math.abs(a[2] - b[2]) < 1e-6
   test('O3a hovering ROTATED (5,2): tile → (1,1,1) AND outline → resolved × 1.0, mask n,w',
-    r.ok && near3(v.on52?.tile, [1, 1, 1]) && near3(v.on52?.outline?.rgb, brown(1)) &&
+    r.ok && near3(v.on52?.tile, [1, 1, 1]) && near3(v.on52?.outline?.rgb, grassOwner(1)) &&
     v.on52?.outline?.mask === 'n,w' && v.on52?.hover?.rotation === 90 && v.on52?.hover?.variant === 'grass-dirt-n',
     r.ok ? JSON.stringify(v.on52) : r.error)
   test('O3b moving to GREEN cell (1,8): (5,2) tile + outline restored to × 0.88 together',
-    r.ok && near3(v.on18?.t52, [0.88, 0.88, 0.88]) && near3(v.on18?.o52?.rgb, brown(0.88)),
+    r.ok && near3(v.on18?.t52, [0.88, 0.88, 0.88]) && near3(v.on18?.o52?.rgb, grassOwner(0.88)),
     r.ok ? JSON.stringify({ t52: v.on18?.t52, o52: v.on18?.o52 }) : r.error)
   test('O3c new hover (1,8): tile 1.0 + GREEN outline × 1.0',
     r.ok && near3(v.on18?.t18, [1, 1, 1]) && near3(v.on18?.o18?.rgb, green(1)) &&
     v.on18?.hover?.x === 1 && v.on18?.hover?.y === 8,
     r.ok ? JSON.stringify({ t18: v.on18?.t18, o18: v.on18?.o18 }) : r.error)
   test('O3d pointerout restores both tiles and both outlines to neutral × 0.88',
-    r.ok && near3(v.afterOut?.t52, [0.88, 0.88, 0.88]) && near3(v.afterOut?.o52?.rgb, brown(0.88)) &&
+    r.ok && near3(v.afterOut?.t52, [0.88, 0.88, 0.88]) && near3(v.afterOut?.o52?.rgb, grassOwner(0.88)) &&
     near3(v.afterOut?.t18, [0.88, 0.88, 0.88]) && near3(v.afterOut?.o18?.rgb, green(0.88)) && v.afterOut?.hover === null,
     r.ok ? JSON.stringify(v.afterOut) : r.error)
   test('O3e no page errors during outline hover battery', page.__pageErrors.length === 0, JSON.stringify(page.__pageErrors))

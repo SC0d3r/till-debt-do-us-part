@@ -23,7 +23,7 @@
 
 import * as THREE from 'three'
 import fixtures from '../../tests/scene-fixtures.json'
-import * as grassTiles from '../assets/tiles/grass'
+import { VARIANTS as TILE_VARIANTS, resolveFactory } from '../assets/tiles'
 import { TileMapComposer, type TileMapRecord, type TileMapOutlineOptions } from '../world/TileMapComposer'
 import { SHOWCASE_MAP, validateShowcaseMap } from '../world/showcaseMap'
 
@@ -161,11 +161,11 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
   // from the showcase map — asset review needs a clean, unambiguous shot with
   // no map context, lighting variance, or occlusion.
   //
-  // Iterate the family's VARIANTS manifest so new variants get previews
-  // automatically (no per-variant hardcoding here).
+  // Iterate the MERGED tile registry so every family's variants get previews
+  // automatically (no per-family hardcoding here).
   const assetFactories: Record<string, () => THREE.Object3D> = {}
-  for (const variant of Object.keys(grassTiles.VARIANTS)) {
-    assetFactories[variant] = () => grassTiles.createGrassTile(variant)
+  for (const variant of Object.keys(TILE_VARIANTS)) {
+    assetFactories[variant] = resolveFactory(variant)
   }
 
   interface PreviewState {
@@ -306,8 +306,8 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
   // data-driven TileMapComposer and frames the camera for the entire 9x9 map.
   // Default map-level outline config: mode 'interior' (edges touching another
   // cell) — the outline color demo lives in SHOWCASE_MAP's per-record
-  // outlineColor fields (green grass columns x=0..2 vs the brown biome
-  // default). Tests may override the outline config via opts.
+  // outlineColor fields (green grass columns x=0..2 vs the biome-default deep
+  // green on x=3..8). Tests may override the outline config via opts.
   async function showcaseTileMap(data?: TileMapRecord[], opts?: { outline?: TileMapOutlineOptions }): Promise<void> {
     const mapData = data ?? SHOWCASE_MAP
     // Data-level acceptance gate FIRST: a bad map throws before any staging
@@ -328,10 +328,10 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
       composer = new TileMapComposer({
         parent: scene,
         data: mapData,
-        // Variant STRING → grass-family factory (the composer knows nothing
+        // Variant STRING → tile-registry factory (the composer knows nothing
         // about families; resolveFactory is the only family knowledge and it
-        // lives here, in the debug harness).
-        resolveFactory: (variant) => () => grassTiles.createGrassTile(variant),
+        // lives in the registry, src/assets/tiles/index.js).
+        resolveFactory: (variant) => resolveFactory(variant),
         raycastTarget: cam,
         onHover: (record) => { showcase.lastHover = record },
         outline: opts?.outline ?? { mode: 'interior' },
