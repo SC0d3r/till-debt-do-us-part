@@ -11,8 +11,8 @@
   },
   "tile-showcase": {
     "path": "tests/screenshots/tile-showcase.png",
-    "capturedAt": "2026-08-07T22:33:18.952Z",
-    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+    "capturedAt": "2026-08-08T10:03:56.997Z",
+    "commit": "fb2d29a7cbc9aa72bc11b77325d0fa2da72e0c5b"
   },
   "water-plain": {
     "path": "tests/screenshots/water-plain.png",
@@ -141,7 +141,17 @@
   },
   "props-showcase": {
     "path": "tests/screenshots/props-showcase.png",
-    "capturedAt": "2026-08-07T22:33:18.954Z",
-    "commit": "5dde1e8632a3feb8bb5afeb8a4447770c7f94d54"
+    "capturedAt": "2026-08-08T10:03:56.997Z",
+    "commit": "fb2d29a7cbc9aa72bc11b77325d0fa2da72e0c5b"
+  },
+  "slice-c-demo": {
+    "path": "tests/screenshots/slice-c-demo.png",
+    "capturedAt": "2026-08-08T10:03:56.997Z",
+    "commit": "fb2d29a7cbc9aa72bc11b77325d0fa2da72e0c5b"
+  },
+  "slice-c-demo-night": {
+    "path": "tests/screenshots/slice-c-demo-night.png",
+    "capturedAt": "2026-08-08T10:03:56.997Z",
+    "commit": "fb2d29a7cbc9aa72bc11b77325d0fa2da72e0c5b"
   }
 }
