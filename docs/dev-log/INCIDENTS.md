@@ -17,6 +17,20 @@ Observed: feature-writer rev-2 round returned EMPTY (completed with no output); 
 Retries: 4 subagent resumes (all successful); 1 capture re-dispatch (successful); 1 push retry (successful)
 Resolution: all resumed successfully on the same-session path
 
+## 2026-08-08 ~05:25 — Slice C fix rounds
+Subagent: qa-tester (final gate dispatch), preceded by a user-confirmed internet outage
+Observed: the qa-tester final-gate dispatch was CANCELLED mid-call (user reported
+an internet outage around the same time; the task tool returned "Task cancelled"
+without a session id). The outage did not corrupt the working tree (all fix
+rounds were already committed to disk by feature-writer, verified by git status
+after recovery). Re-dispatched qa-tester fresh — no session id existed to resume,
+so this was a legitimately unresumable cancellation, not a silent failure.
+Also noted (user feedback, 2026-08-08): "library image card design is good but
+make the images a little taller" — no library/card UI exists in the codebase yet;
+queued as a backlog idea (Polish & Game Feel) and flagged to the user.
+Retries: 1 fresh qa-tester dispatch after recovery
+Resolution: resumed successfully on next invocation (fresh dispatch, documented)
+
 # Incidents
 
 Append-only. `game-director` writes here whenever a subagent fails 3 retries
