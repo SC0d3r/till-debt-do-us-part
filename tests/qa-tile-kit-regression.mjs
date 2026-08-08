@@ -4,7 +4,7 @@
 // asset-preview fixtures) must NOT have broken anything else. The farming game
 // was deleted (project pivot, 2026-08-07): there are no gameplay fixtures, no
 // clock, no HUD. This file verifies:
-//   T1  registry integrity (29 fixtures: 27 asset-preview + 2 showcase)
+//   T1  registry integrity (32 fixtures: 27 asset-preview + 2 showcase + 3 demo)
 //   T2  boot state: the tile world loads with the loop running (started=true)
 //   T3  all 27 asset-preview fixtures resolve via gotoFixture/previewAsset
 //   T4  previewAsset stops the loop cleanly (started=false during preview,
@@ -99,15 +99,17 @@ section('T1. Registry integrity')
   const lf = await evl(page, () => window.__debug.listFixtures())
   const names = lf.ok ? lf.value.map(f => f.name) : []
   const byCategory = lf.ok ? lf.value.reduce((m, f) => { m[f.category] = (m[f.category] || 0) + 1; return m }, {}) : {}
-  // 29 entries: 27 asset-preview + 2 showcase (tile-showcase + props-showcase).
-  // The 9 gameplay fixtures were deleted with the farming game (project
-  // pivot, 2026-08-07).
-  test('T1a listFixtures returns 29 entries (27 asset-preview + 2 showcase)',
-    lf.ok && names.length === 29 &&
+  // 32 entries: 27 asset-preview + 2 showcase (tile-showcase + props-showcase)
+  // + 3 demo (slice-c-demo + slice-c-demo-night + qa-spawn-island-scene,
+  // added with Slice C and fix round 2).
+  test('T1a listFixtures returns 32 entries (27 asset-preview + 2 showcase + 3 demo)',
+    lf.ok && names.length === 32 &&
     ALL_PREVIEW_FIXTURES.every(n => names.includes(n)) &&
-    names.includes('tile-showcase') && names.includes('props-showcase'),
+    names.includes('tile-showcase') && names.includes('props-showcase') &&
+    names.includes('slice-c-demo') && names.includes('slice-c-demo-night') &&
+    names.includes('qa-spawn-island-scene'),
     lf.ok ? `${names.length} entries; cat=${JSON.stringify(byCategory)}` : lf.error)
-  test('T1b fixture names unique', lf.ok && new Set(names).size === 29, lf.ok ? String(new Set(names).size) : lf.error)
+  test('T1b fixture names unique', lf.ok && new Set(names).size === 32, lf.ok ? String(new Set(names).size) : lf.error)
   test('T1c exactly 27 asset-preview fixtures, all from the merged tile + prop registries',
     lf.ok && byCategory['asset-preview'] === 27 &&
     ALL_PREVIEW_FIXTURES.every(n => lf.value.find(f => f.name === n)?.category === 'asset-preview'),
