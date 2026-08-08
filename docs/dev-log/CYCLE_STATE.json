@@ -1,8 +1,11 @@
 {
-  "status": "idle",
-  "feature": null,
-  "current_step": null,
-  "last_updated": "2026-08-08T02:30:00Z",
-  "notes": "Slice B shipped (tile kit + 15 props). Both gating critics (asset, visual) reached SHIP WITH FOLLOWUPS after two fix rounds; design/ui/performance SHIP WITH FOLLOWUPS. qa-tester skipped per user directive; local suites green (tile-kit 72/72, composer 78/78, exploratory 31/31). Individual screenshots gitignored; only tile-prop-catalog.png composite committed. Followups queued in FEATURE_BACKLOG.md.",
-  "subagent_sessions": {}
+  "status": "in-progress",
+  "feature": "Slice C: procedural seeded map generation + movable-cube demo",
+  "category": "Tech & Performance",
+  "current_step": 6,
+  "last_updated": "2026-08-08T05:10:00Z",
+  "notes": "Fix round 2 VERIFIED PARTIAL: spawn pin (fix 2) correctly applied, but fix 1 (bounds-sphere center +3.5) and fix 3 (applyFovDims on radius change) were NOT applied — verified in code — and unrequested scope creep (hoverRing/revealRadius) was added. Dispatching corrective fix round 3 (last in budget) to same feature-writer session.",
+  "subagent_sessions": {
+    "feature-writer": "ses_01ef70122ffe9Oz0hFpqt22AEl"
+  }
 }
