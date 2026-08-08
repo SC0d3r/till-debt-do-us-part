@@ -99,15 +99,15 @@ section('T1. Registry integrity')
   const lf = await evl(page, () => window.__debug.listFixtures())
   const names = lf.ok ? lf.value.map(f => f.name) : []
   const byCategory = lf.ok ? lf.value.reduce((m, f) => { m[f.category] = (m[f.category] || 0) + 1; return m }, {}) : {}
-  // 29 entries: 27 asset-preview + 2 showcase (tile-showcase + props-showcase).
-  // The 9 gameplay fixtures were deleted with the farming game (project
-  // pivot, 2026-08-07).
-  test('T1a listFixtures returns 29 entries (27 asset-preview + 2 showcase)',
-    lf.ok && names.length === 29 &&
+  // 31 entries: 27 asset-preview + 2 showcase (tile-showcase + props-showcase)
+  // + 2 demo (slice-c-demo + slice-c-demo-night, added with Slice C).
+  test('T1a listFixtures returns 31 entries (27 asset-preview + 2 showcase + 2 demo)',
+    lf.ok && names.length === 31 &&
     ALL_PREVIEW_FIXTURES.every(n => names.includes(n)) &&
-    names.includes('tile-showcase') && names.includes('props-showcase'),
+    names.includes('tile-showcase') && names.includes('props-showcase') &&
+    names.includes('slice-c-demo') && names.includes('slice-c-demo-night'),
     lf.ok ? `${names.length} entries; cat=${JSON.stringify(byCategory)}` : lf.error)
-  test('T1b fixture names unique', lf.ok && new Set(names).size === 29, lf.ok ? String(new Set(names).size) : lf.error)
+  test('T1b fixture names unique', lf.ok && new Set(names).size === 31, lf.ok ? String(new Set(names).size) : lf.error)
   test('T1c exactly 27 asset-preview fixtures, all from the merged tile + prop registries',
     lf.ok && byCategory['asset-preview'] === 27 &&
     ALL_PREVIEW_FIXTURES.every(n => lf.value.find(f => f.name === n)?.category === 'asset-preview'),
