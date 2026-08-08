@@ -143,5 +143,20 @@
     "name": "props-showcase",
     "description": "Prop showcase: all 15 props staged on a 7x6 mixed-terrain diorama (rests-on-tiles + cross-prop hierarchy proof)",
     "category": "showcase"
+  },
+  {
+    "name": "slice-c-demo",
+    "description": "Slice C demo world: floating sky islands (seed 1337, ragged tile-level coastlines, sparse stepping-stone bridges), player cube at spawn, noon (12:00), day FOV 9, debug overlay ON",
+    "category": "demo"
+  },
+  {
+    "name": "slice-c-demo-night",
+    "description": "Slice C demo world at night: same seed 1337 floating islands, 22:00, night FOV 5, dark sky + Don't Starve-style warm light pool, debug overlay OFF",
+    "category": "demo"
+  },
+  {
+    "name": "qa-spawn-island-scene",
+    "description": "QA spawn scene (fix round 2): seed 777 at noon — the 5x5 spawn patch (max(|x|,|y|)<=2) is always solid grass around the origin, red origin marker at the mesh center of tile (8,8), debug overlay OFF",
+    "category": "demo"
   }
 ]
