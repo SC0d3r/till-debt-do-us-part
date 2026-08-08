@@ -1,8 +1,9 @@
 {
-  "status": "idle",
-  "feature": null,
-  "current_step": null,
-  "last_updated": "2026-08-08T02:30:00Z",
-  "notes": "Slice B shipped (tile kit + 15 props). Both gating critics (asset, visual) reached SHIP WITH FOLLOWUPS after two fix rounds; design/ui/performance SHIP WITH FOLLOWUPS. qa-tester skipped per user directive; local suites green (tile-kit 72/72, composer 78/78, exploratory 31/31). Individual screenshots gitignored; only tile-prop-catalog.png composite committed. Followups queued in FEATURE_BACKLOG.md.",
+  "status": "in-progress",
+  "feature": "Slice C: procedural seeded map generation + movable-cube demo",
+  "category": "Tech & Performance",
+  "current_step": 6,
+  "last_updated": "2026-08-08T05:25:00Z",
+  "notes": "Fix round 3 verified in code by design-critic (SHIP WITH FOLLOWUPS; P0 bounds-sphere center, P1 spawn pin confirmed; revert confirmed) and performance-critic (SHIP; Fix 3 real, R5 discriminates, bundle flat). Fresh screenshots captured and reviewed: visual-critic SHIP WITH FOLLOWUPS (night prop lighting, key-light direction, player pool blowout Majors), ui-critic SHIP WITH FOLLOWUPS (WASD-while-typing Major). No DO NOT SHIP anywhere. Final gate: qa-tester ONCE.",
   "subagent_sessions": {}
 }
