@@ -20,15 +20,39 @@ export class InputManager {
   }
 
   constructor() {
+    // Completion round: keydown/keyup bubble to the window listener with
+    // e.target = the focused element, so typing into the debug overlay (or
+    // any input/textarea) would otherwise leak WASD into the game keys.
+    // Guard both directions: a keyup whose target is a form field must not
+    // clear a game key either.
+    const isTypingTarget = (e: KeyboardEvent): boolean => {
+      const t = e.target
+      if (!(t instanceof HTMLElement)) return false
+      return t.closest('input, textarea, #debug-overlay') !== null
+    }
     window.addEventListener('keydown', (e) => {
+      if (isTypingTarget(e)) return
       this.keys[e.code] = true
       // Non-repeat only: OS key-repeat while holding must keep the once-per-
       // press edge semantics (a repeat would otherwise re-latch every tick).
       if (this.fastLatch && !e.repeat) this.latched[e.code] = true
     })
     window.addEventListener('keyup', (e) => {
+      if (isTypingTarget(e)) return
       this.keys[e.code] = false
     })
+    // Completion round: tabbing out (or the page being hidden) swallows the
+    // OS keyup — without a reset the key stays held and the cube keeps
+    // walking when focus returns. Clear ALL key state on blur/
+    // visibilitychange (keys, latches, edges — nothing may survive a tab).
+    const clearAll = () => {
+      for (const key in this.keys) delete this.keys[key]
+      for (const key in this.latched) delete this.latched[key]
+      for (const key in this.prevKeys) delete this.prevKeys[key]
+      for (const key in this.justPressed) delete this.justPressed[key]
+    }
+    window.addEventListener('blur', clearAll)
+    document.addEventListener('visibilitychange', clearAll)
   }
 
   update() {
