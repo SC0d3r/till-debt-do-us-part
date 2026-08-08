@@ -95,7 +95,10 @@
  *   no-op).
  *   The composer exposes read-only `outlineGroups: [{ mask, count, records,
  *   mesh }]`; dispose() removes the outline meshes from the parent and
- *   disposes the cached frame geometries + the shared material.
+ *   disposes the per-composer material. Frame GEOMETRY is shared module-level
+ *   (OUTLINE_GEOM_CACHE, keyed mask|topY|baseY|width — fix round 1: identical
+ *   frames are built once across ALL composers) and is NEVER disposed per
+ *   composer — it lives for the page lifetime.
  *
  * GROUPING (convention §3, pinned): groups are keyed by VARIANT STRING only
  * (never by biome/module) — biome routing breaks when placeholder variants
@@ -111,6 +114,26 @@
  * neutral brightness bump to (1,1,1) — no black flashes from uninitialized
  * colors.
  *
+ * INSTANCE DIMS (Slice C, world-manager FOV fog band): `setInstanceDims(dims)`
+ * writes a per-record dim factor (0..1, 1 = full brightness) into the same
+ * instanceColor pipeline: instanceColor = dim × (hovered ? 1.0 : 0.88) for
+ * tiles, and resolved outline color × dim × (hovered ? 1.0 : 0.88) for the
+ * record's outline instance — so the ink outlines fade with the fog band and
+ * at night, never stay full-bright. Hover set/restore MULTIPLY by the stored
+ * dim factor, so hover and fog compose (hover on a dimmed tile brightens it
+ * within its dimmed value, never back to full).
+ *
+ * HOVER RING + REVEAL (fix round 2, design-critic): `opts.hoverRing` shows a
+ * thin circular halo around the hovered tile (just above its cap, slightly
+ * outside the ±0.5 diamond — reads as a selection ring without covering the
+ * tile face). `opts.revealRadius` (data tiles) forces every tile inside a
+ * circle around the hovered tile to FULL brightness (dim factor 1) while the
+ * pointer is over it: the FOV fog band "lights up" around the cursor, and
+ * the revealed tiles' outlines stay full-ink too. The dim → reveal → dim
+ * round trip never changes the stored dim factors (the reveal overrides are
+ * recomputed from scratch on every hover change). Both are pure hover visual
+ * state: no render-loop involvement, restored on hover clear.
+ *
  * HOVER CONTRACT (design-critic Major, locked): raycast happens ONLY on
  * pointermove events (last pointer is stored; there is no per-frame
  * raycast — the composer has no render-loop involvement at all). On hover:
@@ -120,18 +143,53 @@
  * pointermove). `onHover(tileRecord | null)` fires on every hover CHANGE,
  * where tileRecord = { x, y, variant, rotation, instanceId, group }.
  *
+ * BIND-OWN-HOVER-EVENTS (Slice C, world manager): `bindOwnHoverEvents`
+ * (constructor option, default true) skips the internal document/window
+ * listener binding when false. Per-chunk composers pass false; the world
+ * manager owns ONE shared pointermove listener, calls
+ * `raycastFromPointer(ndcX, ndcY)` against every loaded chunk, and forwards
+ * the nearest hit via the public `applyHover(hit)` — one listener instead
+ * of N. `raycastFromPointer` is pure (never mutates hover state) and
+ * `clearHover()` clears this composer's hover programmatically.
+ *
  * PERFORMANCE: zero per-frame allocations — no tick/update method, no loop
  * hookup; the only per-event allocations are in the pointermove handler
- * (event-driven, acceptable) and the onHover record object.
+ * (event-driven, acceptable) and the onHover record object. setInstanceDims
+ * is event-driven (FOV recompute happens only when the player's tile
+ * changes / chunks load or unload), never per-frame.
  */
 
 import * as THREE from 'three'
+
+/**
+ * MODULE-LEVEL shared outline frame-geometry cache (fix round 1,
+ * performance-critic MAJOR). Identical resolved-mask frames are built ONCE
+ * and shared across ALL composers — the WorldManager's per-chunk composers
+ * previously rebuilt the same frame geometry per chunk (~49× duplication of
+ * build ms and GPU memory). Key: resolved local mask | topY | baseY | width
+ * (all four are part of the geometry). This cache is NEVER disposed per
+ * chunk: composers dispose only the geometry they own (per-composer
+ * materials + meshes); the cache lives for the page lifetime.
+ */
+const OUTLINE_GEOM_CACHE = new Map()
 
 /** Neutral per-instance color set for EVERY instance at build (brightness
  *  bump to 1,1,1 on hover). */
 const NEUTRAL_COLOR = new THREE.Color(0.88, 0.88, 0.88)
 /** Hover highlight color. */
 const HOVER_COLOR = new THREE.Color(1, 1, 1)
+
+// ─── Hover ring (fix round 2, design-critic) ───
+/** Ring inner/outer radius: just outside the ±0.5 tile diamond, so the halo
+ *  reads as a selection ring around the tile instead of covering its face. */
+const RING_INNER = 0.52
+const RING_OUTER = 0.64
+/** Ring lift above the tile cap (above the outline ribbons' +0.002). */
+const RING_LIFT = 0.006
+/** Ring tessellation. */
+const RING_SEGMENTS = 48
+/** Ring opacity (semi-transparent halo). */
+const RING_OPACITY = 0.85
 
 // ─── Outline constants (convention §3, pinned) ───
 /** Outline modes. */
@@ -263,8 +321,19 @@ export class TileMapComposer {
    *   instanceId: number, group: object} | null) => void} [opts.onHover] -
    *   called on every hover change; null means the pointer moved off / left /
    *   window lost focus.
+   * @param {boolean} [opts.bindOwnHoverEvents=true] - when false, the
+   *   composer does NOT bind its own document/window hover listeners (the
+   *   world manager owns the single shared pointermove listener and drives
+   *   hover through raycastFromPointer + applyHover). dispose() is safe
+   *   either way (removeEventListener on never-added handlers is a no-op).
+   * @param {boolean} [opts.hoverRing=false] - show a thin circular halo
+   *   around the hovered tile (fix round 2). Lazy-built on first hover;
+   *   disposed in dispose().
+   * @param {number} [opts.revealRadius=0] - data-space radius (tiles) around
+   *   the hovered tile whose dim factor is forced to 1.0 while hovered — the
+   *   FOV fog band lights up around the cursor (fix round 2). 0 disables.
    */
-  constructor({ parent, data, resolveFactory, raycastTarget, outline, onHover }) {
+  constructor({ parent, data, resolveFactory, raycastTarget, outline, onHover, bindOwnHoverEvents = true, hoverRing = false, revealRadius = 0 }) {
     if (!parent || typeof parent.add !== 'function') {
       throw new Error('TileMapComposer: `parent` must be a THREE.Object3D (scene or group)')
     }
@@ -293,6 +362,12 @@ export class TileMapComposer {
         throw new Error(`TileMapComposer: outline width must be a positive number, got ${JSON.stringify(outline.width)}`)
       }
     }
+    if (typeof hoverRing !== 'boolean') {
+      throw new Error(`TileMapComposer: \`hoverRing\` must be a boolean, got ${JSON.stringify(hoverRing)}`)
+    }
+    if (!Number.isFinite(revealRadius) || revealRadius < 0) {
+      throw new Error(`TileMapComposer: \`revealRadius\` must be a non-negative number (data tiles), got ${JSON.stringify(revealRadius)}`)
+    }
 
     this.parent = parent
     this.raycastTarget = raycastTarget
@@ -317,10 +392,24 @@ export class TileMapComposer {
     this._groupByMesh = new Map()
     this._raycaster = new THREE.Raycaster()
     this._ndc = new THREE.Vector2()
+    // Slice C: per-record dim factor (FOV fog band) + record → group index
+    // lookup + a scratch color for the dim/hover color math (event-driven
+    // only, never in a render path).
+    this._dimByRecord = new Map()
+    this._indexByRecord = new Map()
+    this._scratchColor = new THREE.Color(1, 1, 1)
+    // Round 2: hover ring + reveal circle state (pure hover visuals).
+    this._hoverRingEnabled = hoverRing
+    this._revealRadius = revealRadius
+    this._ring = null
+    this._ringMaterial = null
+    /** @type {Set<object>} records currently forced to full brightness (inside
+     *  the reveal circle around the hovered tile). Recomputed on every hover
+     *  change; empty while nothing is hovered. */
+    this._revealRecords = new Set()
 
     // Outline state (only touched when the outline option is present).
     this._outlineMeshes = []
-    this._outlineGeomCache = new Map()
     this._outlineMaterial = null
     /** record object → { mesh, instanceId, color } for hover sync. */
     this._outlineByRecord = new Map()
@@ -328,7 +417,7 @@ export class TileMapComposer {
     this._variantOutlineMeta = new Map()
 
     this._build(data, resolveFactory, outline)
-    this._bindHoverEvents()
+    if (bindOwnHoverEvents) this._bindHoverEvents()
   }
 
   // ─── Build ────────────────────────────────────────────────────────────
@@ -413,6 +502,11 @@ export class TileMapComposer {
         this.groups.push(group)
         this._meshes.push(mesh)
         this._groupByMesh.set(mesh, group)
+        // Slice C: record → { group, instanceId } index (instanceId == index
+        // into `records`), used by setInstanceDims to write per-instance dims.
+        for (let i = 0; i < records.length; i++) {
+          this._indexByRecord.set(records[i], { group, instanceId: i })
+        }
       }
 
       // Outline pass (convention §3): built AFTER every tile group, so a
@@ -435,17 +529,16 @@ export class TileMapComposer {
     }
   }
 
-  /** Removes every outline mesh from the parent and disposes the frame
-   *  geometries + the shared material (used by mid-build cleanup AND
-   *  dispose()). */
+  /** Removes every outline mesh from the parent and disposes the per-composer
+   *  outline material (used by mid-build cleanup AND dispose()). Frame
+   *  geometry is NOT disposed here — it is shared module-level
+   *  (OUTLINE_GEOM_CACHE) and lives for the page lifetime (fix round 1). */
   _teardownOutlineMeshes() {
     for (const im of this._outlineMeshes) this.parent.remove(im)
     this._outlineMeshes = []
     this.outlineGroups = []
     this._outlineByRecord.clear()
     this._variantOutlineMeta.clear()
-    for (const geom of this._outlineGeomCache.values()) geom.dispose()
-    this._outlineGeomCache.clear()
     if (this._outlineMaterial) {
       this._outlineMaterial.dispose()
       this._outlineMaterial = null
@@ -585,12 +678,16 @@ export class TileMapComposer {
       }
       if (baseY === Infinity) baseY = 0
 
-      let geom = this._outlineGeomCache.get(key)
+      // Shared module-level frame cache, keyed by mask | topY | baseY |
+      // width — identical frames are built once and shared across composers
+      // (fix round 1: the per-composer cache rebuilt every chunk's frames).
+      const cacheKey = `${key}|${topY}|${baseY}|${width}`
+      let geom = OUTLINE_GEOM_CACHE.get(cacheKey)
       if (!geom) {
         // '' mask → zero-triangle frame (split('') would yield ['']).
         const sides = key === '' ? [] : key.split(',')
         geom = buildOutlineFrameGeometry(sides, topY, baseY, width)
-        this._outlineGeomCache.set(key, geom)
+        OUTLINE_GEOM_CACHE.set(cacheKey, geom)
       }
       if (!this._outlineMaterial) {
         // ONE white material per composer — all outline color lives in
@@ -706,43 +803,135 @@ export class TileMapComposer {
       x: (e.clientX / window.innerWidth) * 2 - 1,
       y: -(e.clientY / window.innerHeight) * 2 + 1,
     }
-    this._ndc.set(this._lastPointer.x, this._lastPointer.y)
+    const hit = this.raycastFromPointer(this._lastPointer.x, this._lastPointer.y)
+    if (hit) this._setHover(hit.group, hit.instanceId, hit.record)
+    else this._setHover(null)
+  }
+
+  /**
+   * Public, PURE raycast (Slice C, world manager): runs the same raycast
+   * logic as the pointermove handler against THIS composer's tile meshes
+   * only, through the given NDC pointer coordinates. Does NOT mutate hover
+   * state — the caller decides what to do with the hit.
+   *
+   * @param {number} ndcX - pointer NDC x (−1..1)
+   * @param {number} ndcY - pointer NDC y (−1..1)
+   * @returns {{record: object, group: object, instanceId: number, distance: number} | null}
+   */
+  raycastFromPointer(ndcX, ndcY) {
+    this._ndc.set(ndcX, ndcY)
     this._raycaster.setFromCamera(this._ndc, this.raycastTarget)
     const hits = this._raycaster.intersectObjects(this._meshes, false)
     const hit = hits[0]
     if (hit && hit.instanceId !== undefined && hit.instanceId < hit.object.count) {
       const group = this._groupByMesh.get(hit.object)
-      this._setHover(group, hit.instanceId, group.records[hit.instanceId])
-    } else {
-      this._setHover(null)
+      return { record: group.records[hit.instanceId], group, instanceId: hit.instanceId, distance: hit.distance }
+    }
+    return null
+  }
+
+  /**
+   * Public hover-apply (Slice C, world manager): applies a raycastFromPointer
+   * hit (or null to clear) to this composer's hover state — the same
+   * _setHover path the internal pointermove handler uses, so hover visuals
+   * and the onHover contract behave identically whether hover is driven by
+   * this composer's own listeners or by the world manager's shared one.
+   *
+   * @param {{record: object, group: object, instanceId: number} | null} hit
+   */
+  applyHover(hit) {
+    if (hit) this._setHover(hit.group, hit.instanceId, hit.record)
+    else this._setHover(null)
+  }
+
+  /** Public hover clear (Slice C): clears this composer's hover state. */
+  clearHover() {
+    this._setHover(null)
+  }
+
+  /**
+   * Public per-instance dim write (Slice C, FOV fog band): `dims` is an
+   * array of { record, factor } entries (factor 0..1, 1 = full brightness).
+   * For every entry the factor is stored per instance (keyed by record) and
+   * written into the instanceColor pipeline: tile instanceColor = factor ×
+   * (hovered ? 1.0 : 0.88); the record's OUTLINE instance gets resolved
+   * color × factor × (hovered ? 1.0 : 0.88) — the ink outlines fade with the
+   * fog band and at night, never stay full-bright. Hover set/restore
+   * multiply by the stored factor, so hover and fog compose. Build-time
+   * instanceColor stays 0.88 (dim 1.0 default). Round 2: records inside the
+   * reveal circle (around the hovered tile) ignore the passed factor — they
+   * are forced to full brightness, so a mid-hover fog pass can never re-dim
+   * them; the STORED factor is still updated for the restore path.
+   *
+   * @param {Array<{record: object, factor: number}>} dims
+   */
+  setInstanceDims(dims) {
+    for (const { record, factor } of dims) {
+      const entry = this._indexByRecord.get(record)
+      if (!entry) continue
+      this._dimByRecord.set(record, factor)
+      const hovered = this._hovered && this._hovered.record === record
+      const base = hovered ? HOVER_COLOR : NEUTRAL_COLOR
+      const effective = this._isRevealed(record) ? 1 : factor
+      entry.group.mesh.setColorAt(entry.instanceId, this._scratchColor.copy(base).multiplyScalar(effective))
+      entry.group.mesh.instanceColor.needsUpdate = true
+      const outline = this._outlineByRecord.get(record)
+      if (outline) this._setOutlineFactor(outline, hovered ? OUTLINE_HOVER : OUTLINE_DIM, record)
     }
   }
 
   /** Sets/clears the hovered instance; restores the previous instance's color
    *  to neutral on move-off. The record's outline instance (if any) follows
-   *  the tile's brightness in sync (convention §3). Notifies onHover only
-   *  when the hover CHANGES. */
+   *  the tile's brightness in sync (convention §3). With revealRadius > 0 the
+   *  tiles inside a data-space circle around the hovered tile are forced to
+   *  full brightness (dim factor 1) while hovered — the FOV fog band "lights
+   *  up" around the cursor (round-2 design fix). The reveal set is recomputed
+   *  from scratch on every hover change, so the dim → reveal → dim round trip
+   *  never drifts. Notifies onHover only when the hover CHANGES. */
   _setHover(group, instanceId, record) {
     if (this._hovered) {
       if (group && this._hovered.group === group && this._hovered.instanceId === instanceId) {
         return // pointer moved within the same tile — nothing changes
       }
-      this._restoreHoveredColor()
     } else if (!group) {
       return // nothing was hovered, nothing to clear
     }
-    this._hovered = group
-      ? { group, instanceId, record }
-      : null
-    if (group) {
-      group.mesh.setColorAt(instanceId, HOVER_COLOR)
-      group.mesh.instanceColor.needsUpdate = true
-      const outline = this._outlineByRecord.get(record)
-      if (outline) this._setOutlineFactor(outline, OUTLINE_HOVER)
+    const oldHovered = this._hovered
+    const newHovered = group ? { group, instanceId, record } : null
+
+    // Reveal circle: every record within revealRadius (Euclidean in data
+    // space) of the hovered tile stays full-bright. Empty on hover clear.
+    const oldReveal = this._revealRecords
+    const newReveal = new Set()
+    if (newHovered && this._revealRadius > 0) {
+      const r2 = this._revealRadius * this._revealRadius
+      for (const rec of this._indexByRecord.keys()) {
+        const dx = rec.x - newHovered.record.x
+        const dy = rec.y - newHovered.record.y
+        if (dx * dx + dy * dy <= r2) newReveal.add(rec)
+      }
     }
+    this._revealRecords = newReveal
+
+    // Restore whatever is no longer hovered/revealed, then brighten what is.
+    if (oldHovered && !newReveal.has(oldHovered.record)) {
+      this._writeTileColor(oldHovered.record, NEUTRAL_COLOR)
+    }
+    for (const rec of oldReveal) {
+      if (!newReveal.has(rec)) this._writeTileColor(rec, NEUTRAL_COLOR)
+    }
+    for (const rec of newReveal) {
+      this._writeTileColor(rec, rec === (newHovered ? newHovered.record : null) ? HOVER_COLOR : NEUTRAL_COLOR)
+    }
+    if (newHovered && !newReveal.has(newHovered.record)) {
+      this._writeTileColor(newHovered.record, HOVER_COLOR)
+    }
+
+    this._hovered = newHovered
+    this._syncRing()
     if (this.onHover) {
       this.onHover(
-        this._hovered
+        newHovered
           ? {
               x: record.x,
               y: record.y,
@@ -756,19 +945,69 @@ export class TileMapComposer {
     }
   }
 
-  _restoreHoveredColor() {
-    if (!this._hovered) return
-    this._hovered.group.mesh.setColorAt(this._hovered.instanceId, NEUTRAL_COLOR)
-    this._hovered.group.mesh.instanceColor.needsUpdate = true
-    const outline = this._outlineByRecord.get(this._hovered.record)
-    if (outline) this._setOutlineFactor(outline, OUTLINE_DIM)
+  /** Writes one tile instance's color + its outline factor. `base` is the
+   *  hover-neutral color (NEUTRAL or HOVER); the final instanceColor = base ×
+   *  effective dim, where the effective dim is 1.0 inside the reveal circle
+   *  (round-2) and the stored FOV dim factor otherwise. */
+  _writeTileColor(record, base) {
+    const entry = this._indexByRecord.get(record)
+    if (!entry) return
+    const factor = this._isRevealed(record) ? 1 : (this._dimByRecord.get(record) || 1)
+    entry.group.mesh.setColorAt(entry.instanceId, this._scratchColor.copy(base).multiplyScalar(factor))
+    entry.group.mesh.instanceColor.needsUpdate = true
+    const outline = this._outlineByRecord.get(record)
+    if (outline) this._setOutlineFactor(outline, base === HOVER_COLOR ? OUTLINE_HOVER : OUTLINE_DIM, record)
   }
 
-  /** Writes an outline instance's instanceColor = resolved color × factor
-   *  (event-driven only, never in a render path). */
-  _setOutlineFactor(outline, factor) {
-    const color = outline.color.clone().multiplyScalar(factor)
-    outline.mesh.setColorAt(outline.instanceId, color)
+  /** Is this record inside the current reveal circle (forced full-bright)? */
+  _isRevealed(record) {
+    return this._revealRecords.has(record)
+  }
+
+  /** Moves the hover ring onto the hovered tile (or hides it). The ring is
+   *  lazy-built on first hover when hoverRing is enabled. */
+  _syncRing() {
+    if (!this._hoverRingEnabled) return
+    if (!this._hovered) {
+      if (this._ring) this._ring.visible = false
+      return
+    }
+    this._buildRing()
+    const rec = this._hovered.record
+    const meta = this._variantOutlineMeta.get(rec.variant)
+    const topY = meta && Number.isFinite(meta.topY) ? meta.topY : 0.34
+    this._ring.position.set((rec.x - rec.y) * 0.5, topY + RING_LIFT, (rec.x + rec.y) * 0.5)
+    this._ring.visible = true
+  }
+
+  /** Lazy ring build (only when hoverRing is enabled): a flat circular halo
+   *  just above the tile cap, slightly outside the ±0.5 diamond. */
+  _buildRing() {
+    if (this._ring) return
+    const geometry = new THREE.RingGeometry(RING_INNER, RING_OUTER, RING_SEGMENTS)
+    this._ringMaterial = new THREE.MeshBasicMaterial({
+      color: HOVER_COLOR,
+      transparent: true,
+      opacity: RING_OPACITY,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    })
+    this._ring = new THREE.Mesh(geometry, this._ringMaterial)
+    this._ring.rotation.x = -Math.PI / 2
+    this._ring.visible = false
+    this._ring.renderOrder = 10 // halo over the tile cap + outline ribbons
+    this.parent.add(this._ring)
+  }
+
+  /** Writes an outline instance's instanceColor = resolved color × factor ×
+   *  effective dim — the effective dim is 1.0 inside the reveal circle
+   *  (round-2: outlines around the cursor stay full-ink in the fog band) and
+   *  the stored FOV dim otherwise. Event-driven only, never in a render path. */
+  _setOutlineFactor(outline, factor, record) {
+    const stored = record ? (this._dimByRecord.get(record) || 1) : 1
+    const dim = record && this._isRevealed(record) ? 1 : stored
+    this._scratchColor.copy(outline.color).multiplyScalar(factor).multiplyScalar(dim)
+    outline.mesh.setColorAt(outline.instanceId, this._scratchColor)
     outline.mesh.instanceColor.needsUpdate = true
   }
 
@@ -787,7 +1026,19 @@ export class TileMapComposer {
     this.groups = []
     this._meshes = []
     this._groupByMesh.clear()
+    this._dimByRecord.clear()
+    this._revealRecords.clear()
+    this._indexByRecord.clear()
     this._teardownOutlineMeshes()
+    // Hover ring (round-2): the ring geometry + material are owned by this
+    // composer — dispose them with it.
+    if (this._ring) {
+      this.parent.remove(this._ring)
+      this._ring.geometry.dispose()
+      if (this._ringMaterial) this._ringMaterial.dispose()
+      this._ring = null
+      this._ringMaterial = null
+    }
     this._lastPointer = null
     document.removeEventListener('pointermove', this._onPointerMove)
     document.removeEventListener('pointerout', this._onPointerOut)
