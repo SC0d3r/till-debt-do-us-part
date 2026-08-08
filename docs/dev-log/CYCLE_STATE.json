@@ -1,8 +1,11 @@
 {
-  "status": "idle",
-  "feature": null,
-  "current_step": null,
-  "last_updated": "2026-08-08T02:30:00Z",
-  "notes": "Slice B shipped (tile kit + 15 props). Both gating critics (asset, visual) reached SHIP WITH FOLLOWUPS after two fix rounds; design/ui/performance SHIP WITH FOLLOWUPS. qa-tester skipped per user directive; local suites green (tile-kit 72/72, composer 78/78, exploratory 31/31). Individual screenshots gitignored; only tile-prop-catalog.png composite committed. Followups queued in FEATURE_BACKLOG.md.",
-  "subagent_sessions": {}
+  "status": "in-progress",
+  "feature": "Slice C: procedural seeded map generation + movable-cube demo",
+  "category": "Tech & Performance",
+  "current_step": 6,
+  "last_updated": "2026-08-08T04:45:00Z",
+  "notes": "Fix round 1 shipped to working tree. Fast critics round 2: design-critic SHIP WITH FOLLOWUPS (P0: chunk bounding-sphere center off by 3.5 → hover/click dead zone on ~19% of spawn island; P1: origin pin tile-only → seeds 777/4242 boot to 1-tile island; P2 followups: coastline outlines, stepping-stone bridges), performance-critic SHIP WITH FOLLOWUPS (Major: live day/night tween never reapplies FOV dims to retained chunks → dawn halo; minors: cold-GPU gen spike, outline cache never evicts, listener teardown nits). Dispatching fix round 2 (3 targeted fixes) to feature-writer session ses_01ef70122ffe9Oz0hFpqt22AEl.",
+  "subagent_sessions": {
+    "feature-writer": "ses_01ef70122ffe9Oz0hFpqt22AEl"
+  }
 }

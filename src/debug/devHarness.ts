@@ -27,6 +27,10 @@ import { VARIANTS as TILE_VARIANTS, resolveFactory } from '../assets/tiles'
 import { PROPS as PROP_VARIANTS, resolvePropFactory, createProp } from '../assets/props'
 import { TileMapComposer, type TileMapRecord, type TileMapOutlineOptions } from '../world/TileMapComposer'
 import { SHOWCASE_MAP, validateShowcaseMap } from '../world/showcaseMap'
+import type { WorldManager } from '../world/WorldManager'
+import type { GeneratedChunk } from '../world/worldGenerator'
+import { SPAWN_PIN_RADIUS } from '../world/worldGenerator'
+import { initDebugOverlay, type DebugOverlayHandle } from './debugOverlay'
 
 interface FixtureDef {
   name: string
@@ -72,6 +76,61 @@ interface DebugApi {
   showcaseTileMap(data?: TileMapRecord[], opts?: { outline?: TileMapOutlineOptions }): Promise<void>
   showcase: ShowcaseDebugHandle
   inspectProp(name: string): PropInspect
+  // Slice C: world-state primitives (all through the settle mechanism).
+  setState(patch: { timeOfDay?: number }): Promise<void>
+  fastForward(minutes: number): Promise<void>
+  teleport(x: number, y: number): Promise<void>
+  regenerate(seed?: number): Promise<void>
+  setFovRadius(r: number): Promise<void>
+  world: WorldDebugHandle
+}
+
+/** Debug handle for the Slice C world (the WorldManager). Test-only read
+ *  hooks: live state getters, the pure generator (determinism checks), biome
+ *  / fog-factor queries, camera projection, chunk-registry inspection (void
+ *  chunks produce zero meshes — fix round 1), and the last hover record. */
+interface WorldDebugHandle {
+  seed: number
+  player: { x: number; y: number }
+  timeOfDay: number
+  fovRadius: number
+  loadedChunkCount: number
+  lastChunkGenMs: number
+  biomeAtPlayer: string
+  chunkData(cx: number, cy: number): GeneratedChunk
+  biomeAt(x: number, y: number): string
+  fogFactorAt(x: number, y: number): number
+  projectTile(x: number, y: number): { x: number; y: number } | null
+  lastHover: { x: number; y: number; variant: string; rotation: number } | null
+  pendingChunkLoads(): number
+  /** Chunk-registry inspection (fix round 1 QA): whether the chunk is
+   *  tracked, its solid tile count, and how many meshes its scene group
+   *  contains (0 for void chunks — they must produce no meshes). */
+  chunkInfo(cx: number, cy: number): { tracked: boolean; tileCount: number; sceneChildCount: number }
+  /** Outline-geometry report across chunks within Chebyshev `radius` of the
+   *  player's chunk (fix round 1 QA): per solid chunk, each outline group's
+   *  local mask + instance count + shared geometry UUID. Identical UUIDs
+   *  across chunks prove the module-level OUTLINE_GEOM_CACHE dedupe (one
+   *  geometry object per mask key for the whole page). */
+  outlineGeometryReport(radius: number): Array<{ key: string; entries: Array<{ mask: string; count: number; uuid: string }> }>
+  /** Round-2 spawn QA: how many of the origin 5×5 spawn patch tiles
+   *  (max(|x|,|y|) <= SPAWN_PIN_RADIUS = 2) actually exist in the generated
+   *  chunk (0,0) for the CURRENT seed — every one of the 25 MUST be present
+   *  (the spawn island floor, fix round 2). */
+  spawnPatchReport(): { pinRadius: number; expected: number; missing: Array<{ x: number; y: number }> }
+  /** Round-2 fog QA: the live dim factor of the tile at (x, y) — the raw
+   *  instanceColor channel ÷ the hover base (0.88 neutral / 1.0 hovered), so
+   *  the value is directly comparable to fogFactorAt(x, y). Null when the
+   *  tile is not loaded or has no instanceColor. */
+  tileDimAt(x: number, y: number): { dim: number; color: [number, number, number]; hovered: boolean } | null
+  /** Round-2 origin-marker QA: the red spawn marker's data tile, world
+   *  position and screen projection (null when the marker is not shown). The
+   *  marker must sit at the MESH CENTER of its tile, never at the
+   *  data-origin corner (round-2 design fix). */
+  originMarkerAt(): { data: { x: number; y: number }; world: [number, number, number]; screen: { x: number; y: number } | null; tileVariant: string | null } | null
+  /** Round-2 hover-ring QA: which loaded chunk composer currently shows the
+   *  hover ring (visible + world position + screen projection). */
+  hoverRingInfo(): { visible: boolean; world: [number, number, number] | null; screen: { x: number; y: number } | null } | null
 }
 
 declare global {
@@ -96,7 +155,8 @@ const SETTLE_MS = 600
 // (`game as any`): started and setFastMode.
 export interface DevHarnessGraph {
   world: { scene: THREE.Scene; camera: THREE.PerspectiveCamera }
-  composer: TileMapComposer
+  composer: TileMapComposer | null
+  worldManager: WorldManager
 }
 
 export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
@@ -105,6 +165,7 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
 
   const g = game as any
   const world = graph.world
+  const wm = graph.worldManager
 
   let dirtyAt = 0
   let pendingSettles: Array<() => void> = []
@@ -113,8 +174,158 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
   // references it directly; projectTile is a hoisted function declaration, so
   // referencing it in the literal is safe.
   const showcase: ShowcaseDebugHandle = { composer: null, lastHover: null, validation: null, projectTile, ndc }
+  // Slice C world handle: live getters over the WorldManager (declared before
+  // the api literal — the api references it directly).
+  const worldHandle: WorldDebugHandle = {
+    get seed() { return wm.getState().seed },
+    get player() { return wm.getState().player },
+    get timeOfDay() { return wm.getState().timeOfDay },
+    get fovRadius() { return wm.getState().fovRadius },
+    get loadedChunkCount() { return wm.getState().loadedChunkCount },
+    get lastChunkGenMs() { return wm.getState().lastChunkGenMs },
+    get biomeAtPlayer() { return wm.getState().biomeAtPlayer },
+    chunkData: (cx, cy) => wm.chunkData(cx, cy),
+    biomeAt: (x, y) => wm.biomeAt(x, y),
+    fogFactorAt: (x, y) => wm.fogFactorAt(x, y),
+    projectTile: (x, y) => wm.projectTile(x, y),
+    get lastHover() { return wm.lastHover },
+    pendingChunkLoads: () => wm.pendingChunkLoads(),
+    chunkInfo: (cx, cy) => {
+      const chunk = wm.chunks.get(`${cx},${cy}`)
+      if (!chunk) return { tracked: false, tileCount: 0, sceneChildCount: 0 }
+      return {
+        tracked: true,
+        tileCount: chunk.tiles.length,
+        sceneChildCount: chunk.group ? chunk.group.children.length : 0,
+      }
+    },
+    outlineGeometryReport: (radius) => {
+      const out = []
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const chunk = wm.chunks.get(`${dx},${dy}`)
+          if (!chunk?.composer) continue
+          out.push({
+            key: `${dx},${dy}`,
+            entries: chunk.composer.outlineGroups.map(g => ({ mask: g.mask, count: g.count, uuid: g.mesh.geometry.uuid })),
+          })
+        }
+      }
+      return out
+    },
+    spawnPatchReport: () => {
+      const chunk = wm.chunks.get('0,0')
+      const present = new Set((chunk ? chunk.tiles : []).map((t: { x: number; y: number }) => `${t.x},${t.y}`))
+      const missing: Array<{ x: number; y: number }> = []
+      for (let x = -SPAWN_PIN_RADIUS; x <= SPAWN_PIN_RADIUS; x++) {
+        for (let y = -SPAWN_PIN_RADIUS; y <= SPAWN_PIN_RADIUS; y++) {
+          if (Math.max(Math.abs(x), Math.abs(y)) <= SPAWN_PIN_RADIUS && !present.has(`${x},${y}`)) {
+            missing.push({ x, y })
+          }
+        }
+      }
+      return { pinRadius: SPAWN_PIN_RADIUS, expected: 25, missing }
+    },
+    tileDimAt: (x, y) => {
+      const cx = Math.floor(x / 8)
+      const cy = Math.floor(y / 8)
+      const chunk = wm.chunks.get(`${cx},${cy}`)
+      if (!chunk?.composer) return null
+      const composer = chunk.composer as any
+      const record = chunk.tiles.find((t: { x: number; y: number }) => t.x === x && t.y === y)
+      if (!record) return null
+      const entry = composer._indexByRecord.get(record)
+      if (!entry) return null
+      const col = entry.group.mesh.instanceColor
+      if (!col) return null
+      const hovered = !!(composer._hovered && composer._hovered.record === record)
+      // instanceColor = dim × (hovered ? 1.0 : 0.88) — divide out the base.
+      const base = hovered ? 1 : 0.88
+      const r = col.getX(entry.instanceId)
+      return {
+        dim: base > 0 ? Math.max(0, r / base) : 0,
+        color: [r, col.getY(entry.instanceId), col.getZ(entry.instanceId)],
+        hovered,
+      }
+    },
+    originMarkerAt: () => {
+      if (!originMarker) return null
+      const p = originMarker.position
+      const wpos: [number, number, number] = [p.x, p.y, p.z]
+      projVec.copy(p).project(world.camera)
+      const screen =
+        projVec.z > 1 || projVec.z < -1
+          ? null
+          : { x: (projVec.x * 0.5 + 0.5) * window.innerWidth, y: (-projVec.y * 0.5 + 0.5) * window.innerHeight }
+      const chunk = wm.chunks.get(`${Math.floor(ORIGIN_MARKER_TILE.x / 8)},${Math.floor(ORIGIN_MARKER_TILE.y / 8)}`)
+      const tile = chunk ? chunk.tiles.find((t: { x: number; y: number }) => t.x === ORIGIN_MARKER_TILE.x && t.y === ORIGIN_MARKER_TILE.y) : null
+      return { data: { ...ORIGIN_MARKER_TILE }, world: wpos, screen, tileVariant: tile ? tile.variant : null }
+    },
+    hoverRingInfo: () => {
+      for (const chunk of wm.chunks.values()) {
+        const composer = chunk.composer as any
+        const ring = composer && composer._ring
+        if (!ring || !ring.visible) continue
+        const p = ring.position
+        const rpos: [number, number, number] = [p.x, p.y, p.z]
+        projVec.copy(p).project(world.camera)
+        const screen =
+          projVec.z > 1 || projVec.z < -1
+            ? null
+            : { x: (projVec.x * 0.5 + 0.5) * window.innerWidth, y: (-projVec.y * 0.5 + 0.5) * window.innerHeight }
+        return { visible: true, world: rpos, screen }
+      }
+      return { visible: false, world: null, screen: null }
+    },
+  }
   // Reused projection scratch (event/test-driven, not per-frame).
   const projVec = new THREE.Vector3()
+
+  // ── Origin marker (round-2 fix) ──
+  // A red diamond outline at the MESH CENTER of the origin tile — data (8,8),
+  // world (0, topY+lift, 8) — per the round-2 evaluation directive ("the
+  // origin marker was drawn at the wrong position: it should be at the mesh
+  // center of the origin tile — tile (8,8) — not at the data-origin corner").
+  // Dev-harness-owned (demo fixtures + the QA spawn scene show it; reset()
+  // removes it), so production code never knows about it.
+  const ORIGIN_MARKER_TILE = { x: 8, y: 8 }
+  const ORIGIN_MARKER_LIFT = 0.02
+  /** @type {THREE.LineLoop | null} */
+  let originMarker: THREE.LineLoop | null = null
+
+  function ensureOriginMarker(): void {
+    if (originMarker) return
+    const topY = 0.34 // TILE_SYSTEM_CONVENTION §1: top face ~0.34
+    const y = topY + ORIGIN_MARKER_LIFT
+    const pts = [
+      new THREE.Vector3(0, y, 0.5),
+      new THREE.Vector3(0.5, y, 0),
+      new THREE.Vector3(0, y, -0.5),
+      new THREE.Vector3(-0.5, y, 0),
+    ]
+    const geometry = new THREE.BufferGeometry().setFromPoints(pts)
+    const material = new THREE.LineBasicMaterial({ color: 0xff5555 })
+    originMarker = new THREE.LineLoop(geometry, material)
+    // Mesh center of tile (8,8): ((8−8)·0.5, y, (8+8)·0.5) = (0, y, 8).
+    originMarker.position.set(
+      (ORIGIN_MARKER_TILE.x - ORIGIN_MARKER_TILE.y) * 0.5,
+      y,
+      (ORIGIN_MARKER_TILE.x + ORIGIN_MARKER_TILE.y) * 0.5,
+    )
+    world.scene.add(originMarker)
+  }
+
+  function clearOriginMarker(): void {
+    if (!originMarker) return
+    world.scene.remove(originMarker)
+    originMarker.geometry.dispose()
+    if (Array.isArray(originMarker.material)) {
+      for (const m of originMarker.material) m.dispose()
+    } else {
+      originMarker.material.dispose()
+    }
+    originMarker = null
+  }
 
   const api: DebugApi = {
     ready: false,
@@ -126,8 +337,18 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
     showcaseTileMap,
     showcase,
     inspectProp,
+    setState,
+    fastForward,
+    teleport,
+    regenerate,
+    setFovRadius,
+    world: worldHandle,
   }
   window.__debug = api
+
+  // The debug overlay (backtick panel) — dev-only, imported only from here.
+  // Initialized right after the api object so the fixture setups can use it.
+  const overlay: DebugOverlayHandle = initDebugOverlay(api)
 
   // `?fast=1` (dev-only): re-assert the runtime side of fast QA mode. The
   // renderer-side settings (antialias/pixelRatio) were already applied at
@@ -137,6 +358,58 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
 
   function setFastMode(enabled: boolean, renderEvery = 60): void {
     g.setFastMode(enabled, renderEvery)
+  }
+
+  // ── Slice C world primitives (all through the settle mechanism) ──
+  // Minimal setState revival per DEBUG_HARNESS.md Part B: the world's only
+  // mutable state is the clock, so { timeOfDay } is the only accepted key.
+  async function setState(patch: { timeOfDay?: number }): Promise<void> {
+    if (typeof patch !== 'object' || patch === null || Array.isArray(patch)) {
+      throw new Error('setState: patch must be an object')
+    }
+    for (const key of Object.keys(patch)) {
+      if (key !== 'timeOfDay') throw new Error(`setState: unknown key "${key}" (only timeOfDay is supported)`)
+    }
+    if (patch.timeOfDay !== undefined) {
+      if (!Number.isFinite(patch.timeOfDay) || patch.timeOfDay < 0 || patch.timeOfDay > 1439) {
+        throw new Error(`setState: timeOfDay must be 0..1439, got ${patch.timeOfDay}`)
+      }
+      wm.setTimeOfDay(patch.timeOfDay)
+    }
+    markDirty()
+    await waitForSettle()
+  }
+
+  async function fastForward(minutes: number): Promise<void> {
+    if (!Number.isFinite(minutes)) throw new Error(`fastForward: minutes must be a number, got ${minutes}`)
+    wm.fastForward(minutes)
+    markDirty()
+    await waitForSettle()
+  }
+
+  async function teleport(x: number, y: number): Promise<void> {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      throw new Error(`teleport: x/y must be numbers, got (${x}, ${y})`)
+    }
+    wm.teleport(x, y)
+    markDirty()
+    await waitForSettle()
+  }
+
+  async function regenerate(seed?: number): Promise<void> {
+    if (seed !== undefined && (!Number.isInteger(seed) || seed < 0)) {
+      throw new Error(`regenerate: seed must be a non-negative integer, got ${seed}`)
+    }
+    wm.setSeed(seed !== undefined ? seed : wm.getState().seed + 1)
+    markDirty()
+    await waitForSettle()
+  }
+
+  async function setFovRadius(r: number): Promise<void> {
+    if (!Number.isFinite(r) || r < 1) throw new Error(`setFovRadius: radius must be >= 1, got ${r}`)
+    wm.setFovRadius(r)
+    markDirty()
+    await waitForSettle()
   }
 
   function markDirty() {
@@ -161,6 +434,7 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
 
   // ── getState ──
   function getState(): Record<string, unknown> {
+    const ws = wm.getState()
     return {
       ready: api.ready,
       started: g.started === true,
@@ -172,6 +446,15 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
         // loop() run). Undefined while fast mode is off.
         ticks: g.fastTickCount,
       },
+      // Slice C world state (live from the WorldManager).
+      seed: ws.seed,
+      timeOfDay: ws.timeOfDay,
+      fovRadius: ws.fovRadius,
+      loadedChunkCount: ws.loadedChunkCount,
+      lastChunkGenMs: ws.lastChunkGenMs,
+      player: ws.player,
+      biomeAtPlayer: ws.biomeAtPlayer,
+      dayNightPhase: ws.dayNightPhase,
     }
   }
 
@@ -216,10 +499,10 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
   /**
    * Overlay/HUD DOM elements that must be hidden for the duration of an asset
    * preview so the screenshot is a clean studio shot of just the tile. The
-   * tile world has no HUD/overlays (project pivot, 2026-08-07), so this list
-   * is empty — kept as a mechanism in case future slices add DOM.
+   * Slice C debug panel (backtick overlay) is the only DOM overlay — previews
+   * hide it; the demo fixtures re-show it explicitly.
    */
-  const PREVIEW_OVERLAY_IDS: string[] = []
+  const PREVIEW_OVERLAY_IDS: string[] = ['debug-overlay']
 
   function hidePreviewOverlays(): Array<{ el: HTMLElement; display: string }> {
     const saved: Array<{ el: HTMLElement; display: string }> = []
@@ -647,6 +930,7 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
   async function reset(): Promise<void> {
     // Restore the game scene if the previous fixture was a preview.
     teardownPreview()
+    clearOriginMarker()
     markDirty()
     await waitForSettle()
   }
@@ -654,10 +938,64 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
   // ── Fixture setups ──
   // Every name in tests/scene-fixtures.json MUST have a setup here; gotoFixture
   // throws a clear error otherwise. Asset-preview fixtures are dispatched by
-  // category (previewAsset); only the showcase fixture needs a setup.
+  // category (previewAsset); showcase + demo fixtures have setups here.
+  // The demo fixtures do NOT use beginPreviewState — the demo IS the boot
+  // world, so teardownPreview() first restores it, then the world manager is
+  // configured directly. Both fixtures reset the FOV override (canonical
+  // day/night radii) and wait for the streaming queue to drain so the
+  // screenshot is a fully-loaded, deterministic world even on slow software
+  // renderers.
+  async function waitForChunksLoaded(): Promise<void> {
+    const deadline = performance.now() + 15000
+    while (wm.pendingChunkLoads() > 0 && performance.now() < deadline) {
+      await new Promise(r => window.setTimeout(r, 100))
+    }
+  }
+
   const fixtureSetups: Record<string, () => void | Promise<void>> = {
     'tile-showcase': () => showcaseTileMap(),
     'props-showcase': () => propsShowcase(),
+    'slice-c-demo': async () => {
+      teardownPreview()
+      wm.setSeed(1337)
+      wm.teleport(0, 0)
+      wm.resetFovOverride()
+      wm.setTimeOfDay(720) // noon → day fov 9
+      ensureOriginMarker()
+      overlay.show()
+      await waitForChunksLoaded()
+      markDirty()
+      await waitForSettle()
+    },
+    'slice-c-demo-night': async () => {
+      teardownPreview()
+      wm.setSeed(1337)
+      wm.teleport(0, 0)
+      wm.resetFovOverride()
+      wm.setTimeOfDay(1320) // 22:00 → night fov 5
+      ensureOriginMarker()
+      overlay.hide()
+      await waitForChunksLoaded()
+      markDirty()
+      await waitForSettle()
+    },
+    // Round-2 spawn QA scene: the round-2 boot-to-1-tile seed (777) at noon,
+    // debug overlay off, the red origin marker at the mesh center of tile
+    // (8,8). The 5×5 spawn patch (max(|x|,|y|) <= 2) must be fully solid
+    // grass — the marker + patch are screenshot-verified and probed by
+    // tests/qa-spawn-round2.mjs.
+    'qa-spawn-island-scene': async () => {
+      teardownPreview()
+      wm.setSeed(777)
+      wm.teleport(0, 0)
+      wm.resetFovOverride()
+      wm.setTimeOfDay(720) // noon → day fov 9
+      ensureOriginMarker()
+      overlay.hide()
+      await waitForChunksLoaded()
+      markDirty()
+      await waitForSettle()
+    },
   }
 
   // Initial settle: ready=true shortly after page load (covers the boot world).
