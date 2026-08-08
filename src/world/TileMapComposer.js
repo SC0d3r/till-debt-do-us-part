@@ -111,6 +111,15 @@
  * neutral brightness bump to (1,1,1) — no black flashes from uninitialized
  * colors.
  *
+ * INSTANCE DIMS (Slice C, world-manager FOV fog band): `setInstanceDims(dims)`
+ * writes a per-record dim factor (0..1, 1 = full brightness) into the same
+ * instanceColor pipeline: instanceColor = dim × (hovered ? 1.0 : 0.88) for
+ * tiles, and resolved outline color × dim × (hovered ? 1.0 : 0.88) for the
+ * record's outline instance — so the ink outlines fade with the fog band and
+ * at night, never stay full-bright. Hover set/restore MULTIPLY by the stored
+ * dim factor, so hover and fog compose (hover on a dimmed tile brightens it
+ * within its dimmed value, never back to full).
+ *
  * HOVER CONTRACT (design-critic Major, locked): raycast happens ONLY on
  * pointermove events (last pointer is stored; there is no per-frame
  * raycast — the composer has no render-loop involvement at all). On hover:
@@ -120,9 +129,20 @@
  * pointermove). `onHover(tileRecord | null)` fires on every hover CHANGE,
  * where tileRecord = { x, y, variant, rotation, instanceId, group }.
  *
+ * BIND-OWN-HOVER-EVENTS (Slice C, world manager): `bindOwnHoverEvents`
+ * (constructor option, default true) skips the internal document/window
+ * listener binding when false. Per-chunk composers pass false; the world
+ * manager owns ONE shared pointermove listener, calls
+ * `raycastFromPointer(ndcX, ndcY)` against every loaded chunk, and forwards
+ * the nearest hit via the public `applyHover(hit)` — one listener instead
+ * of N. `raycastFromPointer` is pure (never mutates hover state) and
+ * `clearHover()` clears this composer's hover programmatically.
+ *
  * PERFORMANCE: zero per-frame allocations — no tick/update method, no loop
  * hookup; the only per-event allocations are in the pointermove handler
- * (event-driven, acceptable) and the onHover record object.
+ * (event-driven, acceptable) and the onHover record object. setInstanceDims
+ * is event-driven (FOV recompute happens only when the player's tile
+ * changes / chunks load or unload), never per-frame.
  */
 
 import * as THREE from 'three'
@@ -263,8 +283,13 @@ export class TileMapComposer {
    *   instanceId: number, group: object} | null) => void} [opts.onHover] -
    *   called on every hover change; null means the pointer moved off / left /
    *   window lost focus.
+   * @param {boolean} [opts.bindOwnHoverEvents=true] - when false, the
+   *   composer does NOT bind its own document/window hover listeners (the
+   *   world manager owns the single shared pointermove listener and drives
+   *   hover through raycastFromPointer + applyHover). dispose() is safe
+   *   either way (removeEventListener on never-added handlers is a no-op).
    */
-  constructor({ parent, data, resolveFactory, raycastTarget, outline, onHover }) {
+  constructor({ parent, data, resolveFactory, raycastTarget, outline, onHover, bindOwnHoverEvents = true }) {
     if (!parent || typeof parent.add !== 'function') {
       throw new Error('TileMapComposer: `parent` must be a THREE.Object3D (scene or group)')
     }
@@ -317,6 +342,12 @@ export class TileMapComposer {
     this._groupByMesh = new Map()
     this._raycaster = new THREE.Raycaster()
     this._ndc = new THREE.Vector2()
+    // Slice C: per-record dim factor (FOV fog band) + record → group index
+    // lookup + a scratch color for the dim/hover color math (event-driven
+    // only, never in a render path).
+    this._dimByRecord = new Map()
+    this._indexByRecord = new Map()
+    this._scratchColor = new THREE.Color(1, 1, 1)
 
     // Outline state (only touched when the outline option is present).
     this._outlineMeshes = []
@@ -328,7 +359,7 @@ export class TileMapComposer {
     this._variantOutlineMeta = new Map()
 
     this._build(data, resolveFactory, outline)
-    this._bindHoverEvents()
+    if (bindOwnHoverEvents) this._bindHoverEvents()
   }
 
   // ─── Build ────────────────────────────────────────────────────────────
@@ -413,6 +444,11 @@ export class TileMapComposer {
         this.groups.push(group)
         this._meshes.push(mesh)
         this._groupByMesh.set(mesh, group)
+        // Slice C: record → { group, instanceId } index (instanceId == index
+        // into `records`), used by setInstanceDims to write per-instance dims.
+        for (let i = 0; i < records.length; i++) {
+          this._indexByRecord.set(records[i], { group, instanceId: i })
+        }
       }
 
       // Outline pass (convention §3): built AFTER every tile group, so a
@@ -706,15 +742,76 @@ export class TileMapComposer {
       x: (e.clientX / window.innerWidth) * 2 - 1,
       y: -(e.clientY / window.innerHeight) * 2 + 1,
     }
-    this._ndc.set(this._lastPointer.x, this._lastPointer.y)
+    const hit = this.raycastFromPointer(this._lastPointer.x, this._lastPointer.y)
+    if (hit) this._setHover(hit.group, hit.instanceId, hit.record)
+    else this._setHover(null)
+  }
+
+  /**
+   * Public, PURE raycast (Slice C, world manager): runs the same raycast
+   * logic as the pointermove handler against THIS composer's tile meshes
+   * only, through the given NDC pointer coordinates. Does NOT mutate hover
+   * state — the caller decides what to do with the hit.
+   *
+   * @param {number} ndcX - pointer NDC x (−1..1)
+   * @param {number} ndcY - pointer NDC y (−1..1)
+   * @returns {{record: object, group: object, instanceId: number, distance: number} | null}
+   */
+  raycastFromPointer(ndcX, ndcY) {
+    this._ndc.set(ndcX, ndcY)
     this._raycaster.setFromCamera(this._ndc, this.raycastTarget)
     const hits = this._raycaster.intersectObjects(this._meshes, false)
     const hit = hits[0]
     if (hit && hit.instanceId !== undefined && hit.instanceId < hit.object.count) {
       const group = this._groupByMesh.get(hit.object)
-      this._setHover(group, hit.instanceId, group.records[hit.instanceId])
-    } else {
-      this._setHover(null)
+      return { record: group.records[hit.instanceId], group, instanceId: hit.instanceId, distance: hit.distance }
+    }
+    return null
+  }
+
+  /**
+   * Public hover-apply (Slice C, world manager): applies a raycastFromPointer
+   * hit (or null to clear) to this composer's hover state — the same
+   * _setHover path the internal pointermove handler uses, so hover visuals
+   * and the onHover contract behave identically whether hover is driven by
+   * this composer's own listeners or by the world manager's shared one.
+   *
+   * @param {{record: object, group: object, instanceId: number} | null} hit
+   */
+  applyHover(hit) {
+    if (hit) this._setHover(hit.group, hit.instanceId, hit.record)
+    else this._setHover(null)
+  }
+
+  /** Public hover clear (Slice C): clears this composer's hover state. */
+  clearHover() {
+    this._setHover(null)
+  }
+
+  /**
+   * Public per-instance dim write (Slice C, FOV fog band): `dims` is an
+   * array of { record, factor } entries (factor 0..1, 1 = full brightness).
+   * For every entry the factor is stored per instance (keyed by record) and
+   * written into the instanceColor pipeline: tile instanceColor = factor ×
+   * (hovered ? 1.0 : 0.88); the record's OUTLINE instance gets resolved
+   * color × factor × (hovered ? 1.0 : 0.88) — the ink outlines fade with the
+   * fog band and at night, never stay full-bright. Hover set/restore
+   * multiply by the stored factor, so hover and fog compose. Build-time
+   * instanceColor stays 0.88 (dim 1.0 default).
+   *
+   * @param {Array<{record: object, factor: number}>} dims
+   */
+  setInstanceDims(dims) {
+    for (const { record, factor } of dims) {
+      const entry = this._indexByRecord.get(record)
+      if (!entry) continue
+      this._dimByRecord.set(record, factor)
+      const hovered = this._hovered && this._hovered.record === record
+      const base = hovered ? HOVER_COLOR : NEUTRAL_COLOR
+      entry.group.mesh.setColorAt(entry.instanceId, this._scratchColor.copy(base).multiplyScalar(factor))
+      entry.group.mesh.instanceColor.needsUpdate = true
+      const outline = this._outlineByRecord.get(record)
+      if (outline) this._setOutlineFactor(outline, hovered ? OUTLINE_HOVER : OUTLINE_DIM, record)
     }
   }
 
@@ -735,10 +832,13 @@ export class TileMapComposer {
       ? { group, instanceId, record }
       : null
     if (group) {
-      group.mesh.setColorAt(instanceId, HOVER_COLOR)
+      // Hover × stored dim factor (Slice C): a hovered tile inside the fog
+      // band brightens within its dimmed value, never back to full.
+      const dim = this._dimByRecord.get(record) || 1
+      group.mesh.setColorAt(instanceId, this._scratchColor.copy(HOVER_COLOR).multiplyScalar(dim))
       group.mesh.instanceColor.needsUpdate = true
       const outline = this._outlineByRecord.get(record)
-      if (outline) this._setOutlineFactor(outline, OUTLINE_HOVER)
+      if (outline) this._setOutlineFactor(outline, OUTLINE_HOVER, record)
     }
     if (this.onHover) {
       this.onHover(
@@ -758,17 +858,19 @@ export class TileMapComposer {
 
   _restoreHoveredColor() {
     if (!this._hovered) return
-    this._hovered.group.mesh.setColorAt(this._hovered.instanceId, NEUTRAL_COLOR)
+    const dim = this._dimByRecord.get(this._hovered.record) || 1
+    this._hovered.group.mesh.setColorAt(this._hovered.instanceId, this._scratchColor.copy(NEUTRAL_COLOR).multiplyScalar(dim))
     this._hovered.group.mesh.instanceColor.needsUpdate = true
     const outline = this._outlineByRecord.get(this._hovered.record)
-    if (outline) this._setOutlineFactor(outline, OUTLINE_DIM)
+    if (outline) this._setOutlineFactor(outline, OUTLINE_DIM, this._hovered.record)
   }
 
-  /** Writes an outline instance's instanceColor = resolved color × factor
-   *  (event-driven only, never in a render path). */
-  _setOutlineFactor(outline, factor) {
-    const color = outline.color.clone().multiplyScalar(factor)
-    outline.mesh.setColorAt(outline.instanceId, color)
+  /** Writes an outline instance's instanceColor = resolved color × factor ×
+   *  stored dim factor (event-driven only, never in a render path). */
+  _setOutlineFactor(outline, factor, record) {
+    const dim = record ? (this._dimByRecord.get(record) || 1) : 1
+    this._scratchColor.copy(outline.color).multiplyScalar(factor).multiplyScalar(dim)
+    outline.mesh.setColorAt(outline.instanceId, this._scratchColor)
     outline.mesh.instanceColor.needsUpdate = true
   }
 
@@ -787,6 +889,8 @@ export class TileMapComposer {
     this.groups = []
     this._meshes = []
     this._groupByMesh.clear()
+    this._dimByRecord.clear()
+    this._indexByRecord.clear()
     this._teardownOutlineMeshes()
     this._lastPointer = null
     document.removeEventListener('pointermove', this._onPointerMove)

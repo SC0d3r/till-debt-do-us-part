@@ -1,8 +1,11 @@
 {
-  "status": "idle",
-  "feature": null,
-  "current_step": null,
-  "last_updated": "2026-08-08T02:30:00Z",
-  "notes": "Slice B shipped (tile kit + 15 props). Both gating critics (asset, visual) reached SHIP WITH FOLLOWUPS after two fix rounds; design/ui/performance SHIP WITH FOLLOWUPS. qa-tester skipped per user directive; local suites green (tile-kit 72/72, composer 78/78, exploratory 31/31). Individual screenshots gitignored; only tile-prop-catalog.png composite committed. Followups queued in FEATURE_BACKLOG.md.",
-  "subagent_sessions": {}
+  "status": "in-progress",
+  "feature": "Slice C: procedural seeded map generation + movable-cube demo",
+  "category": "Tech & Performance",
+  "current_step": 5,
+  "last_updated": "2026-08-08T13:30:00Z",
+  "notes": "Implementation complete and verified: WorldManager (streaming, FOV dims, day/night, WASD + click-to-move, hover), worldGenerator (Voronoi biomes + choke-point gate pass, deterministic), DayNight rig, debug overlay + commands, demo fixtures slice-c-demo/-night. Local probes 14/14 + 7/7; qa-tile-kit 72/72 (T1a/T1b updated for 31 fixtures), qa-composer 78/78, exploratory 31/31, smoke PASS. Screenshots verified (day: bright, overlay visible; night: dark, warm light radius, overlay hidden). Remaining: QA eval sign-off + game-director merge.",
+  "subagent_sessions": {
+    "feature-writer": "ses_01f81f47effeU0lbeUn150n1kG"
+  }
 }

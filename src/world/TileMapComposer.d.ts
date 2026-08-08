@@ -84,6 +84,26 @@ export interface TileMapComposerOptions {
   outline?: TileMapOutlineOptions
   /** called on every hover change; null = pointer moved off/left/blur */
   onHover?: ((record: TileMapHoverRecord | null) => void) | null
+  /** when false, the composer does NOT bind its own document/window hover
+   *  listeners (Slice C: the world manager owns the single shared pointermove
+   *  listener and drives hover through raycastFromPointer + applyHover).
+   *  Default true — existing single-map usage is unaffected. */
+  bindOwnHoverEvents?: boolean
+}
+
+/** Result of a pure raycastFromPointer call (Slice C). */
+export interface TileMapRaycastHit {
+  record: TileMapRecord
+  group: TileMapGroup
+  instanceId: number
+  distance: number
+}
+
+/** One entry of setInstanceDims (Slice C): a per-record dim factor 0..1
+ *  (1 = full brightness). */
+export interface TileMapDimEntry {
+  record: TileMapRecord
+  factor: number
 }
 
 /**
@@ -108,6 +128,20 @@ export class TileMapComposer {
   /** read-only outline group descriptors, one per resolved local mask
    *  (empty when the outline option is absent) */
   readonly outlineGroups: TileMapOutlineGroup[]
+  /** Pure raycast against THIS composer's tile meshes only (Slice C): same
+   *  logic as the pointermove handler, through the given NDC pointer
+   *  coordinates. Does NOT mutate hover state. */
+  raycastFromPointer(ndcX: number, ndcY: number): TileMapRaycastHit | null
+  /** Applies a raycastFromPointer hit (or null to clear) to this composer's
+   *  hover state — the same path the internal pointermove handler uses. */
+  applyHover(hit: TileMapRaycastHit | null): void
+  /** Clears this composer's hover state. */
+  clearHover(): void
+  /** Writes per-instance dim factors (FOV fog band): tile instanceColor =
+   *  factor × (hovered ? 1.0 : 0.88); the record's outline instance gets
+   *  resolved color × factor × (hovered ? 1.0 : 0.88). Hover set/restore
+   *  multiply by the stored factor, so hover and fog compose. */
+  setInstanceDims(dims: TileMapDimEntry[]): void
   /** Removes meshes from the parent, disposes outline frame geometry +
    *  material, and unbinds hover listeners. Shared tile geometry/materials
    *  are NOT disposed (owned by the tile family modules). */

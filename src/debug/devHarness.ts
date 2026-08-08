@@ -27,6 +27,9 @@ import { VARIANTS as TILE_VARIANTS, resolveFactory } from '../assets/tiles'
 import { PROPS as PROP_VARIANTS, resolvePropFactory, createProp } from '../assets/props'
 import { TileMapComposer, type TileMapRecord, type TileMapOutlineOptions } from '../world/TileMapComposer'
 import { SHOWCASE_MAP, validateShowcaseMap } from '../world/showcaseMap'
+import type { WorldManager } from '../world/WorldManager'
+import type { GeneratedChunk } from '../world/worldGenerator'
+import { initDebugOverlay, type DebugOverlayHandle } from './debugOverlay'
 
 interface FixtureDef {
   name: string
@@ -72,6 +75,32 @@ interface DebugApi {
   showcaseTileMap(data?: TileMapRecord[], opts?: { outline?: TileMapOutlineOptions }): Promise<void>
   showcase: ShowcaseDebugHandle
   inspectProp(name: string): PropInspect
+  // Slice C: world-state primitives (all through the settle mechanism).
+  setState(patch: { timeOfDay?: number }): Promise<void>
+  fastForward(minutes: number): Promise<void>
+  teleport(x: number, y: number): Promise<void>
+  regenerate(seed?: number): Promise<void>
+  setFovRadius(r: number): Promise<void>
+  world: WorldDebugHandle
+}
+
+/** Debug handle for the Slice C world (the WorldManager). Test-only read
+ *  hooks: live state getters, the pure generator (determinism checks), biome
+ *  / fog-factor queries, camera projection, and the last hover record. */
+interface WorldDebugHandle {
+  seed: number
+  player: { x: number; y: number }
+  timeOfDay: number
+  fovRadius: number
+  loadedChunkCount: number
+  lastChunkGenMs: number
+  biomeAtPlayer: string
+  chunkData(cx: number, cy: number): GeneratedChunk
+  biomeAt(x: number, y: number): string
+  fogFactorAt(x: number, y: number): number
+  projectTile(x: number, y: number): { x: number; y: number } | null
+  lastHover: { x: number; y: number; variant: string; rotation: number } | null
+  pendingChunkLoads(): number
 }
 
 declare global {
@@ -96,7 +125,8 @@ const SETTLE_MS = 600
 // (`game as any`): started and setFastMode.
 export interface DevHarnessGraph {
   world: { scene: THREE.Scene; camera: THREE.PerspectiveCamera }
-  composer: TileMapComposer
+  composer: TileMapComposer | null
+  worldManager: WorldManager
 }
 
 export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
@@ -105,6 +135,7 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
 
   const g = game as any
   const world = graph.world
+  const wm = graph.worldManager
 
   let dirtyAt = 0
   let pendingSettles: Array<() => void> = []
@@ -113,6 +144,23 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
   // references it directly; projectTile is a hoisted function declaration, so
   // referencing it in the literal is safe.
   const showcase: ShowcaseDebugHandle = { composer: null, lastHover: null, validation: null, projectTile, ndc }
+  // Slice C world handle: live getters over the WorldManager (declared before
+  // the api literal — the api references it directly).
+  const worldHandle: WorldDebugHandle = {
+    get seed() { return wm.getState().seed },
+    get player() { return wm.getState().player },
+    get timeOfDay() { return wm.getState().timeOfDay },
+    get fovRadius() { return wm.getState().fovRadius },
+    get loadedChunkCount() { return wm.getState().loadedChunkCount },
+    get lastChunkGenMs() { return wm.getState().lastChunkGenMs },
+    get biomeAtPlayer() { return wm.getState().biomeAtPlayer },
+    chunkData: (cx, cy) => wm.chunkData(cx, cy),
+    biomeAt: (x, y) => wm.biomeAt(x, y),
+    fogFactorAt: (x, y) => wm.fogFactorAt(x, y),
+    projectTile: (x, y) => wm.projectTile(x, y),
+    get lastHover() { return wm.lastHover },
+    pendingChunkLoads: () => wm.pendingChunkLoads(),
+  }
   // Reused projection scratch (event/test-driven, not per-frame).
   const projVec = new THREE.Vector3()
 
@@ -126,8 +174,18 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
     showcaseTileMap,
     showcase,
     inspectProp,
+    setState,
+    fastForward,
+    teleport,
+    regenerate,
+    setFovRadius,
+    world: worldHandle,
   }
   window.__debug = api
+
+  // The debug overlay (backtick panel) — dev-only, imported only from here.
+  // Initialized right after the api object so the fixture setups can use it.
+  const overlay: DebugOverlayHandle = initDebugOverlay(api)
 
   // `?fast=1` (dev-only): re-assert the runtime side of fast QA mode. The
   // renderer-side settings (antialias/pixelRatio) were already applied at
@@ -137,6 +195,58 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
 
   function setFastMode(enabled: boolean, renderEvery = 60): void {
     g.setFastMode(enabled, renderEvery)
+  }
+
+  // ── Slice C world primitives (all through the settle mechanism) ──
+  // Minimal setState revival per DEBUG_HARNESS.md Part B: the world's only
+  // mutable state is the clock, so { timeOfDay } is the only accepted key.
+  async function setState(patch: { timeOfDay?: number }): Promise<void> {
+    if (typeof patch !== 'object' || patch === null || Array.isArray(patch)) {
+      throw new Error('setState: patch must be an object')
+    }
+    for (const key of Object.keys(patch)) {
+      if (key !== 'timeOfDay') throw new Error(`setState: unknown key "${key}" (only timeOfDay is supported)`)
+    }
+    if (patch.timeOfDay !== undefined) {
+      if (!Number.isFinite(patch.timeOfDay) || patch.timeOfDay < 0 || patch.timeOfDay > 1439) {
+        throw new Error(`setState: timeOfDay must be 0..1439, got ${patch.timeOfDay}`)
+      }
+      wm.setTimeOfDay(patch.timeOfDay)
+    }
+    markDirty()
+    await waitForSettle()
+  }
+
+  async function fastForward(minutes: number): Promise<void> {
+    if (!Number.isFinite(minutes)) throw new Error(`fastForward: minutes must be a number, got ${minutes}`)
+    wm.fastForward(minutes)
+    markDirty()
+    await waitForSettle()
+  }
+
+  async function teleport(x: number, y: number): Promise<void> {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      throw new Error(`teleport: x/y must be numbers, got (${x}, ${y})`)
+    }
+    wm.teleport(x, y)
+    markDirty()
+    await waitForSettle()
+  }
+
+  async function regenerate(seed?: number): Promise<void> {
+    if (seed !== undefined && (!Number.isInteger(seed) || seed < 0)) {
+      throw new Error(`regenerate: seed must be a non-negative integer, got ${seed}`)
+    }
+    wm.setSeed(seed !== undefined ? seed : wm.getState().seed + 1)
+    markDirty()
+    await waitForSettle()
+  }
+
+  async function setFovRadius(r: number): Promise<void> {
+    if (!Number.isFinite(r) || r < 1) throw new Error(`setFovRadius: radius must be >= 1, got ${r}`)
+    wm.setFovRadius(r)
+    markDirty()
+    await waitForSettle()
   }
 
   function markDirty() {
@@ -161,6 +271,7 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
 
   // ── getState ──
   function getState(): Record<string, unknown> {
+    const ws = wm.getState()
     return {
       ready: api.ready,
       started: g.started === true,
@@ -172,6 +283,15 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
         // loop() run). Undefined while fast mode is off.
         ticks: g.fastTickCount,
       },
+      // Slice C world state (live from the WorldManager).
+      seed: ws.seed,
+      timeOfDay: ws.timeOfDay,
+      fovRadius: ws.fovRadius,
+      loadedChunkCount: ws.loadedChunkCount,
+      lastChunkGenMs: ws.lastChunkGenMs,
+      player: ws.player,
+      biomeAtPlayer: ws.biomeAtPlayer,
+      dayNightPhase: ws.dayNightPhase,
     }
   }
 
@@ -216,10 +336,10 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
   /**
    * Overlay/HUD DOM elements that must be hidden for the duration of an asset
    * preview so the screenshot is a clean studio shot of just the tile. The
-   * tile world has no HUD/overlays (project pivot, 2026-08-07), so this list
-   * is empty — kept as a mechanism in case future slices add DOM.
+   * Slice C debug panel (backtick overlay) is the only DOM overlay — previews
+   * hide it; the demo fixtures re-show it explicitly.
    */
-  const PREVIEW_OVERLAY_IDS: string[] = []
+  const PREVIEW_OVERLAY_IDS: string[] = ['debug-overlay']
 
   function hidePreviewOverlays(): Array<{ el: HTMLElement; display: string }> {
     const saved: Array<{ el: HTMLElement; display: string }> = []
@@ -654,10 +774,45 @@ export function initDevHarness(game: unknown, graph: DevHarnessGraph): void {
   // ── Fixture setups ──
   // Every name in tests/scene-fixtures.json MUST have a setup here; gotoFixture
   // throws a clear error otherwise. Asset-preview fixtures are dispatched by
-  // category (previewAsset); only the showcase fixture needs a setup.
+  // category (previewAsset); showcase + demo fixtures have setups here.
+  // The demo fixtures do NOT use beginPreviewState — the demo IS the boot
+  // world, so teardownPreview() first restores it, then the world manager is
+  // configured directly. Both fixtures reset the FOV override (canonical
+  // day/night radii) and wait for the streaming queue to drain so the
+  // screenshot is a fully-loaded, deterministic world even on slow software
+  // renderers.
+  async function waitForChunksLoaded(): Promise<void> {
+    const deadline = performance.now() + 15000
+    while (wm.pendingChunkLoads() > 0 && performance.now() < deadline) {
+      await new Promise(r => window.setTimeout(r, 100))
+    }
+  }
+
   const fixtureSetups: Record<string, () => void | Promise<void>> = {
     'tile-showcase': () => showcaseTileMap(),
     'props-showcase': () => propsShowcase(),
+    'slice-c-demo': async () => {
+      teardownPreview()
+      wm.setSeed(1337)
+      wm.teleport(0, 0)
+      wm.resetFovOverride()
+      wm.setTimeOfDay(720) // noon → day fov 9
+      overlay.show()
+      await waitForChunksLoaded()
+      markDirty()
+      await waitForSettle()
+    },
+    'slice-c-demo-night': async () => {
+      teardownPreview()
+      wm.setSeed(1337)
+      wm.teleport(0, 0)
+      wm.resetFovOverride()
+      wm.setTimeOfDay(1320) // 22:00 → night fov 5
+      overlay.hide()
+      await waitForChunksLoaded()
+      markDirty()
+      await waitForSettle()
+    },
   }
 
   // Initial settle: ready=true shortly after page load (covers the boot world).
