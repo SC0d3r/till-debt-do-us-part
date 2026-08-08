@@ -1,8 +1,11 @@
 {
-  "status": "idle",
-  "feature": null,
-  "current_step": null,
-  "last_updated": "2026-08-08T02:30:00Z",
-  "notes": "Slice B shipped (tile kit + 15 props). Both gating critics (asset, visual) reached SHIP WITH FOLLOWUPS after two fix rounds; design/ui/performance SHIP WITH FOLLOWUPS. qa-tester skipped per user directive; local suites green (tile-kit 72/72, composer 78/78, exploratory 31/31). Individual screenshots gitignored; only tile-prop-catalog.png composite committed. Followups queued in FEATURE_BACKLOG.md.",
-  "subagent_sessions": {}
+  "status": "in-progress",
+  "feature": "Slice C: procedural seeded map generation + movable-cube demo",
+  "category": "Tech & Performance",
+  "current_step": 6,
+  "last_updated": "2026-08-08T06:10:00Z",
+  "notes": "qa-tester final gate returned SHIP WITH FOLLOWUPS (Major: FOV dims freeze between chunk-radius crossings during natural dusk/dawn tween — spec section 4 violation; minors: WASD-into-overlay leak [also ui-critic Major], blur/visibility key-reset gap). USER DIRECTIVE 2026-08-08: implement ALL of SLICE_C_PROCEDURAL_MAP_GENERATION_v2.md — audited: sections 2/3 complete; section 4 (tween-tracked fade) and 5 (night prop dimming) partial; section 6 WASD leak. Dispatching completion round to feature-writer.",
+  "subagent_sessions": {
+    "feature-writer": "ses_01ef70122ffe9Oz0hFpqt22AEl"
+  }
 }
